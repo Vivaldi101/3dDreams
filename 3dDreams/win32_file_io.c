@@ -21,6 +21,9 @@ static file_result win32_file_read(arena* file_arena, const char* path)
       return (file_result) {};
 
    u32 file_size_32 = (u32)(file_size.QuadPart);
+   if(file_size_32 == 0)
+      return (file_result) {};
+
    if(!arena_left(file_arena, byte))
       return (file_result) {};
 

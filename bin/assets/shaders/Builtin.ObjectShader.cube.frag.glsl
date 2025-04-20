@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(location = 0) out vec4 out_color;
-layout(location = 0) in vec4 in_pos;
+layout(location = 0) in vec4 in_color;
 
 layout(push_constant) uniform Transform
 {
@@ -33,8 +33,10 @@ vec3 hsvToRgb(vec3 c)
 
 void main() 
 {
-    float linear_z = ndc_to_linear_z(gl_FragCoord.z, transform.near, transform.far);
+    //float linear_z = ndc_to_linear_z(gl_FragCoord.z, transform.near, transform.far);
 
     //out_color = vec4(hsvToRgb(vec3(linear_z)), 1.0);
-    out_color = vec4(vec3(linear_z*0.125f), 1.0f);
+
+    out_color = in_color;
+    //out_color = vec4(1.0);
 }

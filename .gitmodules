@@ -4,3 +4,6 @@
 [submodule "extern/tinyobjloader-c"]
 	path = extern/tinyobjloader-c
 	url = https://github.com/syoyo/tinyobjloader-c.git
+[submodule "extern/--force"]
+	path = extern/--force
+	url = https://github.com/zeux/meshoptimizer.git

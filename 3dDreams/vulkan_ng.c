@@ -27,6 +27,57 @@ typedef struct
    f32 tu, tv;       // texture
 } tinyobj_vertex;
 
+// Simple float hashing
+static inline uint32_t float_to_bits(float f)
+{
+   uint32_t u;
+   memcpy(&u, &f, sizeof(uint32_t));
+   return u;
+}
+
+// TODO: Proper hash table for this
+// FNV-1a hash combining
+static uint32_t hash_vertex(const tinyobj_vertex* v, size modulo)
+{
+   uint32_t hash = 2166136261u;
+
+#define HASH_F(f) do { \
+        uint32_t bits = float_to_bits((f)); \
+        hash ^= bits; \
+        hash *= 16777619u; \
+    } while(0)
+
+   HASH_F(v->vx); HASH_F(v->vy); HASH_F(v->vz);
+   HASH_F(v->nx); HASH_F(v->ny); HASH_F(v->nz);
+   HASH_F(v->tu); HASH_F(v->tv);
+
+#undef HASH_F
+
+   return hash % modulo;
+}
+
+// Approximate float equality helper (in case of precision issues)
+static inline int float_eq(float a, float b)
+{
+   return fabsf(a - b) < 1e-6f;
+}
+
+static int vertex_equal(const tinyobj_vertex* a, const tinyobj_vertex* b)
+{
+   return float_eq(a->vx, b->vx) && float_eq(a->vy, b->vy) && float_eq(a->vz, b->vz) &&
+      float_eq(a->nx, b->nx) && float_eq(a->ny, b->ny) && float_eq(a->nz, b->nz) &&
+      float_eq(a->tu, b->tu) && float_eq(a->tv, b->tv);
+}
+
+static u32 vertex_get(const tinyobj_vertex* vertex, const tinyobj_vertex* unique_verts, u32 unique_count)
+{
+   for(u32 i = 0; i < unique_count; ++i)
+      if(vertex_equal(&unique_verts[i], vertex))
+         return i;
+
+   return (u32)-1;  // not found
+}
+
 static tinyobj_vertex* tinyobj_mesh_storage(arena* storage, u32 vertex_count)
 {
    set_arena_type(tinyobj_vertex);
@@ -116,6 +167,14 @@ align_struct
 
 align_struct
 {
+   VkBuffer handle;
+   VkDeviceMemory memory;
+   void* data;
+   size size;
+} vk_buffer;
+
+align_struct
+{
    VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
 
    VkPhysicalDevice physical_dev;
@@ -135,19 +194,15 @@ align_struct
    VkPipeline frustum_pipeline;
    VkPipelineLayout pipeline_layout;
 
+   vk_buffer vb;
+   vk_buffer ib;
+   u32 index_count;
+
    swapchain_surface_info swapchain_info;
 
    arena* storage;
    u32 queue_family_index;
 } vk_context;
-
-align_struct
-{
-   VkBuffer handle;
-   VkDeviceMemory memory;
-   void* data;
-   size size;
-} vk_buffer;
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage)
 {
@@ -710,12 +765,13 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 10.0f;
+      float radius = 5.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = {
           radius * cosf(theta/2.0f),
           radius * 0.5f * cosf(theta*2.0f),
+          //1.0f,
           radius * sinf(theta/2.0f),
       };
 
@@ -780,8 +836,12 @@ void vk_present(vk_context* context)
 
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->cube_pipeline);
 
-      vkCmdDraw(command_buffer, 24, 1, 0, 0);
+      const VkDeviceSize offset = 0;
+      vkCmdBindVertexBuffers(command_buffer, 0, 1, &context->vb.handle, &offset);
+      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+      vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 
+#if 0
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
 
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
@@ -789,6 +849,7 @@ void vk_present(vk_context* context)
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
 
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
+#endif
 
       vkCmdEndRenderPass(command_buffer);
 
@@ -916,10 +977,34 @@ static VkPipeline vk_cube_pipeline_create(VkDevice logical_dev, VkRenderPass ren
    pipeline_info.pStages = stages;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
+
+   VkVertexInputBindingDescription stream = {};
+   stream.binding = 0;
+   stream.stride = sizeof(tinyobj_vertex);
+   stream.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+   VkVertexInputAttributeDescription attributes[3] = {};   // pos, normal, uv
+   attributes[0].location = 0;
+   attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+   attributes[0].offset = 0;
+
+   attributes[1].location = 1;
+   attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+   attributes[1].offset = 12;
+
+   attributes[2].location = 2;
+   attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
+   attributes[2].offset = 24;
+
+   vertex_input_info.vertexBindingDescriptionCount = 1;
+   vertex_input_info.pVertexBindingDescriptions = &stream;
+   vertex_input_info.vertexAttributeDescriptionCount = array_count(attributes);
+   vertex_input_info.pVertexAttributeDescriptions = attributes;
+
    pipeline_info.pVertexInputState = &vertex_input_info;
 
    VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
-   assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+   assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
    pipeline_info.pInputAssemblyState = &assembly_info;
 
    VkPipelineViewportStateCreateInfo viewport_info = {vk_info(PIPELINE_VIEWPORT_STATE)};
@@ -1260,30 +1345,31 @@ bool vk_initialize(hw* hw)
    context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[2]);
    context->pipeline_layout = layout;
 
-
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
    size buffer_size = MB(10);
-   vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+   vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
    // valid gpu buffers
    if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE)
       return false;
 
-   // tinyobj 
+   context->vb = vertex_buffer;
+   context->ib = index_buffer;
+
+ // tinyobj 
    {
       const char* filename = "cube.obj";
-      //const char* filename = "cornell_box.obj";
-      const char* search_path = 0;
+      ////const char* filename = "cornell_box.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
       tinyobj_attrib_t attrib = {};
 
-      size_t num_shapes = 0;
-      size_t num_materials = 0;
+      size_t shape_count = 0;
+      size_t material_count = 0;
 
       tinyobj_attrib_init(&attrib);
 
@@ -1291,63 +1377,77 @@ bool vk_initialize(hw* hw)
       // user data scratch arena
       user_data.scratch = scratch;
 
-      if(!tinyobj_parse_obj(&attrib, &shapes, &num_shapes, &materials, &num_materials, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
          return false;
 
-      // TODO: Why is this / 3?
-      size index_count = attrib.num_faces/3;
+      usize index_count = attrib.num_faces;
 
       arena index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, tinyobj_vertex);
-      assert(index_scratch.end <= scratch.end);
 
-      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
-      assert(index_scratch.beg == index_scratch.end);
+      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);  // TODO: Enable
+      tinyobj_vertex unique_verts[36] = {}; // TODO: Fix this hard value
+      u32 indices[36] = {}; // TODO: Fix this hard value
+      u32 unique_vertex_count = 0;
 
-      assert(num_shapes == 1);
-      for(size i = 0; (byte*)verts != index_scratch.end; ++i, ++verts)
+      for(usize i = 0; i < index_count; ++i)
       {
          tinyobj_vertex v = {};
          int vi = attrib.faces[i].v_idx;
          int vti = attrib.faces[i].vt_idx;
          int vni = attrib.faces[i].vn_idx;
 
-         if(vi >= 0.0f)
+         if(vi >= 0)
          {
             v.vx = attrib.vertices[vi * 3 + 0];
             v.vy = attrib.vertices[vi * 3 + 1];
             v.vz = attrib.vertices[vi * 3 + 2];
          }
 
-         if(vni >= 0.0f)
+         if(vni >= 0)
          {
             v.nx = attrib.normals[vni * 3 + 0];
             v.ny = attrib.normals[vni * 3 + 1];
             v.nz = attrib.normals[vni * 3 + 2];
          }
 
-         if(vti >= 0.0f)
+         if(vti >= 0)
          {
-            v.tu = attrib.normals[vti * 2 + 0];
-            v.tv = attrib.normals[vti * 2 + 1];
+            v.tu = attrib.texcoords[vti * 2 + 0];
+            v.tv = attrib.texcoords[vti * 2 + 1];
          }
 
-         verts[i] = v;
-      }
-      // vb
-      memcpy(vertex_buffer.data, verts, index_count*sizeof(*verts));
+         int index = vertex_get(&v, unique_verts, unique_vertex_count);
+         if(index == -1)
+         {
+            index = unique_vertex_count;
+            unique_verts[index] = v;
+            unique_vertex_count++;
+         }
 
+         indices[i] = index;
+      }
+
+      // load vb
+      memcpy(context->vb.data, unique_verts, unique_vertex_count*sizeof(tinyobj_vertex));
+
+#if 0
       index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, u32);
 
-      u32* indices = new(&index_scratch, u32, index_count);
-      assert(index_scratch.beg == index_scratch.end);
+      // TOOD: Enable once the index buffer shit works
+      //u32* indices = new(&index_scratch, u32, index_count);
 
-      for(size i = 0; (byte*)indices++ != index_scratch.end; ++i)
-         indices[i] = (u32)i;
+      u32 face_index = 0;
+      for(u32 i = 0; indices + i != (u32*)index_scratch.end; ++i)
+      {
+         indices[i] = i;
+      }
+#endif
 
-      // ib
-      memcpy(index_buffer.data, indices, index_count*sizeof(*indices));
+      // load ib
+      memcpy(context->ib.data, indices, index_count*sizeof(u32));
+      context->index_count = (u32)index_count;
    }
 
    // app callbacks

@@ -85,11 +85,16 @@ const vec3 foo[5] = {
     vec3(-0.5, -0.5, -0.5)    // Base back-left
 };
 
-layout(location = 0) out vec4 out_pos;
+layout(location = 0) out vec4 out_color;
+
+layout(location = 0) in vec3 in_pos;
+layout(location = 1) in vec3 in_normal;
+layout(location = 2) in vec2 in_uv;
 
 void main()
 {
-   vec3 pos = cube_strip[gl_VertexIndex];
+   vec3 pos = in_pos;
    gl_Position = transform.projection * transform.view * transform.model * vec4(pos, 1.0f);
-   out_pos = gl_Position;
+
+   out_color = vec4(in_normal * 0.5 + vec3(0.5), 1.0);
 }
