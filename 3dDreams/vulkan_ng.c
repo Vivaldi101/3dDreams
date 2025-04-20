@@ -1380,10 +1380,10 @@ bool vk_initialize(hw* hw)
 
       usize index_count = attrib.num_faces;
 
-      arena index_scratch = scratch;
-      scratch_shrink(index_scratch, index_count, tinyobj_vertex);
+      //arena index_scratch = scratch;
+      //scratch_shrink(index_scratch, index_count, tinyobj_vertex);
 
-      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
+      //tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
       u32 unique_vertex_count = 0;
 
       for(usize i = 0; i < index_count; ++i)
@@ -1413,26 +1413,26 @@ bool vk_initialize(hw* hw)
             v.tv = attrib.texcoords[vti * 2 + 1];
          }
 
-         int index = vertex_get(&v, verts, unique_vertex_count);
+         int index = vertex_get(&v, context->vb.data, unique_vertex_count);
          if(index == -1)
          {
             index = unique_vertex_count;
-            verts[index] = v;
+            ((tinyobj_vertex*)context->vb.data)[index] = v;
             unique_vertex_count++;
          }
 
          ((u32*)context->ib.data)[i] = index;
       }
 
+#if 0
       // load vb
       memcpy(context->vb.data, verts, unique_vertex_count*sizeof(tinyobj_vertex));
 
-#if 0
       index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, u32);
 
       // TOOD: Enable once the index buffer shit works
-      //u32* indices = new(&index_scratch, u32, index_count);
+      u32* indices = new(&index_scratch, u32, index_count);
 
       u32 face_index = 0;
       for(u32 i = 0; indices + i != (u32*)index_scratch.end; ++i)
@@ -1441,7 +1441,7 @@ bool vk_initialize(hw* hw)
       }
 
       // load ib
-      //memcpy(context->ib.data, indices, index_count*sizeof(u32));
+      memcpy(context->ib.data, indices, index_count*sizeof(u32));
 #endif
       context->index_count = (u32)index_count;
    }
