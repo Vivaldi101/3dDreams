@@ -841,7 +841,6 @@ void vk_present(vk_context* context)
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 
-#if 0
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
 
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
@@ -849,7 +848,6 @@ void vk_present(vk_context* context)
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
 
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
-#endif
 
       vkCmdEndRenderPass(command_buffer);
 
@@ -1362,7 +1360,7 @@ bool vk_initialize(hw* hw)
  // tinyobj 
    {
       const char* filename = "cube.obj";
-      ////const char* filename = "cornell_box.obj";
+      //const char* filename = "cornell_box.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1385,9 +1383,7 @@ bool vk_initialize(hw* hw)
       arena index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, tinyobj_vertex);
 
-      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);  // TODO: Enable
-      tinyobj_vertex unique_verts[36] = {}; // TODO: Fix this hard value
-      u32 indices[36] = {}; // TODO: Fix this hard value
+      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
       u32 unique_vertex_count = 0;
 
       for(usize i = 0; i < index_count; ++i)
@@ -1417,19 +1413,19 @@ bool vk_initialize(hw* hw)
             v.tv = attrib.texcoords[vti * 2 + 1];
          }
 
-         int index = vertex_get(&v, unique_verts, unique_vertex_count);
+         int index = vertex_get(&v, verts, unique_vertex_count);
          if(index == -1)
          {
             index = unique_vertex_count;
-            unique_verts[index] = v;
+            verts[index] = v;
             unique_vertex_count++;
          }
 
-         indices[i] = index;
+         ((u32*)context->ib.data)[i] = index;
       }
 
       // load vb
-      memcpy(context->vb.data, unique_verts, unique_vertex_count*sizeof(tinyobj_vertex));
+      memcpy(context->vb.data, verts, unique_vertex_count*sizeof(tinyobj_vertex));
 
 #if 0
       index_scratch = scratch;
@@ -1443,10 +1439,10 @@ bool vk_initialize(hw* hw)
       {
          indices[i] = i;
       }
-#endif
 
       // load ib
-      memcpy(context->ib.data, indices, index_count*sizeof(u32));
+      //memcpy(context->ib.data, indices, index_count*sizeof(u32));
+#endif
       context->index_count = (u32)index_count;
    }
 
