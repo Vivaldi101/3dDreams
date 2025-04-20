@@ -780,10 +780,10 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 90.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){7.6f, 1.0f, -13.0f});
+      mat4 translate = mat4_translate((vec3){0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 3.0f);
+      mvp.model = mat4_scale(mvp.model, 0.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1360,8 +1360,10 @@ bool vk_initialize(hw* hw)
    {
       //const char* filename = "cube.obj";
       //const char* filename = "cornell_box.obj";
-      //const char* filename = "teapot.obj";
-      const char* filename = "suzanne.obj";
+      const char* filename = "teapot.obj";
+      //const char* filename = "max-planck.obj";
+      //const char* filename = "suzanne.obj";
+      //const char* filename = "homer.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
