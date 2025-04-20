@@ -24,7 +24,7 @@ static file_result win32_file_read(arena* file_arena, const char* path)
    if(file_size_32 == 0)
       return (file_result) {};
 
-   if(!arena_left(file_arena, byte))
+   if(arena_left(file_arena, byte) < file_size_32)
       return (file_result) {};
 
    result.data = newsize(file_arena, file_size_32);

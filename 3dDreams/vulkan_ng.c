@@ -189,7 +189,7 @@ align_struct
    VkRenderPass renderpass;
 
    // TODO: Pipelines into an array
-   VkPipeline cube_pipeline;
+   VkPipeline obj_pipeline;
    VkPipeline axes_pipeline;
    VkPipeline frustum_pipeline;
    VkPipelineLayout pipeline_layout;
@@ -765,26 +765,25 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 5.0f;
+      float radius = 10.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = {
           radius * cosf(theta/2.0f),
-          radius * 0.5f * cosf(theta*2.0f),
-          //1.0f,
+          3.0f,
           radius * sinf(theta/2.0f),
       };
 
-      vec3 center = {0.0f, 0.0f, 0.0f};
-      vec3 dir = vec3_sub(&eye, &center);
+      vec3 origin = {0.0f, 0.0f, 0.0f};
+      vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 90.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){7.6f, 1.0f, -13.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_mul(mat4_mul(mat4_rotation_z(rot/2.0f), mat4_rotation_x(rot/4.0f)), mvp.model);
+      mvp.model = mat4_scale(mvp.model, 3.0f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -834,7 +833,7 @@ void vk_present(vk_context* context)
       vkCmdSetViewport(command_buffer, 0, 1, &viewport);
       vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->cube_pipeline);
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->obj_pipeline);
 
       const VkDeviceSize offset = 0;
       vkCmdBindVertexBuffers(command_buffer, 0, 1, &context->vb.handle, &offset);
@@ -845,9 +844,9 @@ void vk_present(vk_context* context)
 
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+      //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
 
-      vkCmdDraw(command_buffer, 12, 1, 0, 0);
+      //vkCmdDraw(command_buffer, 12, 1, 0, 0);
 
       vkCmdEndRenderPass(command_buffer);
 
@@ -949,7 +948,7 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
 }
 
 // TODO: Cleanup these pipelines
-static VkPipeline vk_cube_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
+static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
    assert(vk_valid_handle(shaders->fs));
@@ -1338,7 +1337,7 @@ bool vk_initialize(hw* hw)
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
    // TODO: Cleanup this
-   context->cube_pipeline = vk_cube_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[0]);
+   context->obj_pipeline = vk_obj_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[0]);
    context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[1]);
    context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[2]);
    context->pipeline_layout = layout;
@@ -1359,8 +1358,10 @@ bool vk_initialize(hw* hw)
 
  // tinyobj 
    {
-      const char* filename = "cube.obj";
+      //const char* filename = "cube.obj";
       //const char* filename = "cornell_box.obj";
+      //const char* filename = "teapot.obj";
+      const char* filename = "suzanne.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1378,50 +1379,56 @@ bool vk_initialize(hw* hw)
       if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
          return false;
 
-      usize index_count = attrib.num_faces;
+      usize index_count = 0;
 
       //arena index_scratch = scratch;
       //scratch_shrink(index_scratch, index_count, tinyobj_vertex);
 
       //tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
       u32 unique_vertex_count = 0;
-
-      for(usize i = 0; i < index_count; ++i)
+      for(usize j = 0; j < shape_count; ++j)
       {
-         tinyobj_vertex v = {};
-         int vi = attrib.faces[i].v_idx;
-         int vti = attrib.faces[i].vt_idx;
-         int vni = attrib.faces[i].vn_idx;
-
-         if(vi >= 0)
+         tinyobj_shape_t* shape = &shapes[j];
+         // TODO: Assume triangles for now
+         index_count += shape->length*3;
+         //tinyobj_material_t* material_ids = &materials[j];
+         for(usize i = 0; i < shape->length*3; ++i)
          {
-            v.vx = attrib.vertices[vi * 3 + 0];
-            v.vy = attrib.vertices[vi * 3 + 1];
-            v.vz = attrib.vertices[vi * 3 + 2];
-         }
+            tinyobj_vertex v = {};
+            int vi = attrib.faces[i].v_idx;
+            int vti = attrib.faces[i].vt_idx;
+            int vni = attrib.faces[i].vn_idx;
 
-         if(vni >= 0)
-         {
-            v.nx = attrib.normals[vni * 3 + 0];
-            v.ny = attrib.normals[vni * 3 + 1];
-            v.nz = attrib.normals[vni * 3 + 2];
-         }
+            if(vi >= 0)
+            {
+               v.vx = attrib.vertices[vi * 3 + 0];
+               v.vy = attrib.vertices[vi * 3 + 1];
+               v.vz = attrib.vertices[vi * 3 + 2];
+            }
 
-         if(vti >= 0)
-         {
-            v.tu = attrib.texcoords[vti * 2 + 0];
-            v.tv = attrib.texcoords[vti * 2 + 1];
-         }
+            if(vni >= 0)
+            {
+               v.nx = attrib.normals[vni * 3 + 0];
+               v.ny = attrib.normals[vni * 3 + 1];
+               v.nz = attrib.normals[vni * 3 + 2];
+            }
 
-         int index = vertex_get(&v, context->vb.data, unique_vertex_count);
-         if(index == -1)
-         {
-            index = unique_vertex_count;
-            ((tinyobj_vertex*)context->vb.data)[index] = v;
-            unique_vertex_count++;
-         }
+            if(vti >= 0)
+            {
+               v.tu = attrib.texcoords[vti * 2 + 0];
+               v.tv = attrib.texcoords[vti * 2 + 1];
+            }
 
-         ((u32*)context->ib.data)[i] = index;
+            int index = vertex_get(&v, context->vb.data, unique_vertex_count);
+            if(index == -1)
+            {
+               index = unique_vertex_count;
+               ((tinyobj_vertex*)context->vb.data)[index] = v;
+               unique_vertex_count++;
+            }
+
+            ((u32*)context->ib.data)[i] = index;
+         }
       }
 
 #if 0

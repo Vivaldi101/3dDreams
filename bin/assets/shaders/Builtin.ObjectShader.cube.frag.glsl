@@ -33,10 +33,5 @@ vec3 hsvToRgb(vec3 c)
 
 void main() 
 {
-    //float linear_z = ndc_to_linear_z(gl_FragCoord.z, transform.near, transform.far);
-
-    //out_color = vec4(hsvToRgb(vec3(linear_z)), 1.0);
-
     out_color = in_color;
-    //out_color = vec4(1.0);
 }

@@ -93,8 +93,7 @@ layout(location = 2) in vec2 in_uv;
 
 void main()
 {
-   vec3 pos = in_pos;
-   gl_Position = transform.projection * transform.view * transform.model * vec4(pos, 1.0f);
+   gl_Position = transform.projection * transform.view * transform.model * vec4(in_pos, 1.0f);
 
    out_color = vec4(in_normal * 0.5 + vec3(0.5), 1.0);
 }
