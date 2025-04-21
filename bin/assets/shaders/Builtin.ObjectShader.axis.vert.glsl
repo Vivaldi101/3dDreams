@@ -62,7 +62,7 @@ vec3 colors[verts_count] = vec3[](
     vec3(0, 0, 1), vec3(0, 0, 1),
     vec3(0, 0, 1), vec3(0, 0, 1)
 );
-    mat4 t = translate(vec3(-0.42, 5.0, 0.0));
+    mat4 t = translate(vec3(0.0, 10.0, 0.0));
     gl_Position = transform.projection * transform.view * t * vec4(positions[gl_VertexIndex], 1.0);
 
     axis_color = colors[gl_VertexIndex];

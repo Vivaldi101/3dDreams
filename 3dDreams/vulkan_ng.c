@@ -6,12 +6,11 @@
 #include "vulkan_ng.h"
 
 #include <volk.c>
-#include "win32_file_io.c" // TODO: pass these as function pointers from the platform
+#include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-/* define TINYOBJ_LOADER_C_IMPLEMENTATION for only *one* .c */
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
 
@@ -56,23 +55,23 @@ static uint32_t hash_vertex(const tinyobj_vertex* v, size modulo)
    return hash % modulo;
 }
 
-// Approximate float equality helper (in case of precision issues)
+// TODO: Cleanup this
 static inline int float_eq(float a, float b)
 {
    return fabsf(a - b) < 1e-6f;
 }
 
-static int vertex_equal(const tinyobj_vertex* a, const tinyobj_vertex* b)
+static int tinyobj_vertex_equal(const tinyobj_vertex* a, const tinyobj_vertex* b)
 {
    return float_eq(a->vx, b->vx) && float_eq(a->vy, b->vy) && float_eq(a->vz, b->vz) &&
       float_eq(a->nx, b->nx) && float_eq(a->ny, b->ny) && float_eq(a->nz, b->nz) &&
       float_eq(a->tu, b->tu) && float_eq(a->tv, b->tv);
 }
 
-static u32 vertex_get(const tinyobj_vertex* vertex, const tinyobj_vertex* unique_verts, u32 unique_count)
+static u32 tinyobj_vertex_get(const tinyobj_vertex* vertex, const tinyobj_vertex* unique_verts, u32 unique_count)
 {
    for(u32 i = 0; i < unique_count; ++i)
-      if(vertex_equal(&unique_verts[i], vertex))
+      if(tinyobj_vertex_equal(&unique_verts[i], vertex))
          return i;
 
    return (u32)-1;  // not found
@@ -765,12 +764,12 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 10.0f;
+      float radius = 15.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = {
           radius * cosf(theta/2.0f),
-          3.0f,
+          7.0f,
           radius * sinf(theta/2.0f),
       };
 
@@ -780,10 +779,10 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 90.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, -3.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 0.5f);
+      mvp.model = mat4_scale(mvp.model, 5.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -980,15 +979,18 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
    stream.stride = sizeof(tinyobj_vertex);
    stream.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-   VkVertexInputAttributeDescription attributes[3] = {};   // pos, normal, uv
+   VkVertexInputAttributeDescription attributes[3] = {};
+   // pos
    attributes[0].location = 0;
    attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
    attributes[0].offset = 0;
 
+   // normal
    attributes[1].location = 1;
    attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
    attributes[1].offset = 12;
 
+   // texture
    attributes[2].location = 2;
    attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
    attributes[2].offset = 24;
@@ -1328,7 +1330,7 @@ bool vk_initialize(hw* hw)
    if(!vk_swapchain_update(context))
       return false;
 
-   const char* shader_names[] = {"cube", "axis", "frustum"};
+   const char* shader_names[] = {"obj", "axis", "frustum"};
    vk_shader_modules shaders[array_count(shader_names)];
 
    for(u32 i = 0; i < array_count(shader_names); ++i)
@@ -1359,10 +1361,12 @@ bool vk_initialize(hw* hw)
  // tinyobj 
    {
       //const char* filename = "cube.obj";
-      //const char* filename = "cornell_box.obj";
-      const char* filename = "teapot.obj";
+      //const char* filename = "teapot3.obj";
+      const char* filename = "cornell.obj";
+      //const char* filename = "car.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "suzanne.obj";
+      //const char* filename = "testObj.obj";
       //const char* filename = "homer.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -1381,55 +1385,72 @@ bool vk_initialize(hw* hw)
       if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
          return false;
 
-      usize index_count = 0;
+      // TODO: only triangles allowed
+      assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
 
-      //arena index_scratch = scratch;
-      //scratch_shrink(index_scratch, index_count, tinyobj_vertex);
+      const usize index_count = attrib.num_faces;
 
-      //tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
+#if 0
+      usize triangle_count = attrib.num_face_num_verts;
+
+      static const usize obj_size = sizeof(float) * 3 // pos
+         + sizeof(float) * 3 // normal
+         + sizeof(float) * 3 // color (based on normal)
+         + sizeof(float) * 3; // color from material file.
+
+      usize vb_size = obj_size*triangle_count*3;     // TODO: use this
+
+      arena index_scratch = scratch;
+      scratch_shrink(index_scratch, index_count, tinyobj_vertex);
+
+      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
+#endif
+
       u32 unique_vertex_count = 0;
-      for(usize j = 0; j < shape_count; ++j)
+      // over all the shapes
+      for(usize s = 0; s < shape_count; ++s)
       {
-         tinyobj_shape_t* shape = &shapes[j];
-         // TODO: Assume triangles for now
-         index_count += shape->length*3;
-         //tinyobj_material_t* material_ids = &materials[j];
-         for(usize i = 0; i < shape->length*3; ++i)
+         for(usize f = 0; f < index_count; f += 3)
          {
-            tinyobj_vertex v = {};
-            int vi = attrib.faces[i].v_idx;
-            int vti = attrib.faces[i].vt_idx;
-            int vni = attrib.faces[i].vn_idx;
+            tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
-            if(vi >= 0)
+            for(usize i = 0; i < 3; ++i)
             {
-               v.vx = attrib.vertices[vi * 3 + 0];
-               v.vy = attrib.vertices[vi * 3 + 1];
-               v.vz = attrib.vertices[vi * 3 + 2];
-            }
+               tinyobj_vertex v = {};
+               int vi = vidx[i].v_idx;
+               int vti = vidx[i].vt_idx;
+               int vni = vidx[i].vn_idx;
 
-            if(vni >= 0)
-            {
-               v.nx = attrib.normals[vni * 3 + 0];
-               v.ny = attrib.normals[vni * 3 + 1];
-               v.nz = attrib.normals[vni * 3 + 2];
-            }
+               if(vi >= 0)
+               {
+                  v.vx = attrib.vertices[vi * 3 + 0];
+                  v.vy = attrib.vertices[vi * 3 + 1];
+                  v.vz = attrib.vertices[vi * 3 + 2];
+               }
 
-            if(vti >= 0)
-            {
-               v.tu = attrib.texcoords[vti * 2 + 0];
-               v.tv = attrib.texcoords[vti * 2 + 1];
-            }
+               if(vni >= 0)
+               {
+                  v.nx = attrib.normals[vni * 3 + 0];
+                  v.ny = attrib.normals[vni * 3 + 1];
+                  v.nz = attrib.normals[vni * 3 + 2];
+               }
 
-            int index = vertex_get(&v, context->vb.data, unique_vertex_count);
-            if(index == -1)
-            {
-               index = unique_vertex_count;
-               ((tinyobj_vertex*)context->vb.data)[index] = v;
-               unique_vertex_count++;
-            }
+               if(vti >= 0)
+               {
+                  v.tu = attrib.texcoords[vti * 2 + 0];
+                  v.tv = attrib.texcoords[vti * 2 + 1];
+               }
 
-            ((u32*)context->ib.data)[i] = index;
+               int index = tinyobj_vertex_get(&v, context->vb.data, unique_vertex_count);
+               if(index == -1)
+               {
+                  index = unique_vertex_count;
+                  ((tinyobj_vertex*)context->vb.data)[index] = v;
+                  unique_vertex_count++;
+               }
+
+               ((u32*)context->ib.data)[f+i] = index;
+            }
          }
       }
 
