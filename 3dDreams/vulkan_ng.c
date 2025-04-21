@@ -779,10 +779,10 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 90.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, -3.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 5.5f);
+      mvp.model = mat4_scale(mvp.model, 5.05f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1362,7 +1362,8 @@ bool vk_initialize(hw* hw)
    {
       //const char* filename = "cube.obj";
       //const char* filename = "teapot3.obj";
-      const char* filename = "cornell.obj";
+      //const char* filename = "cornell.obj";
+      const char* filename = "CornellBox-Glossy-Floor.obj";
       //const char* filename = "car.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "suzanne.obj";
