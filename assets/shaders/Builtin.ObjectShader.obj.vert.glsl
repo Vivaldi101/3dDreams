@@ -95,5 +95,5 @@ void main()
 {
    gl_Position = transform.projection * transform.view * transform.model * vec4(in_pos, 1.0f);
 
-   out_color = vec4(in_normal * 0.75 + vec3(0.25), 1.0);
+   out_color = vec4(in_normal * 0.75, 1.0);
 }

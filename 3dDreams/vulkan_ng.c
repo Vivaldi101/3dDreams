@@ -77,13 +77,6 @@ static u32 tinyobj_vertex_get(const tinyobj_vertex* vertex, const tinyobj_vertex
    return (u32)-1;  // not found
 }
 
-static tinyobj_vertex* tinyobj_mesh_storage(arena* storage, u32 vertex_count)
-{
-   set_arena_type(tinyobj_vertex);
-   arena_invariant(vertex_count, storage, arena_type);
-   return new(storage, arena_type, vertex_count);
-}
-
 static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
    char shader_path[MAX_PATH];
@@ -745,7 +738,7 @@ void vk_present(vk_context* context)
 
       const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
 
-      f32 delta = 1.5f;
+      f32 delta = 0.75f;
       static f32 rot = 0.0f;
       static f32 originz = -10.0f;
       static f32 cameraz = 0.0f;
@@ -764,25 +757,25 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 15.0f;
+      float radius = 10.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = {
-          radius * cosf(theta/2.0f),
-          7.0f,
-          radius * sinf(theta/2.0f),
+          radius * sinf(theta),
+          2.0f,
+          radius * cosf(theta),
       };
 
-      vec3 origin = {0.0f, 0.0f, 0.0f};
+      vec3 origin = {0.0f, 5.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
-      mvp.projection = mat4_perspective(ar, 90.0f, mvp.n, mvp.f);
+      mvp.projection = mat4_perspective(ar, 70.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){-20.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 5.05f);
+      mvp.model = mat4_scale(mvp.model, 0.05f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1363,7 +1356,9 @@ bool vk_initialize(hw* hw)
       //const char* filename = "cube.obj";
       //const char* filename = "teapot3.obj";
       //const char* filename = "cornell.obj";
-      const char* filename = "CornellBox-Glossy-Floor.obj";
+      //const char* filename = "CornellBox-Glossy-Floor.obj";
+      const char* filename = "holodeck.obj";
+      //const char* filename = "lost_empire.obj";
       //const char* filename = "car.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "suzanne.obj";
@@ -1399,7 +1394,7 @@ bool vk_initialize(hw* hw)
          + sizeof(float) * 3 // color (based on normal)
          + sizeof(float) * 3; // color from material file.
 
-      usize vb_size = obj_size*triangle_count*3;     // TODO: use this
+      usize vb_size = obj_size * triangle_count * 3;     // TODO: use this
 
       arena index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, tinyobj_vertex);
@@ -1408,56 +1403,55 @@ bool vk_initialize(hw* hw)
 #endif
 
       u32 unique_vertex_count = 0;
-      // over all the shapes
-      for(usize s = 0; s < shape_count; ++s)
+      for(usize f = 0; f < index_count; f += 3)
       {
-         for(usize f = 0; f < index_count; f += 3)
+         tinyobj_vertex_index_t* vidx = attrib.faces + f;
+
+         for(usize i = 0; i < 3; ++i)
          {
-            tinyobj_vertex_index_t* vidx = attrib.faces + f;
+            tinyobj_vertex v = {};
+            int vi = vidx[i].v_idx;
+            int vti = vidx[i].vt_idx;
+            int vni = vidx[i].vn_idx;
 
-            for(usize i = 0; i < 3; ++i)
+            if(vi >= 0)
             {
-               tinyobj_vertex v = {};
-               int vi = vidx[i].v_idx;
-               int vti = vidx[i].vt_idx;
-               int vni = vidx[i].vn_idx;
-
-               if(vi >= 0)
-               {
-                  v.vx = attrib.vertices[vi * 3 + 0];
-                  v.vy = attrib.vertices[vi * 3 + 1];
-                  v.vz = attrib.vertices[vi * 3 + 2];
-               }
-
-               if(vni >= 0)
-               {
-                  v.nx = attrib.normals[vni * 3 + 0];
-                  v.ny = attrib.normals[vni * 3 + 1];
-                  v.nz = attrib.normals[vni * 3 + 2];
-               }
-
-               if(vti >= 0)
-               {
-                  v.tu = attrib.texcoords[vti * 2 + 0];
-                  v.tv = attrib.texcoords[vti * 2 + 1];
-               }
-
-               int index = tinyobj_vertex_get(&v, context->vb.data, unique_vertex_count);
-               if(index == -1)
-               {
-                  index = unique_vertex_count;
-                  ((tinyobj_vertex*)context->vb.data)[index] = v;
-                  unique_vertex_count++;
-               }
-
-               ((u32*)context->ib.data)[f+i] = index;
+               v.vx = attrib.vertices[vi * 3 + 0];
+               v.vy = attrib.vertices[vi * 3 + 1];
+               v.vz = attrib.vertices[vi * 3 + 2];
             }
+
+            if(vni >= 0)
+            {
+               v.nx = attrib.normals[vni * 3 + 0];
+               v.ny = attrib.normals[vni * 3 + 1];
+               v.nz = attrib.normals[vni * 3 + 2];
+            }
+
+            if(vti >= 0)
+            {
+               v.tu = attrib.texcoords[vti * 2 + 0];
+               v.tv = attrib.texcoords[vti * 2 + 1];
+            }
+
+            // TODO: hash lookup for unique vertex
+#if 1
+            int index = tinyobj_vertex_get(&v, context->vb.data, unique_vertex_count);
+            if(index == -1)
+            {
+               index = unique_vertex_count;
+               ((tinyobj_vertex*)context->vb.data)[index] = v;
+               unique_vertex_count++;
+            }
+
+            ((u32*)context->ib.data)[f + i] = index;
+#endif
          }
       }
 
 #if 0
       // load vb
-      memcpy(context->vb.data, verts, unique_vertex_count*sizeof(tinyobj_vertex));
+      memcpy(context->vb.data, verts, unique_vertex_count * sizeof(tinyobj_vertex));
 
       index_scratch = scratch;
       scratch_shrink(index_scratch, index_count, u32);
@@ -1472,7 +1466,7 @@ bool vk_initialize(hw* hw)
       }
 
       // load ib
-      memcpy(context->ib.data, indices, index_count*sizeof(u32));
+      memcpy(context->ib.data, indices, index_count * sizeof(u32));
 #endif
       context->index_count = (u32)index_count;
    }
