@@ -762,11 +762,11 @@ void vk_present(vk_context* context)
 
       vec3 eye = {
           radius * sinf(theta),
-          2.0f,
+          5.0f,
           radius * cosf(theta),
       };
 
-      vec3 origin = {0.0f, 5.0f, 0.0f};
+      vec3 origin = {0.0f, 2.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 70.0f, mvp.n, mvp.f);
@@ -1354,8 +1354,9 @@ bool vk_initialize(hw* hw)
  // tinyobj 
    {
       //const char* filename = "cube.obj";
-      //const char* filename = "teapot3.obj";
+      //const char* filename = "suzanne.obj";
       //const char* filename = "cornell.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "CornellBox-Glossy-Floor.obj";
       const char* filename = "holodeck.obj";
       //const char* filename = "lost_empire.obj";
@@ -1363,7 +1364,7 @@ bool vk_initialize(hw* hw)
       //const char* filename = "max-planck.obj";
       //const char* filename = "suzanne.obj";
       //const char* filename = "testObj.obj";
-      //const char* filename = "homer.obj";
+      //const char* filename = "sponza.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;

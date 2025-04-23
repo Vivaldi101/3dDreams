@@ -35,6 +35,15 @@ static u32 win32_time()
    return timeGetTime() - sys_time_base;
 }
 
+static void win32_fps(hw_window window, u32 fps)
+{
+   static char title[512];
+
+   sprintf(title, "FPS: %u", fps);
+
+   SetWindowText(window.handle, title);
+}
+
 static bool win32_platform_loop()
 {
    MSG msg;
@@ -293,6 +302,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 
    hw.timer.sleep = win32_sleep;
    hw.timer.time = win32_time;
+   hw.timer.fps = win32_fps;
 
    hw.platform_loop = win32_platform_loop;
 

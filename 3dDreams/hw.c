@@ -19,6 +19,7 @@ align_struct hw_timer
 {
    void(*sleep)(u32 ms);
    u32(*time)();
+   void(*fps)(hw_window window, u32 fps);
 } hw_timer;
 
 align_struct hw
@@ -162,10 +163,16 @@ static void hw_frame_render(hw* hw)
    hw->renderer.frame_present(renderers[renderer_index]);
 }
 
+static void hw_print_fps(hw* hw, u32 fps)
+{
+   hw->timer.fps(hw->renderer.window, fps);
+}
+
 void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void (*app_input_function)(struct app_input* input))
 {
    // start the timer
    u32 t = hw->timer.time();
+   u32 s = hw->timer.time();
 
    for (;;)
    {
@@ -182,6 +189,13 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void
       hw_frame_render(hw);
 
       f32 fps = 1.0f/(((f32)hw->timer.time() - t) / 1000.0f);
+
+      if((hw->timer.time() - s) > 500)
+      {
+         hw_print_fps(hw, (u32)(fps + 0.5f));
+         s = hw->timer.time();
+      }
+
       //debug_message("FPS: %u\n", (u32)fps);
       t = hw->timer.time();
    }
