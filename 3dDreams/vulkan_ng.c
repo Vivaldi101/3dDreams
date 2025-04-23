@@ -760,7 +760,8 @@ void vk_present(vk_context* context)
       float radius = 10.0f;
       float theta = DEG2RAD(rot);
 
-      vec3 eye = {
+      vec3 eye = 
+      {
           radius * sinf(theta),
           5.0f,
           radius * cosf(theta),
@@ -836,9 +837,11 @@ void vk_present(vk_context* context)
 
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
-      //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+#if 0
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
 
-      //vkCmdDraw(command_buffer, 12, 1, 0, 0);
+      vkCmdDraw(command_buffer, 12, 1, 0, 0);
+#endif
 
       vkCmdEndRenderPass(command_buffer);
 
