@@ -190,14 +190,13 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void
 
       f32 fps = 1.0f/(((f32)hw->timer.time() - t) / 1000.0f);
 
+      t = hw->timer.time();
+
       if((hw->timer.time() - s) > 500)
       {
          hw_print_fps(hw, (u32)(fps + 0.5f));
          s = hw->timer.time();
       }
-
-      //debug_message("FPS: %u\n", (u32)fps);
-      t = hw->timer.time();
    }
 }
 
