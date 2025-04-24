@@ -38,10 +38,10 @@ static void app_frame_draw_all(arena scratch)
 static void app_frame(arena scratch)
 {
    // first draw 12 types
-   app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 12));
+   //app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 12));
 
    // then draw 2412312313 types(will fail)
-   app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 2412312313));
+   //app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 2412312313));
 
    // will draw all possible types remaining
    app_frame_draw_all(scratch);

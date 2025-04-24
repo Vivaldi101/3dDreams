@@ -67,8 +67,7 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(count <= 0 || count > (a->end - (byte*)p) / alloc_size) // empty or overflow
-      return a->end;
+   assert(!(count <= 0 || count > (a->end - (byte*)p) / alloc_size));
 
    a->beg = (byte*)p + (count * alloc_size);          // advance arena 
 

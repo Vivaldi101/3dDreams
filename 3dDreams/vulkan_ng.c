@@ -26,22 +26,37 @@ typedef struct
    f32 tu, tv;       // texture
 } tinyobj_vertex;
 
-// Simple float hashing
-static inline uint32_t float_to_bits(float f)
+// Move to ordered hash table file
+
+typedef struct 
 {
-   uint32_t u;
-   memcpy(&u, &f, sizeof(uint32_t));
+   i32 vi, vti, vni;
+} hash_key;
+
+typedef u32 hash_value;
+
+typedef struct 
+{
+   hash_value* values;
+   u32* keys;
+   usize count;
+   usize max_count;
+} hash_table;
+
+static inline u32 float_to_bits(f32 f)
+{
+   u32 u;
+   memcpy(&u, &f, sizeof(u32));
    return u;
 }
 
-// TODO: Proper hash table for this
-// FNV-1a hash combining
-static uint32_t hash_vertex(const tinyobj_vertex* v, size modulo)
+#if 0
+static hash_key hash_vertex(const tinyobj_vertex* v, size modulo)
 {
-   uint32_t hash = 2166136261u;
+   hash_key hash = 2166136261u;
 
 #define HASH_F(f) do { \
-        uint32_t bits = float_to_bits((f)); \
+        hash_key bits = float_to_bits((f)); \
         hash ^= bits; \
         hash *= 16777619u; \
     } while(0)
@@ -54,27 +69,68 @@ static uint32_t hash_vertex(const tinyobj_vertex* v, size modulo)
 
    return hash % modulo;
 }
+#endif
 
-// TODO: Cleanup this
-static inline int float_eq(float a, float b)
+static u32 hash_index(hash_key k)
 {
-   return fabsf(a - b) < 1e-6f;
+   u32 hash = 2166136261u;
+
+#define HASH_F(f) do { \
+        u32 bits = (f); \
+        hash ^= bits; \
+        hash *= 16777619u; \
+    } while(0)
+
+   HASH_F(k.vi); HASH_F(k.vni); HASH_F(k.vti);
+
+#undef HASH_F
+
+   return hash;
 }
 
-static int tinyobj_vertex_equal(const tinyobj_vertex* a, const tinyobj_vertex* b)
+static hash_value hash_lookup(hash_table* table, u32 key)
 {
-   return float_eq(a->vx, b->vx) && float_eq(a->vy, b->vy) && float_eq(a->vz, b->vz) &&
-      float_eq(a->nx, b->nx) && float_eq(a->ny, b->ny) && float_eq(a->nz, b->nz) &&
-      float_eq(a->tu, b->tu) && float_eq(a->tv, b->tv);
+   u32 index = key % table->max_count;
+
+   while(table->keys[index] != -1 && table->keys[index] < key)
+      index = index % table->max_count;
+   if(table->keys[index] == key)
+      return table->values[index];
+
+   return ~0u;
 }
 
-static u32 tinyobj_vertex_get(const tinyobj_vertex* vertex, const tinyobj_vertex* unique_verts, u32 unique_count)
+static void hash_insert(hash_table* table, u32 key, hash_value value)
 {
-   for(u32 i = 0; i < unique_count; ++i)
-      if(tinyobj_vertex_equal(&unique_verts[i], vertex))
-         return i;
+   if(table->count == table->max_count) return;
 
-   return (u32)-1;  // not found
+   u32 index = key % table->max_count;
+
+   while(table->keys[index] != -1)
+   {
+      if(table->keys[index] > key)
+      {
+         u32 old_key = table->keys[index];
+         table->keys[index] = key;
+         key = old_key;
+
+         hash_value old_value = table->values[index];
+         table->values[index] = value;
+         value = old_value;
+      }
+      else if(table->keys[index] == key)
+      {
+         table->values[index] = value;
+         return;
+      }
+
+      index = index % table->max_count;
+   }
+
+   table->keys[index] = index;
+   table->values[index] = value;
+
+   table->count++;
 }
 
 static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -356,7 +412,11 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
    queue_info.pQueuePriorities = &queue_prio;
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
-   const char* dev_ext_names[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+   const char* dev_ext_names[] = 
+   {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
+   };
 
    VkPhysicalDeviceFeatures enabled_features = {};
    enabled_features.depthBounds = VK_TRUE;
@@ -773,7 +833,7 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 70.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){-20.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
       mvp.model = mat4_scale(mvp.model, 0.05f);
@@ -1354,21 +1414,14 @@ bool vk_initialize(hw* hw)
    context->vb = vertex_buffer;
    context->ib = index_buffer;
 
+   hash_table tinyobj_table = {};
+
  // tinyobj 
    {
+      const char* filename = "teapot4.obj";
       //const char* filename = "cube.obj";
-      //const char* filename = "suzanne.obj";
-      //const char* filename = "cornell.obj";
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "CornellBox-Glossy-Floor.obj";
-      const char* filename = "holodeck.obj";
-      //const char* filename = "lost_empire.obj";
-      //const char* filename = "car.obj";
-      //const char* filename = "max-planck.obj";
-      //const char* filename = "suzanne.obj";
-      //const char* filename = "testObj.obj";
       //const char* filename = "sponza.obj";
-
+      //const char* filename = "holodeck.obj";
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
       tinyobj_attrib_t attrib = {};
@@ -1379,7 +1432,6 @@ bool vk_initialize(hw* hw)
       tinyobj_attrib_init(&attrib);
 
       tinyobj_user_ctx user_data = {};
-      // user data scratch arena
       user_data.scratch = scratch;
 
       if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
@@ -1388,90 +1440,72 @@ bool vk_initialize(hw* hw)
       // TODO: only triangles allowed
       assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
 
-      const usize index_count = attrib.num_faces;
+      const size index_count = attrib.num_faces;
 
-#if 0
-      usize triangle_count = attrib.num_face_num_verts;
+      tinyobj_table.max_count = index_count;
 
-      static const usize obj_size = sizeof(float) * 3 // pos
-         + sizeof(float) * 3 // normal
-         + sizeof(float) * 3 // color (based on normal)
-         + sizeof(float) * 3; // color from material file.
+      scratch_clear(scratch);
 
-      usize vb_size = obj_size * triangle_count * 3;     // TODO: use this
+      if(scratch_left(scratch, hash_key) < index_count)
+         return 0;
+      if(scratch_left(scratch, hash_value) < index_count)
+         return 0;
 
-      arena index_scratch = scratch;
-      scratch_shrink(index_scratch, index_count, tinyobj_vertex);
+      tinyobj_table.keys = new(&scratch, u32, index_count);
+      tinyobj_table.values = new(&scratch, hash_value, index_count);
 
-      tinyobj_vertex* verts = new(&index_scratch, tinyobj_vertex, index_count);
-#endif
+      memset(tinyobj_table.keys, -1, sizeof(u32)*index_count);
 
-      u32 unique_vertex_count = 0;
-      for(usize f = 0; f < index_count; f += 3)
+      u32 vertex_index = 0;
+      u32 index_reuse_count = 0;
+
+      for(size f = 0; f < index_count; f += 3)
       {
          tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
-         for(usize i = 0; i < 3; ++i)
+         for(size i = 0; i < 3; ++i)
          {
-            tinyobj_vertex v = {};
             int vi = vidx[i].v_idx;
             int vti = vidx[i].vt_idx;
             int vni = vidx[i].vn_idx;
 
-            if(vi >= 0)
-            {
-               v.vx = attrib.vertices[vi * 3 + 0];
-               v.vy = attrib.vertices[vi * 3 + 1];
-               v.vz = attrib.vertices[vi * 3 + 2];
-            }
+            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+            hash_value key = hash_index(index) % tinyobj_table.max_count;
 
-            if(vni >= 0)
-            {
-               v.nx = attrib.normals[vni * 3 + 0];
-               v.ny = attrib.normals[vni * 3 + 1];
-               v.nz = attrib.normals[vni * 3 + 2];
-            }
+            hash_value lookup = hash_lookup(&tinyobj_table, key);
 
-            if(vti >= 0)
+            tinyobj_vertex v = {};
+            if(lookup == ~0u)
             {
-               v.tu = attrib.texcoords[vti * 2 + 0];
-               v.tv = attrib.texcoords[vti * 2 + 1];
-            }
+               if(vi >= 0)
+               {
+                  v.vx = attrib.vertices[vi * 3 + 0];
+                  v.vy = attrib.vertices[vi * 3 + 1];
+                  v.vz = attrib.vertices[vi * 3 + 2];
+               }
 
-            // TODO: hash lookup for unique vertex
-#if 1
-            int index = tinyobj_vertex_get(&v, context->vb.data, unique_vertex_count);
-            if(index == -1)
-            {
-               index = unique_vertex_count;
-               ((tinyobj_vertex*)context->vb.data)[index] = v;
-               unique_vertex_count++;
-            }
+               if(vni >= 0)
+               {
+                  v.nx = attrib.normals[vni * 3 + 0];
+                  v.ny = attrib.normals[vni * 3 + 1];
+                  v.nz = attrib.normals[vni * 3 + 2];
+               }
 
-            ((u32*)context->ib.data)[f + i] = index;
-#endif
+               if(vti >= 0)
+               {
+                  v.tu = attrib.texcoords[vti * 2 + 0];
+                  v.tv = attrib.texcoords[vti * 2 + 1];
+               }
+
+               hash_insert(&tinyobj_table, key, vertex_index);
+               ((u32*)context->ib.data)[f + i] = vertex_index;
+               ((tinyobj_vertex*)context->vb.data)[vertex_index++] = v;
+            }
+            else
+               ((u32*)context->ib.data)[f + i] = lookup;
          }
       }
 
-#if 0
-      // load vb
-      memcpy(context->vb.data, verts, unique_vertex_count * sizeof(tinyobj_vertex));
-
-      index_scratch = scratch;
-      scratch_shrink(index_scratch, index_count, u32);
-
-      // TOOD: Enable once the index buffer shit works
-      u32* indices = new(&index_scratch, u32, index_count);
-
-      u32 face_index = 0;
-      for(u32 i = 0; indices + i != (u32*)index_scratch.end; ++i)
-      {
-         indices[i] = i;
-      }
-
-      // load ib
-      memcpy(context->ib.data, indices, index_count * sizeof(u32));
-#endif
       context->index_count = (u32)index_count;
    }
 

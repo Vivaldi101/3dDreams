@@ -39,7 +39,7 @@ static void win32_fps(hw_window window, u32 fps)
 {
    static char title[512];
 
-   sprintf(title, "FPS: %u", fps);
+   sprintf_s(title, array_count(title), "FPS: %u", fps);
 
    SetWindowText(window.handle, title);
 }

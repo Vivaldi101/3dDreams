@@ -33,6 +33,6 @@ vec3 hsvToRgb(vec3 c)
 
 void main() 
 {
-    out_color = in_color;
-    //out_color = vec4(1.0);
+    //out_color = in_color;
+    out_color = vec4(1.0);
 }
