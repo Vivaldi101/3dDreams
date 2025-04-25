@@ -21,5 +21,5 @@ for %%F in (assets\shaders\*.frag.glsl) do (
 )
 
 echo "Copying assets..."
-echo xcopy "assets" "bin\assets" /h /i /c /k /e /r /y
-xcopy "assets" "bin\assets" /h /i /c /k /e /r /y
+echo xcopy "assets\shaders" "bin\assets" /h /i /c /k /e /r /y
+xcopy "assets\shaders" "bin\assets" /h /i /c /k /e /r /y

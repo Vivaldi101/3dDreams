@@ -46,52 +46,19 @@ typedef struct
 
 static bool key_equals(hash_key a, hash_key b)
 {
-   // TODO: memcmp
-   return a.vi == b.vi && a.vni == b.vni && a.vti == b.vti;
+   return memcmp(&a, &b, sizeof(hash_key)) == 0;
 }
 
 static bool key_less(hash_key a, hash_key b)
 {
-   if(a.vi != b.vi)  
-      return a.vi < b.vi;
-   if(a.vni != b.vni) 
-      return a.vni < b.vni;
-   return a.vti < b.vti;
+   return a.vi < b.vi && a.vni < b.vni && a.vti < b.vti;
 }
 
 static inline bool key_is_empty(hash_key k)
 {
-   // TODO: memcmp
-   return k.vi == -1 && k.vti == -1 && k.vni == -1;
+   hash_key empty = {-1, -1, -1};
+   return memcmp(&k, &empty, sizeof(hash_key)) == 0;
 }
-
-static inline u32 float_to_bits(f32 f)
-{
-   u32 u;
-   memcpy(&u, &f, sizeof(u32));
-   return u;
-}
-
-#if 0
-static hash_key hash_vertex(const tinyobj_vertex* v, size modulo)
-{
-   hash_key hash = 2166136261u;
-
-#define HASH_F(f) do { \
-        hash_key bits = float_to_bits((f)); \
-        hash ^= bits; \
-        hash *= 16777619u; \
-    } while(0)
-
-   HASH_F(v->vx); HASH_F(v->vy); HASH_F(v->vz);
-   HASH_F(v->nx); HASH_F(v->ny); HASH_F(v->nz);
-   HASH_F(v->tu); HASH_F(v->tv);
-
-#undef HASH_F
-
-   return hash % modulo;
-}
-#endif
 
 static u32 hash_index(hash_key k)
 {
@@ -110,53 +77,6 @@ static u32 hash_index(hash_key k)
    return hash;
 }
 
-#if 0
-static hash_value hash_lookup(hash_table* table, u32 key)
-{
-   u32 index = key % table->max_count;
-
-   while(table->keys[index] != -1 && table->keys[index] < key)
-      index = index % table->max_count;
-   if(table->keys[index] == key)
-      return table->values[index];
-
-   return ~0u;
-}
-
-static void hash_insert(hash_table* table, u32 key, hash_value value)
-{
-   if(table->count == table->max_count) return;
-
-   u32 index = key % table->max_count;
-
-   while(table->keys[index] != -1)
-   {
-      if(table->keys[index] > key)
-      {
-         u32 old_key = table->keys[index];
-         table->keys[index] = key;
-         key = old_key;
-
-         hash_value old_value = table->values[index];
-         table->values[index] = value;
-         value = old_value;
-      }
-      else if(table->keys[index] == key)
-      {
-         table->values[index] = value;
-         return;
-      }
-
-      index = index % table->max_count;
-   }
-
-   table->keys[index] = index;
-   table->values[index] = value;
-
-   table->count++;
-}
-#endif
-
 static void hash_insert(hash_table* table, hash_key key, hash_value value)
 {
    u32 index = hash_index(key) % table->max_count;
@@ -171,14 +91,12 @@ static void hash_insert(hash_table* table, hash_key key, hash_value value)
 
       if(key_less(key, table->keys[index]))
       {
-         // Swap in the new key/value here
          hash_key tmp_key = table->keys[index];
          hash_value tmp_value = table->values[index];
 
          table->keys[index] = key;
          table->values[index] = value;
 
-         // Re-insert the displaced entry
          key = tmp_key;
          value = tmp_value;
       }
@@ -887,7 +805,7 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 10.0f;
+      float radius = 20.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = 
@@ -897,18 +815,18 @@ void vk_present(vk_context* context)
           radius * cosf(theta),
       };
 
-      vec3 origin = {0.0f, 2.0f, 0.0f};
+      vec3 origin = {0.0f, 0.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
-      mvp.projection = mat4_perspective(ar, 70.0f, mvp.n, mvp.f);
+      mvp.projection = mat4_perspective(ar, 80.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, -3.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 1.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.3f);
-      mvp.model = mat4_scale(mvp.model, 0.0225f);
-      //mvp.model = mat4_scale(mvp.model, 20.0f);
+      //mvp.model = mat4_scale(mvp.model, 0.45f);
+      mvp.model = mat4_scale(mvp.model, 0.0125f);
+      //mvp.model = mat4_scale(mvp.model, 2.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -965,11 +883,11 @@ void vk_present(vk_context* context)
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 
+#if 0
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
 
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
-#if 0
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
 
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
@@ -1475,7 +1393,7 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-   size buffer_size = MB(200);
+   size buffer_size = MB(100);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -1492,12 +1410,16 @@ bool vk_initialize(hw* hw)
    {
       //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      const char* filename = "sponza.obj";
+      //const char* filename = "sponza.obj";
+      //const char* filename = "rungholt.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "bunny.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
+      //const char* filename = "fireplace_room.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1534,7 +1456,6 @@ bool vk_initialize(hw* hw)
       memset(tinyobj_table.keys, -1, sizeof(hash_key)*index_count);
 
       u32 vertex_index = 0;
-      u32 index_reuse_count = 0;
 
       for(size f = 0; f < index_count; f += 3)
       {
@@ -1584,6 +1505,7 @@ bool vk_initialize(hw* hw)
       }
 
       context->index_count = (u32)index_count;
+      scratch_clear(scratch);
    }
 
    // app callbacks
