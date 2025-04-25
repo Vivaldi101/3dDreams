@@ -33,15 +33,37 @@ typedef struct
    i32 vi, vti, vni;
 } hash_key;
 
-typedef u32 hash_value;
+typedef u32 index_type;
+typedef index_type hash_value;
 
 typedef struct 
 {
    hash_value* values;
-   u32* keys;
+   hash_key* keys;
    usize count;
    usize max_count;
 } hash_table;
+
+static bool key_equals(hash_key a, hash_key b)
+{
+   // TODO: memcmp
+   return a.vi == b.vi && a.vni == b.vni && a.vti == b.vti;
+}
+
+static bool key_less(hash_key a, hash_key b)
+{
+   if(a.vi != b.vi)  
+      return a.vi < b.vi;
+   if(a.vni != b.vni) 
+      return a.vni < b.vni;
+   return a.vti < b.vti;
+}
+
+static inline bool key_is_empty(hash_key k)
+{
+   // TODO: memcmp
+   return k.vi == -1 && k.vti == -1 && k.vni == -1;
+}
 
 static inline u32 float_to_bits(f32 f)
 {
@@ -88,6 +110,7 @@ static u32 hash_index(hash_key k)
    return hash;
 }
 
+#if 0
 static hash_value hash_lookup(hash_table* table, u32 key)
 {
    u32 index = key % table->max_count;
@@ -131,6 +154,53 @@ static void hash_insert(hash_table* table, u32 key, hash_value value)
    table->values[index] = value;
 
    table->count++;
+}
+#endif
+
+static void hash_insert(hash_table* table, hash_key key, hash_value value)
+{
+   u32 index = hash_index(key) % table->max_count;
+
+   while(!key_is_empty(table->keys[index]))
+   {
+      if(key_equals(table->keys[index], key))
+      {
+         table->values[index] = value; // update
+         return;
+      }
+
+      if(key_less(key, table->keys[index]))
+      {
+         // Swap in the new key/value here
+         hash_key tmp_key = table->keys[index];
+         hash_value tmp_value = table->values[index];
+
+         table->keys[index] = key;
+         table->values[index] = value;
+
+         // Re-insert the displaced entry
+         key = tmp_key;
+         value = tmp_value;
+      }
+
+      index = (index + 1) % table->max_count;
+   }
+
+   table->keys[index] = key;
+   table->values[index] = value;
+}
+
+static hash_value hash_lookup(hash_table* table, hash_key key)
+{
+   u32 index = hash_index(key) % table->max_count;
+
+   while(!key_is_empty(table->keys[index]) && key_less(table->keys[index], key))
+      index = (index + 1) % table->max_count;
+
+   if(key_equals(table->keys[index], key))
+      return table->values[index];
+
+   return ~0u;
 }
 
 static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -836,7 +906,7 @@ void vk_present(vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 0.05f);
+      mvp.model = mat4_scale(mvp.model, 1.05f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1418,7 +1488,7 @@ bool vk_initialize(hw* hw)
 
  // tinyobj 
    {
-      const char* filename = "teapot4.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
       //const char* filename = "sponza.obj";
       //const char* filename = "holodeck.obj";
@@ -1451,10 +1521,10 @@ bool vk_initialize(hw* hw)
       if(scratch_left(scratch, hash_value) < index_count)
          return 0;
 
-      tinyobj_table.keys = new(&scratch, u32, index_count);
+      tinyobj_table.keys = new(&scratch, hash_key, index_count);
       tinyobj_table.values = new(&scratch, hash_value, index_count);
 
-      memset(tinyobj_table.keys, -1, sizeof(u32)*index_count);
+      memset(tinyobj_table.keys, -1, sizeof(hash_key)*index_count);
 
       u32 vertex_index = 0;
       u32 index_reuse_count = 0;
@@ -1472,7 +1542,7 @@ bool vk_initialize(hw* hw)
             hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
             hash_value key = hash_index(index) % tinyobj_table.max_count;
 
-            hash_value lookup = hash_lookup(&tinyobj_table, key);
+            hash_value lookup = hash_lookup(&tinyobj_table, index);
 
             tinyobj_vertex v = {};
             if(lookup == ~0u)
@@ -1497,7 +1567,7 @@ bool vk_initialize(hw* hw)
                   v.tv = attrib.texcoords[vti * 2 + 1];
                }
 
-               hash_insert(&tinyobj_table, key, vertex_index);
+               hash_insert(&tinyobj_table, index, vertex_index);
                ((u32*)context->ib.data)[f + i] = vertex_index;
                ((tinyobj_vertex*)context->vb.data)[vertex_index++] = v;
             }
