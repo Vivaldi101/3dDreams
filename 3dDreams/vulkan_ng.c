@@ -903,10 +903,12 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 70.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, -3.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 1.05f);
+      //mvp.model = mat4_scale(mvp.model, 0.3f);
+      mvp.model = mat4_scale(mvp.model, 0.0225f);
+      //mvp.model = mat4_scale(mvp.model, 20.0f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1473,7 +1475,7 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-   size buffer_size = MB(10);
+   size buffer_size = MB(200);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
@@ -1488,10 +1490,15 @@ bool vk_initialize(hw* hw)
 
  // tinyobj 
    {
-      const char* filename = "teapot3.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      //const char* filename = "sponza.obj";
+      const char* filename = "sponza.obj";
+      //const char* filename = "max-planck.obj";
+      //const char* filename = "bunny.obj";
+      //const char* filename = "erato.obj";
+      //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
+
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
       tinyobj_attrib_t attrib = {};
