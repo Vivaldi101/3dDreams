@@ -825,8 +825,8 @@ void vk_present(vk_context* context)
 
       mvp.model = mat4_identity();
       //mvp.model = mat4_scale(mvp.model, 0.45f);
-      mvp.model = mat4_scale(mvp.model, 0.0125f);
-      //mvp.model = mat4_scale(mvp.model, 2.5f);
+      //mvp.model = mat4_scale(mvp.model, 0.0125f);
+      mvp.model = mat4_scale(mvp.model, 20.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1418,8 +1418,8 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "exterior.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;

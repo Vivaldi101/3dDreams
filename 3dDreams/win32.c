@@ -283,7 +283,6 @@ static void arena_free(arena* a)
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
 {
-   const size virtual_memory_amount = default_arena_size;
    const char** argv = 0;
    int argc = 0;
    hw hw = {0};
@@ -291,9 +290,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw_virtual_memory_init();
 
    // TODO: Pool these
-   arena base_storage = hw.vk_storage = arena_new(virtual_memory_amount);
-   hw.vk_scratch = arena_new(virtual_memory_amount);
-   hw.misc_storage = arena_new(virtual_memory_amount);
+   arena base_storage = hw.vk_storage = arena_new(default_arena_size);
+   hw.vk_scratch = arena_new(default_arena_size*100);
+   hw.misc_storage = arena_new(default_arena_size);
    argv = cmd_parse(&hw.misc_storage, lpszCmdLine, &argc);
 
    hw.renderer.window.open = win32_window_open;
