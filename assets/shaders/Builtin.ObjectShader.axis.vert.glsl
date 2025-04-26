@@ -27,7 +27,7 @@ void main() {
    
     const int verts_count = 18;
     const float arrow_head_scale = 0.10;
-    const float axis_scale = 1.0;
+    const float axis_scale = 3.0;
     const float axis_down_scale = axis_scale - 0.2;
 vec3 positions[verts_count] = vec3[](
     // X axis

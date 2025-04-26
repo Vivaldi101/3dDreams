@@ -544,47 +544,43 @@ static VkImage vk_depth_image_create(VkDevice logical_dev, VkPhysicalDevice phys
 
    VkImage result = 0;
 
-   // Image creation info structure
    VkImageCreateInfo image_info = {};
    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-   image_info.imageType = VK_IMAGE_TYPE_2D;  // 2D depth image
-   image_info.extent = extent;              // Width, height, depth
+   image_info.imageType = VK_IMAGE_TYPE_2D; 
+   image_info.extent = extent;
    image_info.mipLevels = 1;
    image_info.arrayLayers = 1;
    image_info.format = format;
    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;  // Initial layout
-   image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;  // Depth usage
-   image_info.samples = VK_SAMPLE_COUNT_1_BIT;  // No multisampling
+   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+   image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
 
-   // Create the depth image
    if(vkCreateImage(logical_dev, &image_info, 0, &result) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
-   // Allocate memory for the image
    VkMemoryRequirements memory_requirements;
    vkGetImageMemoryRequirements(logical_dev, result, &memory_requirements);
 
-   // Allocate memory (find suitable memory type)
    VkMemoryAllocateInfo alloc_info = {};
    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
    alloc_info.allocationSize = memory_requirements.size;
 
-   // Find a memory type that supports depth-stencil attachments
    VkPhysicalDeviceMemoryProperties memory_properties;
    vkGetPhysicalDeviceMemoryProperties(physical_dev, &memory_properties);
 
    uint32_t memory_type_index = VK_MAX_MEMORY_TYPES;
-   for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
+   for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
       if((memory_requirements.memoryTypeBits & (1 << i)) &&
-          (memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+          (memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      {
          memory_type_index = i;
          break;
       }
-   }
+
    if(memory_type_index == VK_MAX_MEMORY_TYPES)
       return VK_NULL_HANDLE;
 
@@ -594,7 +590,6 @@ static VkImage vk_depth_image_create(VkDevice logical_dev, VkPhysicalDevice phys
    if(vkAllocateMemory(logical_dev, &alloc_info, 0, &memory) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
-   // Bind the memory to the image
    if(vkBindImageMemory(logical_dev, result, memory, 0) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
@@ -807,8 +802,8 @@ void vk_present(vk_context* context)
 
       mvp_transform mvp = {};
 
-      mvp.n = 0.01f;
-      mvp.f = 1000.0f;
+      mvp.n = 0.1f;
+      mvp.f = 10000.0f;
       mvp.ar = ar;
 
       float radius = 20.0f;
@@ -902,11 +897,11 @@ void vk_present(vk_context* context)
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 
-#if 0
       // draw axes
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
+#if 0
       // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
