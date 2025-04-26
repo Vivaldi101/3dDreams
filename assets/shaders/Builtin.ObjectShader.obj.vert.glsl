@@ -11,13 +11,6 @@ layout(push_constant) uniform Transform
    float ar;
 } transform;
 
-const vec3 verts[] = 
-{
-   vec3(0.0, -1.0f, 1.0f),
-   vec3(1.0f, 1.0f, 1.0f),
-   vec3(-1.0f, 1.0f, 1.0f),
-};
-
 vec3 cube_strip[] = {
     vec3(-1.0f, -1.0f, +1.0f),
     vec3(+1.0f, -1.0f, +1.0f),
@@ -85,15 +78,25 @@ const vec3 foo[5] = {
     vec3(-0.5, -0.5, -0.5)    // Base back-left
 };
 
-layout(location = 0) out vec4 out_color;
+struct Vertex
+{
+   float vx, vy, vz;   // pos
+   float nx, ny, nz;   // normal
+   float tu, tv;       // texture
+};
 
-layout(location = 0) in vec3 in_pos;
-layout(location = 1) in vec3 in_normal;
-layout(location = 2) in vec2 in_uv;
+layout(set = 0, binding = 0) readonly buffer Verts
+{
+   Vertex verts[];
+};
+
+layout(location = 0) out vec4 out_color;
 
 void main()
 {
-   gl_Position = transform.projection * transform.view * transform.model * vec4(in_pos, 1.0f);
+   Vertex v = verts[gl_VertexIndex];
 
-   out_color = vec4(in_normal * 0.75, 1.0);
+   gl_Position = transform.projection * transform.view * transform.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+
+   out_color = vec4(vec3(v.nx, v.ny, v.nz) * 0.75, 1.0);
 }

@@ -403,13 +403,18 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
    const char* dev_ext_names[] = 
    {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+      VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+      VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
    };
 
    VkPhysicalDeviceFeatures enabled_features = {};
    enabled_features.depthBounds = VK_TRUE;
    enabled_features.wideLines = VK_TRUE;
    enabled_features.fillModeNonSolid = VK_TRUE;
+   //enabled_features.vertexPipelineStoresAndAtomics = VK_TRUE;
+   //enabled_features.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
+   //enabled_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
@@ -811,22 +816,22 @@ void vk_present(vk_context* context)
       vec3 eye = 
       {
           radius * sinf(theta),
-          5.0f,
+          10.0f,
           radius * cosf(theta),
       };
 
-      vec3 origin = {0.0f, 0.0f, 0.0f};
+      vec3 origin = {0.0f, 15.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
-      mvp.projection = mat4_perspective(ar, 80.0f, mvp.n, mvp.f);
+      mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
       mat4 translate = mat4_translate((vec3){0.0f, 1.0f, 0.0f});
 
       mvp.model = mat4_identity();
       //mvp.model = mat4_scale(mvp.model, 0.45f);
-      //mvp.model = mat4_scale(mvp.model, 0.0125f);
-      mvp.model = mat4_scale(mvp.model, 20.5f);
+      mvp.model = mat4_scale(mvp.model, 0.125f);
+      //mvp.model = mat4_scale(mvp.model, 20.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -842,6 +847,7 @@ void vk_present(vk_context* context)
       vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
+      // TODO: Enable depth image barriers
       //VkImage depth_image = context->swapchain_info.depths[image_index];
       //VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
       //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
@@ -878,18 +884,30 @@ void vk_present(vk_context* context)
 
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->obj_pipeline);
 
-      const VkDeviceSize offset = 0;
-      vkCmdBindVertexBuffers(command_buffer, 0, 1, &context->vb.handle, &offset);
+      VkDescriptorBufferInfo desc_buffer_info = {};
+      desc_buffer_info.buffer = context->vb.handle;
+      desc_buffer_info.offset = 0;
+      desc_buffer_info.range = context->vb.size;
+
+      VkWriteDescriptorSet desc_write_set[1] = {};
+      desc_write_set[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      desc_write_set[0].dstBinding = 0;
+      desc_write_set[0].descriptorCount = 1;
+      desc_write_set[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      desc_write_set[0].pBufferInfo = &desc_buffer_info;
+
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(desc_write_set), desc_write_set);
+
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 
 #if 0
+      // draw axes
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
-
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
+      // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
-
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
 #endif
 
@@ -973,11 +991,38 @@ static vk_shader_modules vk_shaders_load(VkDevice logical_dev, arena scratch, co
    return shader_modules;
 }
 
+static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
+{
+   assert(vk_valid_handle(logical_dev));
+   VkDescriptorSetLayout set_layout = 0;
+
+   VkDescriptorSetLayoutBinding bindings[1] = {};
+   bindings[0].binding = 0;
+   bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   bindings[0].descriptorCount = 1;
+   bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+   VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
+
+   info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+   info.bindingCount = array_count(bindings);
+   info.pBindings = bindings;
+
+   vkCreateDescriptorSetLayout(logical_dev, &info, 0, &set_layout);
+
+   return set_layout;
+}
+
 static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
 {
+   assert(vk_valid_handle(logical_dev));
    VkPipelineLayout layout = 0;
 
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
+
+   VkDescriptorSetLayout set_layout = vk_pipeline_set_layout_create(logical_dev);
+   if(!vk_valid_handle(set_layout))
+      return VK_NULL_HANDLE;
 
    VkPushConstantRange push_constants = {};
    push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -986,6 +1031,8 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
 
    info.pushConstantRangeCount = 1;
    info.pPushConstantRanges = &push_constants;
+   info.setLayoutCount = 1;
+   info.pSetLayouts = &set_layout;
 
    vk_test_return(vkCreatePipelineLayout(logical_dev, &info, 0, &layout));
 
@@ -1020,6 +1067,8 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
 
+#if 0
+   // No more legacy FFP input assembly
    VkVertexInputBindingDescription stream = {};
    stream.binding = 0;
    stream.stride = sizeof(tinyobj_vertex);
@@ -1045,6 +1094,7 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
    vertex_input_info.pVertexBindingDescriptions = &stream;
    vertex_input_info.vertexAttributeDescriptionCount = array_count(attributes);
    vertex_input_info.pVertexAttributeDescriptions = attributes;
+#endif
 
    pipeline_info.pVertexInputState = &vertex_input_info;
 
@@ -1395,7 +1445,7 @@ bool vk_initialize(hw* hw)
 
    size buffer_size = MB(100);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
    // valid gpu buffers
    if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE)
@@ -1410,7 +1460,7 @@ bool vk_initialize(hw* hw)
    {
       //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      //const char* filename = "sponza.obj";
+      const char* filename = "sponza.obj";
       //const char* filename = "rungholt.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "bunny.obj";
@@ -1418,7 +1468,7 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
