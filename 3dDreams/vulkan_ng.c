@@ -412,9 +412,6 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
    enabled_features.depthBounds = VK_TRUE;
    enabled_features.wideLines = VK_TRUE;
    enabled_features.fillModeNonSolid = VK_TRUE;
-   //enabled_features.vertexPipelineStoresAndAtomics = VK_TRUE;
-   //enabled_features.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
-   //enabled_features.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
@@ -541,6 +538,10 @@ static VkCommandPool vk_command_pool_create(VkDevice logical_dev, u32 queue_fami
 
 static VkImage vk_depth_image_create(VkDevice logical_dev, VkPhysicalDevice physical_dev, VkFormat format, VkExtent3D extent)
 {
+   assert(vk_valid_handle(logical_dev));
+   assert(vk_valid_handle(physical_dev));
+   assert(vk_valid_format(format));
+
    VkImage result = 0;
 
    // Image creation info structure
