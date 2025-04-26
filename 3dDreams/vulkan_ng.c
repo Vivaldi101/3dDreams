@@ -33,14 +33,12 @@ typedef struct
    i32 vi, vti, vni;
 } hash_key;
 
-typedef u32 index_type;
-typedef index_type hash_value;
+typedef u32 hash_value;
 
 typedef struct 
 {
    hash_value* values;
    hash_key* keys;
-   usize count;
    usize max_count;
 } hash_table;
 
@@ -806,28 +804,28 @@ void vk_present(vk_context* context)
       mvp.f = 10000.0f;
       mvp.ar = ar;
 
-      float radius = 20.0f;
+      float radius = 1.0f;
       float theta = DEG2RAD(rot);
 
       vec3 eye = 
       {
           radius * sinf(theta),
-          10.0f,
+          0.0f,
           radius * cosf(theta),
       };
 
-      vec3 origin = {0.0f, 15.0f, 0.0f};
+      vec3 origin = {0.0f, 0.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 1.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
       //mvp.model = mat4_scale(mvp.model, 0.45f);
-      mvp.model = mat4_scale(mvp.model, 0.125f);
-      //mvp.model = mat4_scale(mvp.model, 20.5f);
+      //mvp.model = mat4_scale(mvp.model, 0.125f);
+      mvp.model = mat4_scale(mvp.model, 1.0f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1456,7 +1454,7 @@ bool vk_initialize(hw* hw)
    {
       //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      const char* filename = "sponza.obj";
+      //const char* filename = "sponza.obj";
       //const char* filename = "rungholt.obj";
       //const char* filename = "max-planck.obj";
       //const char* filename = "bunny.obj";
@@ -1464,7 +1462,7 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      //const char* filename = "buddha.obj";
+      const char* filename = "buddha.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;

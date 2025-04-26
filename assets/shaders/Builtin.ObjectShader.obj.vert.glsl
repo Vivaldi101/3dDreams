@@ -81,7 +81,7 @@ const vec3 foo[5] = {
 struct Vertex
 {
    float vx, vy, vz;   // pos
-   float nx, ny, nz;   // normal
+   float nx, ny, nz;   // normal TODO: Use 8 bit normals in future
    float tu, tv;       // texture
 };
 
