@@ -1464,7 +1464,7 @@ bool vk_initialize(hw* hw)
          return false;
       }
 
-      // TODO: only triangles allowed
+      // only triangles allowed
       assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
 
       const size index_count = attrib.num_faces;
@@ -1534,6 +1534,10 @@ bool vk_initialize(hw* hw)
       }
 
       context->index_count = (u32)index_count;
+
+      tinyobj_materials_free(materials, material_count);
+      tinyobj_shapes_free(shapes, shape_count);
+      tinyobj_attrib_free(&attrib);
    }
 
    // app callbacks
