@@ -3,7 +3,7 @@
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
-static file_result vk_shader_spv_read(arena* storage, const char* shader_dir, const char* shader_name, VkShaderStageFlagBits type)
+static arena vk_shader_spv_read(arena* storage, const char* shader_dir, const char* shader_name, VkShaderStageFlagBits type)
 {
    char* type_name;
    char shader_path[MAX_PATH];
@@ -26,23 +26,23 @@ static file_result vk_shader_spv_read(arena* storage, const char* shader_dir, co
    return win32_file_read(storage, shader_path);
 }
 
-static file_result vk_project_directory(arena* storage)
+static arena vk_project_directory(arena* storage)
 {
-   file_result result = {};
+   arena result = new(storage, char, MAX_PATH);
+   if(result.beg == result.end)
+      return (arena){0};
 
-   arena file = new(storage, char, MAX_PATH);
-   if(file.beg == file.end)
-      return (file_result){0};
-
-   char* fb = file.beg;
+   char* fb = result.beg;
 
    GetCurrentDirectory(MAX_PATH, fb);
 
-   result.data.beg = fb;
-   result.file_size = strlen(fb);
+   usize file_size = strlen(fb);
 
    u32 count = 0;
-   for(size i = result.file_size-1; i-- >= 0;)
+
+   assert(file_size != 0u);
+
+   for(size i = file_size-1; i-- >= 0;)
    {
       if(fb[i] == '\\')
          ++count;
@@ -53,7 +53,9 @@ static file_result vk_project_directory(arena* storage)
       }
    }
 
-   result.file_size = strlen(fb);
+   file_size = strlen(fb);
+
+   scratch_shrink(result, file_size, char);
 
    return result;
 }

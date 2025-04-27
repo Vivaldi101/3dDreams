@@ -294,9 +294,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw.vk_scratch = arena_new(default_arena_size*100);
    hw.misc_storage = arena_new(default_arena_size);
 
-
-   //argv = cmd_parse(&hw.misc_storage, lpszCmdLine, &argc);
-
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
    hw.renderer.window_surface_create = window_surface_create;

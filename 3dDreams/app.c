@@ -14,15 +14,6 @@ typedef struct app_some_type
 } app_some_type;
 
 
-static void app_frame_draw(arena_result scratch)
-{
-   for(size i = 0; i < scratch.count; ++i)
-   {
-      app_some_type* p = (app_some_type*)scratch.data + i;
-      p->isvalid = true;
-   }
-}
-
 static void app_frame_draw_all(arena scratch)
 {
    // take all the scratch space left

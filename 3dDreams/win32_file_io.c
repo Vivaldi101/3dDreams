@@ -2,42 +2,38 @@
 #include "arena.h"
 #include <stdio.h>
 
-// Remove to just use an arena
-align_struct file_result
+static arena win32_file_read(arena* file_arena, const char* path)
 {
-   arena data;
-	size file_size;
-} file_result;
-
-static file_result win32_file_read(arena* file_arena, const char* path)
-{
-   file_result result = {};
+   arena result = {};
 
    HANDLE file = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
    if(file == INVALID_HANDLE_VALUE)
    {
       hw_message("No file with such name");
-      return (file_result) {};
+      return (arena) {};
    }
 
    LARGE_INTEGER file_size;
    if(!GetFileSizeEx(file, &file_size))
-      return (file_result) {};
+      return (arena) {};
 
    u32 file_size_32 = (u32)(file_size.QuadPart);
    if(file_size_32 == 0)
-      return (file_result) {};
+      return (arena) {};
 
    if(arena_left(file_arena, byte) < file_size_32)
-      return (file_result) {};
+      return (arena) {};
 
-   result.data = newsize(file_arena, file_size_32);
+   result = newsize(file_arena, file_size_32);
+
+   if(is_stub(result))
+      return (arena){};
 
    DWORD bytes_read = 0;
-   if(!(ReadFile(file, result.data.beg, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
-      return (file_result) {};
+   if(!(ReadFile(file, result.beg, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
+      return (arena) {};
 
-   result.file_size = bytes_read;
+   scratch_shrink(result, bytes_read, char);
 
    CloseHandle(file);
 

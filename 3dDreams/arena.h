@@ -31,6 +31,7 @@
 #define scratch_shrink(a, s, t) (a).end = (a).beg + (s)*sizeof(t)
 
 #define arena_invariant(s, a, t) assert((s) <= arena_left((a), t))
+#define arena_shrink(a, s, t) (a)->end = (a)->beg + (s)*sizeof(t)
 
 #define is_stub(a) ((a).beg == (a).end)
 
@@ -52,13 +53,6 @@
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
-
-// arena result type
-typedef struct
-{
-   void* data;
-   size count;
-} arena_result;
 
 typedef struct arena
 {

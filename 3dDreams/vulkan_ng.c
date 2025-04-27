@@ -127,15 +127,21 @@ static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const
 
    tinyobj_user_ctx* user_data = (tinyobj_user_ctx*)ctx;
 
-   file_result project_dir = vk_project_directory(&user_data->scratch);
+   arena project_dir = vk_project_directory(&user_data->scratch);
 
-   wsprintf(shader_path, project_dir.data.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.data.beg, obj_filename);
+   if(is_stub(project_dir))
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
 
-   file_result file_read = win32_file_read(&user_data->scratch, shader_path);
+   wsprintf(shader_path, project_dir.beg, array_count(shader_path));
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, obj_filename);
 
-   *len = file_read.file_size;
-   *buf = file_read.data.beg;
+   arena file_read = win32_file_read(&user_data->scratch, shader_path);
+
+   *len = scratch_size(file_read);
+   *buf = file_read.beg;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
@@ -973,21 +979,21 @@ static vk_shader_modules vk_shaders_load(VkDevice logical_dev, arena scratch, co
    vk_shader_modules shader_modules = {};
    VkShaderStageFlagBits shader_type_bits[OBJECT_SHADER_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 
-   file_result project_dir = vk_project_directory(&scratch);
+   arena project_dir = vk_project_directory(&scratch);
 
-   if(project_dir.file_size == 0)
+   if(is_stub(project_dir))
       return (vk_shader_modules){0};
 
    for(u32 i = 0; i < OBJECT_SHADER_COUNT; ++i)
    {
-      file_result shader_file = vk_shader_spv_read(&scratch, project_dir.data.beg, shader_name, shader_type_bits[i]);
-      if(shader_file.file_size == 0)
+      arena shader_file = vk_shader_spv_read(&scratch, project_dir.beg, shader_name, shader_type_bits[i]);
+      if(scratch_size(shader_file) == 0)
          return (vk_shader_modules){0};
 
       VkShaderModuleCreateInfo module_info = {};
       module_info.sType = vk_info(SHADER_MODULE);
-      module_info.pCode = (u32*)shader_file.data.beg;
-      module_info.codeSize = shader_file.file_size;
+      module_info.pCode = (u32*)shader_file.beg;
+      module_info.codeSize = scratch_size(shader_file);
 
       if(!vk_valid(vkCreateShaderModule(logical_dev,
          &module_info,
