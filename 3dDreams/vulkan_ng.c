@@ -1462,8 +1462,8 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      const char* filename = "buddha.obj";
-      //const char* filename = "dragon.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -1493,8 +1493,7 @@ bool vk_initialize(hw* hw)
       arena keys = new(&scratch, hash_key, index_count);
       arena values = new(&scratch, hash_value, index_count);
 
-      // both are stub arenas
-      if(keys.beg == keys.end || values.beg == values.end)
+      if(is_stub(keys) || is_stub(values))
          return 0;
 
       tinyobj_table.keys = (hash_key*)keys.beg;

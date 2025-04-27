@@ -32,6 +32,8 @@
 
 #define arena_invariant(s, a, t) assert((s) <= arena_left((a), t))
 
+#define is_stub(a) ((a).beg == (a).end)
+
 // TODO: Different news for scratch and storage arenas
 
 #define newx(a,b,c,d,e,...) e
@@ -69,7 +71,6 @@ static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   //assert(!(count <= 0 || count > (a->end - (byte*)p) / alloc_size));
    if(count <= 0 || count > (a->end - (char*)p) / alloc_size)
       return (arena){};
 
