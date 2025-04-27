@@ -1490,13 +1490,15 @@ bool vk_initialize(hw* hw)
 
       scratch_clear(scratch);
 
-      if(scratch_left(scratch, hash_key) < index_count)
-         return 0;
-      if(scratch_left(scratch, hash_value) < index_count)
+      arena keys = new(&scratch, hash_key, index_count);
+      arena values = new(&scratch, hash_value, index_count);
+
+      // both are stub arenas
+      if(keys.beg == keys.end || values.beg == values.end)
          return 0;
 
-      tinyobj_table.keys = (hash_key*)new(&scratch, hash_key, index_count).beg;
-      tinyobj_table.values = (hash_value*)new(&scratch, hash_value, index_count).beg;
+      tinyobj_table.keys = (hash_key*)keys.beg;
+      tinyobj_table.values = (hash_value*)values.beg;
 
       memset(tinyobj_table.keys, -1, sizeof(hash_key)*index_count);
 
@@ -1550,7 +1552,6 @@ bool vk_initialize(hw* hw)
       }
 
       context->index_count = (u32)index_count;
-      scratch_clear(scratch);
    }
 
    // app callbacks
