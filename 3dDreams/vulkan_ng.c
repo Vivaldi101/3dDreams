@@ -1087,35 +1087,6 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
 
-#if 0
-   // No more legacy FFP input assembly
-   VkVertexInputBindingDescription stream = {};
-   stream.binding = 0;
-   stream.stride = sizeof(tinyobj_vertex);
-   stream.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-   VkVertexInputAttributeDescription attributes[3] = {};
-   // pos
-   attributes[0].location = 0;
-   attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-   attributes[0].offset = 0;
-
-   // normal
-   attributes[1].location = 1;
-   attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-   attributes[1].offset = 12;
-
-   // texture
-   attributes[2].location = 2;
-   attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
-   attributes[2].offset = 24;
-
-   vertex_input_info.vertexBindingDescriptionCount = 1;
-   vertex_input_info.pVertexBindingDescriptions = &stream;
-   vertex_input_info.vertexAttributeDescriptionCount = array_count(attributes);
-   vertex_input_info.pVertexAttributeDescriptions = attributes;
-#endif
-
    pipeline_info.pVertexInputState = &vertex_input_info;
 
    VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
@@ -1376,16 +1347,13 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   arena a = new(&hw->vk_storage, vk_context);
-   if(a.beg == a.end)
+   vk_context* context = (vk_context*)new(&hw->vk_storage, vk_context).beg;
+   if(!context)
       return false;
-
-   vk_context* context = (vk_context*)a.beg;
 
    context->storage = &hw->vk_storage;
 
    arena scratch = hw->vk_scratch;
-
    VkInstance instance = vk_instance_create(scratch);
 
    if(!instance)
