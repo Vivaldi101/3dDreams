@@ -1458,8 +1458,8 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_user_ctx user_data = {};
@@ -1471,6 +1471,12 @@ bool vk_initialize(hw* hw)
       callbacks.file_close = obj_file_close;
 
       fastObjMesh* mesh = fast_obj_read_with_callbacks(filename, &callbacks, &user_data);
+
+      if(!mesh)
+      {
+         hw_message("Could not load the .obj mesh");
+         return 0;
+      }
 
       const size index_count = mesh->index_count;
 
