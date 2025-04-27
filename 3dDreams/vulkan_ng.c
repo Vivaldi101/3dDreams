@@ -1364,10 +1364,11 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   if(scratch_left(hw->vk_storage, vk_context) < 1)
+   arena a = new(&hw->vk_storage, vk_context);
+   if(a.beg == a.end)
       return false;
 
-   vk_context* context = (vk_context*)new(&hw->vk_storage, vk_context).beg;
+   vk_context* context = (vk_context*)a.beg;
 
    context->storage = &hw->vk_storage;
 
