@@ -30,28 +30,30 @@ static file_result vk_project_directory(arena* storage)
 {
    file_result result = {};
 
-   if(arena_size(storage) < MAX_PATH)
+   arena file = new(storage, char, MAX_PATH);
+   if(file.beg == file.end)
       return (file_result){0};
 
-   char* file_buffer = new(storage, char, MAX_PATH);
-   GetCurrentDirectory(MAX_PATH, file_buffer);
+   char* fb = file.beg;
 
-   result.data = file_buffer;
-   result.file_size = strlen(file_buffer);
+   GetCurrentDirectory(MAX_PATH, fb);
+
+   result.data.beg = fb;
+   result.file_size = strlen(fb);
 
    u32 count = 0;
    for(size i = result.file_size-1; i-- >= 0;)
    {
-      if(result.data[i] == '\\')
+      if(fb[i] == '\\')
          ++count;
       if(count == 2)
       {
-         result.data[i+1] = 0;
+         fb[i+1] = 0;
          break;
       }
    }
 
-   result.file_size = strlen((const char*)result.data);
+   result.file_size = strlen(fb);
 
    return result;
 }

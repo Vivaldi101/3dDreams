@@ -3,7 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <assert.h>
+#include <setjmp.h>
 #include "common.h"
+
 
 #define arena_full(a)      ((a)->beg == (a)->end)   // or empty for stub arenas
 #define arena_loop(i, a, p) for(size (i) = 0; (i) < scratch_left((a), *(p)); ++(i))
@@ -34,9 +36,9 @@
 
 #define newx(a,b,c,d,e,...) e
 #define new(...)            newx(__VA_ARGS__,new4,new3,new2)(__VA_ARGS__)
-#define new2(a, t)          (t*)alloc(a, sizeof(t), __alignof(t), 1, 0)
-#define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
-#define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
+#define new2(a, t)          alloc(a, sizeof(t), __alignof(t), 1, 0)
+#define new3(a, t, n)       alloc(a, sizeof(t), __alignof(t), n, 0)
+#define new4(a, t, n, f)    alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define newxsize(a,b,c,d,e,...) e
 #define newsize(...)            newxsize(__VA_ARGS__,new4size,new3size,new2size)(__VA_ARGS__)
@@ -58,24 +60,27 @@ typedef struct
 
 typedef struct arena
 {
-   byte* beg;
-   byte* end;  // one past the end
+   char* beg;
+   char* end;  // one past the end
 } arena;
 
-static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
+static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   assert(!(count <= 0 || count > (a->end - (byte*)p) / alloc_size));
+   //assert(!(count <= 0 || count > (a->end - (byte*)p) / alloc_size));
+   if(count <= 0 || count > (a->end - (char*)p) / alloc_size)
+      return (arena){};
 
-   a->beg = (byte*)p + (count * alloc_size);          // advance arena 
+   a->beg = (char*)p + (count * alloc_size);          // advance arena 
 
    post(((uptr)p & (align - 1)) == 0);   // aligned result
 
-   return p;
+   return (arena){p, a->end};
 }
 
+#if 0
 static arena_result arena_alloc(arena scratch, size objsize, size count)
 {
    arena_result result = {};
@@ -86,3 +91,4 @@ static arena_result arena_alloc(arena scratch, size objsize, size count)
 
    return result;
 }
+#endif

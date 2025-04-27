@@ -2,9 +2,10 @@
 #include "arena.h"
 #include <stdio.h>
 
+// Remove to just use an arena
 align_struct file_result
 {
-   char* data;
+   arena data;
 	size file_size;
 } file_result;
 
@@ -33,7 +34,7 @@ static file_result win32_file_read(arena* file_arena, const char* path)
    result.data = newsize(file_arena, file_size_32);
 
    DWORD bytes_read = 0;
-   if(!(ReadFile(file, result.data, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
+   if(!(ReadFile(file, result.data.beg, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
       return (file_result) {};
 
    result.file_size = bytes_read;

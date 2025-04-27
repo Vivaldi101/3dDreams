@@ -7,3 +7,6 @@
 [submodule "extern/--force"]
 	path = extern/--force
 	url = https://github.com/zeux/meshoptimizer.git
+[submodule "extern/fast_obj"]
+	path = extern/fast_obj
+	url = git@github.com:thisistherk/fast_obj.git

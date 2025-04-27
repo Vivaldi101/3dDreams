@@ -62,15 +62,17 @@ static u32 hash_index(hash_key k)
 {
    u32 hash = 2166136261u;
 
-#define HASH_F(f) do { \
-        u32 bits = (f); \
-        hash ^= bits; \
-        hash *= 16777619u; \
+#define HASH(f) do {          \
+        u32 bits = (f);       \
+        hash ^= bits;         \
+        hash *= 16777619u;    \
     } while(0)
 
-   HASH_F(k.vi); HASH_F(k.vni); HASH_F(k.vti);
+   HASH(k.vi); 
+   HASH(k.vni); 
+   HASH(k.vti);
 
-#undef HASH_F
+#undef HASH
 
    return hash;
 }
@@ -127,13 +129,13 @@ static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const
 
    file_result project_dir = vk_project_directory(&user_data->scratch);
 
-   wsprintf(shader_path, project_dir.data, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.data, obj_filename);
+   wsprintf(shader_path, project_dir.data.beg, array_count(shader_path));
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.data.beg, obj_filename);
 
    file_result file_read = win32_file_read(&user_data->scratch, shader_path);
 
    *len = file_read.file_size;
-   *buf = file_read.data;
+   *buf = file_read.data.beg;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
@@ -789,6 +791,7 @@ void vk_present(vk_context* context)
       static f32 rot = 0.0f;
       static f32 originz = -10.0f;
       static f32 cameraz = 0.0f;
+      static f32 t = 0.0f;                 // current time
 
       if(originz > 1.0f)
          originz = -10.0f;
@@ -801,31 +804,39 @@ void vk_present(vk_context* context)
       mvp_transform mvp = {};
 
       mvp.n = 0.1f;
-      mvp.f = 10000.0f;
+      mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      float radius = 1.0f;
-      float theta = DEG2RAD(rot);
+      f32 radius = 10.0f;
+      f32 theta = DEG2RAD(rot);
+      f32 height = 2.0f;
+
+#if 0
+      f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
+      f32 omega = 3.0f;           // angular speed (radians per second)
+      f32 theta = A * sinf(omega * t) + A;  // oscillating between 0 and PI
+      f32 cos_theta = cosf(theta);
+      f32 sin_theta = sinf(theta);
+      t += 0.001f;
+#endif
 
       vec3 eye = 
       {
-          radius * sinf(theta),
-          0.0f,
           radius * cosf(theta),
+          height,
+          radius * sinf(theta)
       };
 
-      vec3 origin = {0.0f, 0.0f, 0.0f};
+      vec3 origin = {0.0f, height, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.5f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.45f);
-      //mvp.model = mat4_scale(mvp.model, 0.125f);
-      mvp.model = mat4_scale(mvp.model, 1.0f);
+      mvp.model = mat4_scale(mvp.model, 10.0f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -964,15 +975,18 @@ static vk_shader_modules vk_shaders_load(VkDevice logical_dev, arena scratch, co
 
    file_result project_dir = vk_project_directory(&scratch);
 
+   if(project_dir.file_size == 0)
+      return (vk_shader_modules){0};
+
    for(u32 i = 0; i < OBJECT_SHADER_COUNT; ++i)
    {
-      file_result shader_file = vk_shader_spv_read(&scratch, project_dir.data, shader_name, shader_type_bits[i]);
+      file_result shader_file = vk_shader_spv_read(&scratch, project_dir.data.beg, shader_name, shader_type_bits[i]);
       if(shader_file.file_size == 0)
-         return (vk_shader_modules) {};
+         return (vk_shader_modules){0};
 
       VkShaderModuleCreateInfo module_info = {};
       module_info.sType = vk_info(SHADER_MODULE);
-      module_info.pCode = (u32*)shader_file.data;
+      module_info.pCode = (u32*)shader_file.data.beg;
       module_info.codeSize = shader_file.file_size;
 
       if(!vk_valid(vkCreateShaderModule(logical_dev,
@@ -1301,35 +1315,25 @@ static VkPipeline vk_axis_pipeline_create(VkDevice logical_dev, VkRenderPass ren
    return pipeline;
 }
 
-const char** vk_extension_names_storage(arena* storage, size ext_count)
-{
-   set_arena_type(const char*);
-   arena_invariant(ext_count, storage, arena_type);
-
-   return new(storage, arena_type, ext_count);
-}
-
 VkInstance vk_instance_create(arena scratch)
 {
-   set_arena_type(VkExtensionProperties);
-
    VkInstance instance = 0;
 
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
       return 0;
 
-   if(scratch_left(scratch, arena_type) < ext_count)
+   if(scratch_left(scratch, VkExtensionProperties) < ext_count)
       return 0;
 
-   arena_type* extensions = new(&scratch, arena_type, ext_count);
+   VkExtensionProperties* extensions = (VkExtensionProperties*)new(&scratch, VkExtensionProperties, ext_count).beg;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
       return 0;
 
    if(scratch_left(scratch, const char*) < ext_count)
       return 0;
 
-   const char** ext_names = vk_extension_names_storage(&scratch, ext_count);
+   const char** ext_names = (const char**)new(&scratch, const char*, ext_count).beg;
 
    for(size_t i = 0; i < ext_count; ++i)
       ext_names[i] = extensions[i].extensionName;
@@ -1360,15 +1364,10 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   set_arena_type(vk_context);
-   size contexts_left = scratch_left(hw->vk_storage, arena_type);
-
-   if(contexts_left < 1)
+   if(scratch_left(hw->vk_storage, vk_context) < 1)
       return false;
 
-   scratch_invariant(1, hw->vk_storage, arena_type);
-
-   arena_type* context = new(&hw->vk_storage, arena_type);
+   vk_context* context = (vk_context*)new(&hw->vk_storage, vk_context).beg;
 
    context->storage = &hw->vk_storage;
 
@@ -1437,7 +1436,7 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-   size buffer_size = MB(100);
+   size buffer_size = MB(1000);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
@@ -1463,6 +1462,7 @@ bool vk_initialize(hw* hw)
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
       const char* filename = "buddha.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -1494,8 +1494,8 @@ bool vk_initialize(hw* hw)
       if(scratch_left(scratch, hash_value) < index_count)
          return 0;
 
-      tinyobj_table.keys = new(&scratch, hash_key, index_count);
-      tinyobj_table.values = new(&scratch, hash_value, index_count);
+      tinyobj_table.keys = (hash_key*)new(&scratch, hash_key, index_count).beg;
+      tinyobj_table.values = (hash_value*)new(&scratch, hash_value, index_count).beg;
 
       memset(tinyobj_table.keys, -1, sizeof(hash_key)*index_count);
 
@@ -1503,7 +1503,7 @@ bool vk_initialize(hw* hw)
 
       for(size f = 0; f < index_count; f += 3)
       {
-         tinyobj_vertex_index_t* vidx = attrib.faces + f;
+         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
          for(size i = 0; i < 3; ++i)
          {
@@ -1516,9 +1516,9 @@ bool vk_initialize(hw* hw)
 
             hash_value lookup = hash_lookup(&tinyobj_table, index);
 
-            tinyobj_vertex v = {};
             if(lookup == ~0u)
             {
+               tinyobj_vertex v = {};
                if(vi >= 0)
                {
                   v.vx = attrib.vertices[vi * 3 + 0];

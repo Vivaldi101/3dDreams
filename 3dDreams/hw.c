@@ -217,6 +217,7 @@ static int cmd_get_arg_count(char* cmd)
    return count;
 }
 
+#if 0
 static char** cmd_parse(arena* storage, char* cmd, int* argc)
 {
 	*argc = cmd_get_arg_count(cmd);
@@ -236,3 +237,4 @@ static char** cmd_parse(arena* storage, char* cmd, int* argc)
 
    return (char**)result.data;
 }
+#endif
