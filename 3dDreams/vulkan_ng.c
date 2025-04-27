@@ -140,6 +140,12 @@ static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const
 
    arena file_read = win32_file_read(&user_data->scratch, shader_path);
 
+   if(is_stub(file_read))
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
+
    *len = scratch_size(file_read);
    *buf = file_read.beg;
 }
@@ -1443,7 +1449,7 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-   size buffer_size = MB(1000);
+   size buffer_size = MB(100);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
@@ -1485,7 +1491,10 @@ bool vk_initialize(hw* hw)
       user_data.scratch = scratch;
 
       if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      {
+         hw_message("Could not load .obj file");
          return false;
+      }
 
       // TODO: only triangles allowed
       assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
