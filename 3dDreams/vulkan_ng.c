@@ -816,12 +816,12 @@ void vk_present(vk_context* context)
       mvp_transform mvp = {};
 
       mvp.n = 0.1f;
-      mvp.f = 1000.0f;
+      mvp.f = 10000.0f;
       mvp.ar = ar;
 
-      f32 radius = 10.0f;
+      f32 radius = 1.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 2.0f;
+      f32 height = 1.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -845,10 +845,10 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.5f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 1.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 10.0f);
+      //mvp.model = mat4_scale(mvp.model, 0.1f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1442,8 +1442,8 @@ bool vk_initialize(hw* hw)
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
       tinyobj_shape_t* shapes = 0;
