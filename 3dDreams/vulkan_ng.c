@@ -11,6 +11,8 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
+//#define RTX 1
+
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
 
@@ -25,6 +27,14 @@ typedef struct
    f32 nx, ny, nz;   // normal
    f32 tu, tv;       // texture
 } obj_vertex;
+
+typedef struct 
+{
+   u32 verts[64];
+   u8 indices[126]; // 42 triangles
+   u8 triangle_count;
+   u8 vertex_count;
+} meshlet;
 
 // Move to ordered hash table file
 
@@ -209,6 +219,7 @@ align_struct
 {
    VkShaderModule vs;
    VkShaderModule fs;
+   VkShaderModule ms;
 } vk_shader_modules;
 
 align_struct
@@ -218,6 +229,12 @@ align_struct
    void* data;
    size size;
 } vk_buffer;
+
+align_struct
+{
+   vk_buffer buffer;
+   u32 count;
+} vk_meshlet;
 
 align_struct
 {
@@ -235,13 +252,14 @@ align_struct
    VkRenderPass renderpass;
 
    // TODO: Pipelines into an array
-   VkPipeline obj_pipeline;
+   VkPipeline graphics_pipeline;
    VkPipeline axes_pipeline;
    VkPipeline frustum_pipeline;
    VkPipelineLayout pipeline_layout;
 
-   vk_buffer vb;
-   vk_buffer ib;
+   vk_buffer vb;  // vertex buffer
+   vk_buffer ib;  // index buffer
+   vk_meshlet meshlet;
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
@@ -420,12 +438,22 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
       VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
       VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+#ifdef RTX
+      VK_EXT_MESH_SHADER_EXTENSION_NAME,
+#endif
    };
 
    VkPhysicalDeviceFeatures enabled_features = {};
-   enabled_features.depthBounds = VK_TRUE;
-   enabled_features.wideLines = VK_TRUE;
-   enabled_features.fillModeNonSolid = VK_TRUE;
+   enabled_features.depthBounds = true;
+   enabled_features.wideLines = true;
+   enabled_features.fillModeNonSolid = true;
+
+#ifdef RTX
+   VkPhysicalDeviceMeshShaderFeaturesEXT mesh_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+   mesh_features.meshShader = true;
+
+   ldev_info.pNext = &mesh_features;
+#endif
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
@@ -485,7 +513,7 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_dev, swapchain_surfac
    swapchain_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
    swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
    swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-   swapchain_info.clipped = VK_TRUE;
+   swapchain_info.clipped = true;
    swapchain_info.oldSwapchain = surface_info->swapchain;
 
    vk_test_return_handle(vkCreateSwapchainKHR(logical_dev, &swapchain_info, 0, &swapchain));
@@ -642,7 +670,6 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_dev, VkFormat color_fo
    attachments[color_attachment_index].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
    attachments[color_attachment_index].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-   // TODO: pass the depth format too
    attachments[depth_attachment_index].format = VK_FORMAT_D32_SFLOAT;
    attachments[depth_attachment_index].samples = VK_SAMPLE_COUNT_1_BIT;
    attachments[depth_attachment_index].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -850,7 +877,7 @@ void vk_present(vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 2.75f);
+      //mvp.model = mat4_scale(mvp.model, 2.75f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -901,24 +928,49 @@ void vk_present(vk_context* context)
       vkCmdSetViewport(command_buffer, 0, 1, &viewport);
       vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->obj_pipeline);
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
-      VkDescriptorBufferInfo desc_buffer_info = {};
-      desc_buffer_info.buffer = context->vb.handle;
-      desc_buffer_info.offset = 0;
-      desc_buffer_info.range = context->vb.size;
 
-      VkWriteDescriptorSet desc_write_set[1] = {};
-      desc_write_set[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      desc_write_set[0].dstBinding = 0;
-      desc_write_set[0].descriptorCount = 1;
-      desc_write_set[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      desc_write_set[0].pBufferInfo = &desc_buffer_info;
+      VkDescriptorBufferInfo vb_info = {};
+      vb_info.buffer = context->vb.handle;
+      vb_info.offset = 0;
+      vb_info.range = context->vb.size;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(desc_write_set), desc_write_set);
+#ifdef RTX
+      VkDescriptorBufferInfo mb_info = {};
+      mb_info.buffer = context->meshlet.buffer.handle;
+      mb_info.offset = 0;
+      mb_info.range = context->meshlet.buffer.size;
+
+      VkWriteDescriptorSet descriptors[2] = {};
+      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[0].dstBinding = 0;
+      descriptors[0].descriptorCount = 1;
+      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[0].pBufferInfo = &vb_info;
+
+      descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[1].dstBinding = 1;
+      descriptors[1].descriptorCount = 1;
+      descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[1].pBufferInfo = &mb_info;
+
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+      vkCmdDrawMeshTasksNV(command_buffer, context->meshlet.count, 0);
+#else
+
+      VkWriteDescriptorSet descriptors[1] = {};
+      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[0].dstBinding = 0;
+      descriptors[0].descriptorCount = 1;
+      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[0].pBufferInfo = &vb_info;
+
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+#endif
 
       // draw axes
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
@@ -1018,11 +1070,24 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
    assert(vk_valid_handle(logical_dev));
    VkDescriptorSetLayout set_layout = 0;
 
+#ifdef RTX
+   VkDescriptorSetLayoutBinding bindings[2] = {};
+   bindings[0].binding = 0;
+   bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   bindings[0].descriptorCount = 1;
+   bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+   bindings[1].binding = 1;
+   bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   bindings[1].descriptorCount = 1;
+   bindings[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+#else
    VkDescriptorSetLayoutBinding bindings[1] = {};
    bindings[0].binding = 0;
    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
    bindings[0].descriptorCount = 1;
    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+#endif
 
    VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
@@ -1062,10 +1127,10 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
 }
 
 // TODO: Cleanup these pipelines
-static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
+static VkPipeline vk_graphics_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
-   assert(vk_valid_handle(shaders->fs));
+   assert(vk_valid_handle(shaders->vs));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache));
 
@@ -1074,7 +1139,11 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
 
    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+#ifdef RTX
+   stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+#else
    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+#endif
    stages[0].module = shaders->vs;
    stages[0].pName = "main";
 
@@ -1112,10 +1181,10 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
    pipeline_info.pMultisampleState = &sample_info;
 
    VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
-   depth_stencil_info.depthTestEnable = VK_TRUE;
-   depth_stencil_info.depthWriteEnable = VK_TRUE;
-   depth_stencil_info.depthBoundsTestEnable = VK_TRUE;
-   depth_stencil_info.stencilTestEnable = VK_TRUE;
+   depth_stencil_info.depthTestEnable = true;
+   depth_stencil_info.depthWriteEnable = true;
+   depth_stencil_info.depthBoundsTestEnable = true;
+   depth_stencil_info.stencilTestEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
@@ -1145,7 +1214,7 @@ static VkPipeline vk_obj_pipeline_create(VkDevice logical_dev, VkRenderPass rend
 static VkPipeline vk_frustum_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
-   assert(vk_valid_handle(shaders->fs));
+   assert(vk_valid_handle(shaders->vs));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache));
 
@@ -1191,10 +1260,10 @@ static VkPipeline vk_frustum_pipeline_create(VkDevice logical_dev, VkRenderPass 
    pipeline_info.pMultisampleState = &sample_info;
 
    VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
-   depth_stencil_info.depthTestEnable = VK_TRUE;
-   depth_stencil_info.depthWriteEnable = VK_TRUE;
-   depth_stencil_info.depthBoundsTestEnable = VK_TRUE;
-   depth_stencil_info.stencilTestEnable = VK_TRUE;
+   depth_stencil_info.depthTestEnable = true;
+   depth_stencil_info.depthWriteEnable = true;
+   depth_stencil_info.depthBoundsTestEnable = true;
+   depth_stencil_info.stencilTestEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
@@ -1225,7 +1294,7 @@ static VkPipeline vk_frustum_pipeline_create(VkDevice logical_dev, VkRenderPass 
 static VkPipeline vk_axis_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
-   assert(vk_valid_handle(shaders->fs));
+   assert(vk_valid_handle(shaders->vs));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache));
 
@@ -1271,9 +1340,9 @@ static VkPipeline vk_axis_pipeline_create(VkDevice logical_dev, VkRenderPass ren
    pipeline_info.pMultisampleState = &sample_info;
 
    VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
-   depth_stencil_info.depthBoundsTestEnable = VK_TRUE;
-   depth_stencil_info.depthTestEnable = VK_TRUE;
-   depth_stencil_info.depthWriteEnable = VK_TRUE;
+   depth_stencil_info.depthBoundsTestEnable = true;
+   depth_stencil_info.depthTestEnable = true;
+   depth_stencil_info.depthWriteEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
@@ -1402,7 +1471,11 @@ bool vk_initialize(hw* hw)
    if(!vk_swapchain_update(context))
       return false;
 
+#ifdef RTX
+   const char* shader_names[] = {"meshlet"};
+#else
    const char* shader_names[] = {"obj", "axis", "frustum"};
+#endif
    vk_shader_modules shaders[array_count(shader_names)];
 
    for(u32 i = 0; i < array_count(shader_names); ++i)
@@ -1411,7 +1484,7 @@ bool vk_initialize(hw* hw)
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
    // TODO: Cleanup this
-   context->obj_pipeline = vk_obj_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[0]);
+   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[0]);
    context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[1]);
    context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[2]);
    context->pipeline_layout = layout;
@@ -1419,9 +1492,16 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
+#ifdef RTX 
+   // build the meshlet buffer
+#endif
+
    size buffer_size = MB(100);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+   vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+#ifdef RTX 
+   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+#endif
 
    // valid gpu buffers
    if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE)
@@ -1432,18 +1512,9 @@ bool vk_initialize(hw* hw)
 
    hash_table obj_table = {};
 
- // tinyobj 
+ // semantic compress
    {
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "cube.obj";
-      //const char* filename = "sponza.obj";
-      //const char* filename = "rungholt.obj";
-      //const char* filename = "max-planck.obj";
-      const char* filename = "bunny.obj";
-      //const char* filename = "erato.obj";
-      //const char* filename = "igea.obj";
-      //const char* filename = "holodeck.obj";
-      //const char* filename = "fireplace_room.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
