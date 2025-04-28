@@ -11,17 +11,12 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-//#define TINYOBJ_LOADER_C_IMPLEMENTATION
-//#include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
+#define TINYOBJ_LOADER_C_IMPLEMENTATION
+#include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
 
-#define FAST_OBJ_IMPLEMENTATION
-#include "../extern/fast_obj/fast_obj.h"
-
-// TODO: change tinyobjs names
 typedef struct 
 {
    arena scratch;
-   char* buffer;
 } tinyobj_user_ctx;
 
 typedef struct 
@@ -126,7 +121,7 @@ static hash_value hash_lookup(hash_table* table, hash_key key)
    return ~0u;
 }
 
-static void* obj_file_open(const char* path, void* ctx)
+static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
    char shader_path[MAX_PATH];
 
@@ -135,35 +130,24 @@ static void* obj_file_open(const char* path, void* ctx)
    arena project_dir = vk_project_directory(&user_data->scratch);
 
    if(is_stub(project_dir))
-      return 0;
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
 
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, path);
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, obj_filename);
 
    arena file_read = win32_file_read(&user_data->scratch, shader_path);
 
    if(is_stub(file_read))
-      return 0;
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
 
-   user_data->buffer = file_read.beg;
-
-   return user_data->buffer;
-}
-
-static usize obj_file_read(void* file, void* dst, size_t bytes, void* ctx)
-{
-   tinyobj_user_ctx* user_data = (tinyobj_user_ctx*)ctx;
-   memcpy(dst, user_data->buffer, bytes);
-
-   user_data->buffer += bytes;
-
-   return bytes;
-}
-
-static void obj_file_close(void* file, void* user_data)
-{
-   (void*)file;
-   (void*)user_data;
+   *len = scratch_size(file_read);
+   *buf = file_read.beg;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
@@ -1462,17 +1446,28 @@ bool vk_initialize(hw* hw)
       const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
+      tinyobj_shape_t* shapes = 0;
+      tinyobj_material_t* materials = 0;
+      tinyobj_attrib_t attrib = {};
+
+      size_t shape_count = 0;
+      size_t material_count = 0;
+
+      tinyobj_attrib_init(&attrib);
+
       tinyobj_user_ctx user_data = {};
       user_data.scratch = scratch;
 
-      fastObjCallbacks callbacks = {};
-      callbacks.file_open = obj_file_open;
-      callbacks.file_read = obj_file_read;
-      callbacks.file_close = obj_file_close;
+      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      {
+         hw_message("Could not load .obj file");
+         return false;
+      }
 
-      fastObjMesh* mesh = fast_obj_read_with_callbacks(filename, &callbacks, &user_data);
+      // only triangles allowed
+      assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
 
-      const size index_count = mesh->index_count;
+      const size index_count = attrib.num_faces;
 
       tinyobj_table.max_count = index_count;
 
@@ -1493,13 +1488,13 @@ bool vk_initialize(hw* hw)
 
       for(size f = 0; f < index_count; f += 3)
       {
-         fastObjIndex* vidx = mesh->indices + f;
+         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
          for(size i = 0; i < 3; ++i)
          {
-            int vi = vidx[i].p;
-            int vti = vidx[i].t;
-            int vni = vidx[i].n;
+            int vi = vidx[i].v_idx;
+            int vti = vidx[i].vt_idx;
+            int vni = vidx[i].vn_idx;
 
             hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
             hash_value key = hash_index(index) % tinyobj_table.max_count;
@@ -1511,22 +1506,22 @@ bool vk_initialize(hw* hw)
                tinyobj_vertex v = {};
                if(vi >= 0)
                {
-                  v.vx = mesh->positions[vi * 3 + 0];
-                  v.vy = mesh->positions[vi * 3 + 1];
-                  v.vz = mesh->positions[vi * 3 + 2];
+                  v.vx = attrib.vertices[vi * 3 + 0];
+                  v.vy = attrib.vertices[vi * 3 + 1];
+                  v.vz = attrib.vertices[vi * 3 + 2];
                }
 
                if(vni >= 0)
                {
-                  v.nx = mesh->normals[vni * 3 + 0];
-                  v.ny = mesh->normals[vni * 3 + 1];
-                  v.nz = mesh->normals[vni * 3 + 2];
+                  v.nx = attrib.normals[vni * 3 + 0];
+                  v.ny = attrib.normals[vni * 3 + 1];
+                  v.nz = attrib.normals[vni * 3 + 2];
                }
 
                if(vti >= 0)
                {
-                  v.tu = mesh->texcoords[vti * 2 + 0];
-                  v.tv = mesh->texcoords[vti * 2 + 1];
+                  v.tu = attrib.texcoords[vti * 2 + 0];
+                  v.tv = attrib.texcoords[vti * 2 + 1];
                }
 
                hash_insert(&tinyobj_table, index, vertex_index);
@@ -1540,10 +1535,9 @@ bool vk_initialize(hw* hw)
 
       context->index_count = (u32)index_count;
 
-      //tinyobj_materials_free(materials, material_count);
-      //tinyobj_shapes_free(shapes, shape_count);
-      //tinyobj_attrib_free(&attrib);
-      fast_obj_destroy(mesh);
+      tinyobj_materials_free(materials, material_count);
+      tinyobj_shapes_free(shapes, shape_count);
+      tinyobj_attrib_free(&attrib);
    }
 
    // app callbacks
