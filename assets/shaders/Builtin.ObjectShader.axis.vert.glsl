@@ -27,7 +27,7 @@ void main() {
    
     const int verts_count = 18;
     const float arrow_head_scale = 0.10;
-    const float axis_scale = 1.0;
+    const float axis_scale = 1.5;
     const float axis_down_scale = axis_scale - 0.2;
 vec3 positions[verts_count] = vec3[](
     // X axis
@@ -62,7 +62,7 @@ vec3 colors[verts_count] = vec3[](
     vec3(0, 0, 1), vec3(0, 0, 1),
     vec3(0, 0, 1), vec3(0, 0, 1)
 );
-    mat4 t = translate(vec3(0.0, 7.0, 0.0));
+    mat4 t = translate(vec3(0.0, 7.5, 0.0));
     gl_Position = transform.projection * transform.view * t * vec4(positions[gl_VertexIndex], 1.0);
 
     axis_color = colors[gl_VertexIndex];

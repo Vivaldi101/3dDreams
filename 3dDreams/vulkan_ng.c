@@ -17,14 +17,14 @@
 typedef struct 
 {
    arena scratch;
-} tinyobj_user_ctx;
+} obj_user_ctx;
 
 typedef struct 
 {
    f32 vx, vy, vz;   // pos
    f32 nx, ny, nz;   // normal
    f32 tu, tv;       // texture
-} tinyobj_vertex;
+} obj_vertex;
 
 // Move to ordered hash table file
 
@@ -121,11 +121,11 @@ static hash_value hash_lookup(hash_table* table, hash_key key)
    return ~0u;
 }
 
-static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
+static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
    char shader_path[MAX_PATH];
 
-   tinyobj_user_ctx* user_data = (tinyobj_user_ctx*)ctx;
+   obj_user_ctx* user_data = (obj_user_ctx*)ctx;
 
    arena project_dir = vk_project_directory(&user_data->scratch);
 
@@ -151,8 +151,6 @@ static void tinyobj_file_read(void *ctx, const char *filename, int is_mtl, const
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
-
-//#define vk_break_on_validation
 
 #define vk_valid_handle(v) ((v) != VK_NULL_HANDLE)
 #define vk_valid_format(v) ((v) != VK_FORMAT_UNDEFINED)
@@ -387,15 +385,19 @@ static VkPhysicalDevice vk_pdevice_select(VkInstance instance)
       VkPhysicalDeviceProperties props;
       vkGetPhysicalDeviceProperties(devs[i], &props);
 
+      if(props.apiVersion < VK_VERSION_1_1)
+         continue;
+
       if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
          return devs[i];
    }
+
    if(dev_count > 0)
       return devs[0];
    return 0;
 }
 
-static u32 vk_ldevice_select_index()
+static u32 vk_ldevice_select_family_index()
 {
    // placeholder
    return 0;
@@ -816,12 +818,12 @@ void vk_present(vk_context* context)
       mvp_transform mvp = {};
 
       mvp.n = 0.1f;
-      mvp.f = 10000.0f;
+      mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 1.0f;
+      f32 radius = 10.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 1.0f;
+      f32 height = 5.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -845,10 +847,10 @@ void vk_present(vk_context* context)
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 1.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.1f);
+      mvp.model = mat4_scale(mvp.model, 2.75f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1381,7 +1383,7 @@ bool vk_initialize(hw* hw)
    }
 #endif
 
-   context->queue_family_index = vk_ldevice_select_index();
+   context->queue_family_index = vk_ldevice_select_family_index();
    context->physical_dev = vk_pdevice_select(instance);
    context->logical_dev = vk_ldevice_create(context->physical_dev, context->queue_family_index);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
@@ -1428,7 +1430,7 @@ bool vk_initialize(hw* hw)
    context->vb = vertex_buffer;
    context->ib = index_buffer;
 
-   hash_table tinyobj_table = {};
+   hash_table obj_table = {};
 
  // tinyobj 
    {
@@ -1437,12 +1439,12 @@ bool vk_initialize(hw* hw)
       //const char* filename = "sponza.obj";
       //const char* filename = "rungholt.obj";
       //const char* filename = "max-planck.obj";
-      //const char* filename = "bunny.obj";
+      const char* filename = "bunny.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "igea.obj";
       //const char* filename = "holodeck.obj";
       //const char* filename = "fireplace_room.obj";
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
 
@@ -1455,10 +1457,10 @@ bool vk_initialize(hw* hw)
 
       tinyobj_attrib_init(&attrib);
 
-      tinyobj_user_ctx user_data = {};
+      obj_user_ctx user_data = {};
       user_data.scratch = scratch;
 
-      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, tinyobj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
       {
          hw_message("Could not load .obj file");
          return false;
@@ -1469,7 +1471,7 @@ bool vk_initialize(hw* hw)
 
       const size index_count = attrib.num_faces;
 
-      tinyobj_table.max_count = index_count;
+      obj_table.max_count = index_count;
 
       scratch_clear(scratch);
 
@@ -1479,10 +1481,10 @@ bool vk_initialize(hw* hw)
       if(is_stub(keys) || is_stub(values))
          return 0;
 
-      tinyobj_table.keys = (hash_key*)keys.beg;
-      tinyobj_table.values = (hash_value*)values.beg;
+      obj_table.keys = (hash_key*)keys.beg;
+      obj_table.values = (hash_value*)values.beg;
 
-      memset(tinyobj_table.keys, -1, sizeof(hash_key)*index_count);
+      memset(obj_table.keys, -1, sizeof(hash_key)*index_count);
 
       u32 vertex_index = 0;
 
@@ -1497,13 +1499,13 @@ bool vk_initialize(hw* hw)
             int vni = vidx[i].vn_idx;
 
             hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-            hash_value key = hash_index(index) % tinyobj_table.max_count;
+            hash_value key = hash_index(index) % obj_table.max_count;
 
-            hash_value lookup = hash_lookup(&tinyobj_table, index);
+            hash_value lookup = hash_lookup(&obj_table, index);
 
             if(lookup == ~0u)
             {
-               tinyobj_vertex v = {};
+               obj_vertex v = {};
                if(vi >= 0)
                {
                   v.vx = attrib.vertices[vi * 3 + 0];
@@ -1524,9 +1526,9 @@ bool vk_initialize(hw* hw)
                   v.tv = attrib.texcoords[vti * 2 + 1];
                }
 
-               hash_insert(&tinyobj_table, index, vertex_index);
+               hash_insert(&obj_table, index, vertex_index);
                ((u32*)context->ib.data)[f + i] = vertex_index;
-               ((tinyobj_vertex*)context->vb.data)[vertex_index++] = v;
+               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
             }
             else
                ((u32*)context->ib.data)[f + i] = lookup;
