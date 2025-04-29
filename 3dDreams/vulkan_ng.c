@@ -36,6 +36,11 @@ typedef struct
    u8 vertex_count;
 } meshlet;
 
+static void meshlet_build(arena scratch, u32 vertex_count)
+{
+   meshlet current = {};
+}
+
 // Move to ordered hash table file
 
 typedef struct 
