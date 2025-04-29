@@ -24,6 +24,7 @@ enum
 
 typedef struct hw hw;
 typedef struct arena arena;
+typedef struct string string; // TODO: this
 
 typedef enum { HW_INPUT_TYPE_KEY, HW_INPUT_TYPE_MOUSE, HW_INPUT_TYPE_TOUCH } hw_input_type;
 

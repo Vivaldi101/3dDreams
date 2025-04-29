@@ -3,27 +3,62 @@
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
-static arena vk_shader_spv_read(arena* storage, const char* shader_dir, const char* shader_name, VkShaderStageFlagBits type)
+static vk_shader_modules vk_shader_spv_module_load(VkDevice logical_dev, arena* storage, const char* shader_dir, const char* shader_name)
 {
-   char* type_name;
+   vk_shader_modules spv = {};
+   VkShaderStageFlagBits shader_stage = 0;
+
    char shader_path[MAX_PATH];
 
-   switch(type)
+   size shader_len = strlen(shader_name);
+   assert(shader_len != 0u);
+
+   for(size i = 0; i < shader_len; ++i)
    {
-      default:
-         type_name = "invalid";
-      case VK_SHADER_STAGE_VERTEX_BIT:
-         type_name = "vert";
+      usize frag_len = strlen("frag");
+      if(strncmp(shader_name+i, "frag", frag_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
          break;
-      case VK_SHADER_STAGE_FRAGMENT_BIT:
-         type_name = "frag";
+      }
+
+      usize vert_len = strlen("vert");
+      if(strncmp(shader_name+i, "vert", vert_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
          break;
+      }
+
+      usize mesh_len = strlen("meshlet");
+      if(strncmp(shader_name+i, "meshlet", mesh_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+         break;
+      }
    }
 
    wsprintf(shader_path, shader_dir, array_count(shader_path));
-   wsprintf(shader_path, "%sbin\\assets\\shaders\\%s.%s.%s.spv", shader_dir, BUILTIN_SHADER_NAME, shader_name, type_name);
+   wsprintf(shader_path, "%sbin\\assets\\shaders\\%s", shader_dir, shader_name);
 
-   return win32_file_read(storage, shader_path);
+   assert(strlen(shader_path) <= MAX_PATH);
+
+   arena shader_file = win32_file_read(storage, shader_path);
+
+   if(is_stub(shader_file))
+      return (vk_shader_modules){};
+
+   VkShaderModuleCreateInfo module_info = {};
+   module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+   module_info.pCode = (u32*)shader_file.beg;
+   module_info.codeSize = scratch_size(shader_file);
+
+   if((vkCreateShaderModule(logical_dev,
+      &module_info,
+      0,
+      shader_stage == VK_SHADER_STAGE_VERTEX_BIT ? &spv.vs : &spv.fs)) != VK_SUCCESS)
+      return (vk_shader_modules) {};
+
+   return spv;
 }
 
 static arena vk_project_directory(arena* storage)
@@ -58,4 +93,54 @@ static arena vk_project_directory(arena* storage)
    scratch_shrink(result, file_size, char);
 
    return result;
+}
+
+// TODO: path must end with wildcard - test it
+static const char** vk_shader_folder_read(arena* files, const char* shader_folder_path)
+{
+   arena project_dir = vk_project_directory(files);
+   if(is_stub(project_dir))
+      return 0;
+
+   WIN32_FIND_DATA file_data;
+
+   char path[MAX_PATH];
+   wsprintf(path, "%s\\%s\\*", project_dir.beg, shader_folder_path);
+   HANDLE first_file = FindFirstFile(path, &file_data);
+
+   if(first_file == INVALID_HANDLE_VALUE)
+      (arena){0};
+
+   u32 shader_count = 0;
+
+   do {
+      if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+         shader_count++;
+   } while(FindNextFile(first_file, &file_data) != 0);
+
+   first_file = FindFirstFile(path, &file_data);
+
+   const char** shader_names = (const char**)new(files, const char*, shader_count+1).beg;
+
+   u32 i = 0;
+   do {
+      if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+      {
+         usize file_len = strlen(file_data.cFileName);
+         char* p = new(files, char, file_len+1).beg;
+
+         if(p) 
+         {
+            memcpy(p, file_data.cFileName, file_len);
+            p[file_len] = 0;
+
+            shader_names[i++] = p;
+         }
+      }
+   } while(FindNextFile(first_file, &file_data) != 0);
+
+   shader_names[i] = 0;
+   FindClose(first_file);
+
+   return shader_names;
 }

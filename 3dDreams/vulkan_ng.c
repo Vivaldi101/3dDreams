@@ -7,6 +7,13 @@
 
 #include <volk.c>
 #include "win32_file_io.c"
+
+align_struct
+{
+   VkShaderModule vs;
+   VkShaderModule fs;
+} vk_shader_modules;
+
 #include "vulkan_spirv_loader.c"
 
 #pragma comment(lib,	"vulkan-1.lib")
@@ -36,12 +43,7 @@ typedef struct
    u8 vertex_count;
 } meshlet;
 
-static void meshlet_build(arena scratch, u32 vertex_count)
-{
-   meshlet current = {};
-}
-
-// Move to ordered hash table file
+// TODO: We need to cleanup these hash tables
 
 typedef struct 
 {
@@ -52,10 +54,17 @@ typedef u32 hash_value;
 
 typedef struct 
 {
-   hash_value* values;
+   u32* values;
    hash_key* keys;
    usize max_count;
-} hash_table;
+} index_hash_table;
+
+typedef struct 
+{
+   vk_shader_modules* values;
+   const char* keys;
+   usize max_count;
+} spv_hash_table;
 
 static bool key_equals(hash_key a, hash_key b)
 {
@@ -92,7 +101,20 @@ static u32 hash_index(hash_key k)
    return hash;
 }
 
-static void hash_insert(hash_table* table, hash_key key, hash_value value)
+static u32 spv_hash(const char* key)
+{
+   uint32_t hash = 2166136261U;
+   while(*key)
+   {
+      hash *= 16777619U;
+      hash ^= (uint8_t)(*key);
+      key++;
+   }
+
+   return hash;
+}
+
+static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
 {
    u32 index = hash_index(key) % table->max_count;
 
@@ -123,7 +145,7 @@ static void hash_insert(hash_table* table, hash_key key, hash_value value)
    table->values[index] = value;
 }
 
-static hash_value hash_lookup(hash_table* table, hash_key key)
+static hash_value hash_lookup(index_hash_table* table, hash_key key)
 {
    u32 index = hash_index(key) % table->max_count;
 
@@ -134,6 +156,13 @@ static hash_value hash_lookup(hash_table* table, hash_key key)
       return table->values[index];
 
    return ~0u;
+}
+
+static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
+{
+   u32 index = spv_hash(key) % table->max_count;
+
+   return (vk_shader_modules){};
 }
 
 static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -166,6 +195,7 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
+enum { PIPELINE_GRAPHICS = 0, PIPELINE_AXIS, PIPELINE_FRUSTUM, PIPELINE_MESHLET };
 
 #define vk_valid_handle(v) ((v) != VK_NULL_HANDLE)
 #define vk_valid_format(v) ((v) != VK_FORMAT_UNDEFINED)
@@ -219,13 +249,6 @@ align_struct swapchain_surface_info
    VkImageView image_views[MAX_VULKAN_OBJECT_COUNT];
    VkImageView depth_views[MAX_VULKAN_OBJECT_COUNT];
 } swapchain_surface_info;
-
-align_struct
-{
-   VkShaderModule vs;
-   VkShaderModule fs;
-   VkShaderModule ms;
-} vk_shader_modules;
 
 align_struct
 {
@@ -1037,37 +1060,20 @@ void vk_present(vk_context* context)
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
 }
 
-static vk_shader_modules vk_shaders_load(VkDevice logical_dev, arena scratch, const char* shader_name)
+static vk_shader_modules vk_shader_load(VkDevice logical_dev, arena scratch, const char* shader_name)
 {
    assert(vk_valid_handle(logical_dev));
 
    vk_shader_modules shader_modules = {};
-   VkShaderStageFlagBits shader_type_bits[OBJECT_SHADER_COUNT] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
 
    arena project_dir = vk_project_directory(&scratch);
 
    if(is_stub(project_dir))
       return (vk_shader_modules){0};
 
-   for(u32 i = 0; i < OBJECT_SHADER_COUNT; ++i)
-   {
-      arena shader_file = vk_shader_spv_read(&scratch, project_dir.beg, shader_name, shader_type_bits[i]);
-      if(scratch_size(shader_file) == 0)
-         return (vk_shader_modules){0};
+   vk_shader_modules shader_module = vk_shader_spv_module_load(logical_dev, &scratch, project_dir.beg, shader_name);
 
-      VkShaderModuleCreateInfo module_info = {};
-      module_info.sType = vk_info(SHADER_MODULE);
-      module_info.pCode = (u32*)shader_file.beg;
-      module_info.codeSize = scratch_size(shader_file);
-
-      if(!vk_valid(vkCreateShaderModule(logical_dev,
-         &module_info,
-         0,
-         shader_type_bits[i] == VK_SHADER_STAGE_VERTEX_BIT ? &shader_modules.vs : &shader_modules.fs)))
-         return (vk_shader_modules) {};
-   }
-
-   return shader_modules;
+   return shader_module;
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
@@ -1476,22 +1482,22 @@ bool vk_initialize(hw* hw)
    if(!vk_swapchain_update(context))
       return false;
 
-#ifdef RTX
-   const char* shader_names[] = {"meshlet"};
-#else
-   const char* shader_names[] = {"obj", "axis", "frustum"};
-#endif
-   vk_shader_modules shaders[array_count(shader_names)];
+   const char** shader_names = vk_shader_folder_read(&scratch, "bin\\assets\\shaders");
+   spv_hash_table shaders = {};
+   shaders.max_count = 10 /*shader_count*/;
 
-   for(u32 i = 0; i < array_count(shader_names); ++i)
-      shaders[i] = vk_shaders_load(context->logical_dev, scratch, shader_names[i]);
+   for(const char** p = shader_names; p && *p; ++p)
+   {
+      debug_message("Loading spv shader: %s\n", *p);
+      //shaders[*p] = vk_shader_load(context->logical_dev, scratch, *p);
+   }
 
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
    // TODO: Cleanup this
-   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[0]);
-   context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[1]);
-   context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders[2]);
+   //context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["graphics"]);
+   //context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["axis"]);
+   //context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["frustum"]);
    context->pipeline_layout = layout;
 
    VkPhysicalDeviceMemoryProperties memory_props;
@@ -1515,7 +1521,7 @@ bool vk_initialize(hw* hw)
    context->vb = vertex_buffer;
    context->ib = index_buffer;
 
-   hash_table obj_table = {};
+   index_hash_table obj_table = {};
 
  // semantic compress
    {
