@@ -35,7 +35,7 @@ static void app_frame(arena scratch)
    //app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 2412312313));
 
    // will draw all possible types remaining
-   app_frame_draw_all(scratch);
+   //app_frame_draw_all(scratch);
 }
 
 // do input handling

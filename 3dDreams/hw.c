@@ -181,6 +181,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void
          break;
 
       app_input_function(&input);
+      app_frame_function(hw->vk_scratch);
       scratch_clear(hw->vk_scratch);
 
       // TODO: Use perf counters for better granularity

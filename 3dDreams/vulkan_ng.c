@@ -12,6 +12,7 @@ align_struct
 {
    VkShaderModule vs;
    VkShaderModule fs;
+   VkShaderModule ms;
 } vk_shader_modules;
 
 #include "vulkan_spirv_loader.c"
@@ -52,18 +53,24 @@ typedef struct
 
 typedef u32 hash_value;
 
+// Ordered open addressing with linear probing
+// Currently we wont do double-hashing yet
 typedef struct 
 {
    u32* values;
    hash_key* keys;
+   // Could be signed size
    usize max_count;
+   usize count;
 } index_hash_table;
 
 typedef struct 
 {
    vk_shader_modules* values;
-   const char* keys;
+   const char** keys;
+   // Could be signed size
    usize max_count;
+   usize count;
 } spv_hash_table;
 
 static bool key_equals(hash_key a, hash_key b)
@@ -116,6 +123,9 @@ static u32 spv_hash(const char* key)
 
 static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
 {
+   if(table->count == table->max_count)
+      return;
+
    u32 index = hash_index(key) % table->max_count;
 
    while(!key_is_empty(table->keys[index]))
@@ -143,6 +153,7 @@ static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
 
    table->keys[index] = key;
    table->values[index] = value;
+   table->count++;
 }
 
 static hash_value hash_lookup(index_hash_table* table, hash_key key)
@@ -162,7 +173,47 @@ static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
 {
    u32 index = spv_hash(key) % table->max_count;
 
+   while(table->keys[index] && strcmp(table->keys[index], key) < 0)
+      index = (index + 1) % table->max_count;
+
+   if(table->keys[index] && strcmp(table->keys[index], key) == 0)
+      return table->values[index];
+
    return (vk_shader_modules){};
+}
+
+static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_modules value)
+{
+   if(table->count == table->max_count)
+      return;
+
+   u32 index = spv_hash(key) % table->max_count;
+
+   while(table->keys[index])
+   {
+      if(strcmp(table->keys[index], key) > 0)
+      {
+         const char* tmp_key = table->keys[index];
+         vk_shader_modules tmp_value = table->values[index];
+
+         table->keys[index] = key;
+         table->values[index] = value;
+
+         key = tmp_key;
+         value = tmp_value;
+      }
+      else if(strcmp(table->keys[index], key) == 0)
+      {
+         table->values[index] = value;
+         return;
+      }
+
+      index = (index + 1) % table->max_count;
+   }
+
+   table->keys[index] = key;
+   table->values[index] = value;
+   table->count++;
 }
 
 static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -958,7 +1009,6 @@ void vk_present(vk_context* context)
 
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
-
       VkDescriptorBufferInfo vb_info = {};
       vb_info.buffer = context->vb.handle;
       vb_info.offset = 0;
@@ -1005,6 +1055,7 @@ void vk_present(vk_context* context)
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
 #if 0
+
       // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
@@ -1060,20 +1111,61 @@ void vk_present(vk_context* context)
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
 }
 
-static vk_shader_modules vk_shader_load(VkDevice logical_dev, arena scratch, const char* shader_name)
+static bool vk_shader_load(VkDevice logical_dev, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
 {
    assert(vk_valid_handle(logical_dev));
-
-   vk_shader_modules shader_modules = {};
 
    arena project_dir = vk_project_directory(&scratch);
 
    if(is_stub(project_dir))
-      return (vk_shader_modules){0};
+      return false;
 
-   vk_shader_modules shader_module = vk_shader_spv_module_load(logical_dev, &scratch, project_dir.beg, shader_name);
+   size shader_len = strlen(shader_name);
+   assert(shader_len != 0u);
 
-   return shader_module;
+   VkShaderStageFlagBits shader_stage = 0;
+
+   for(size i = 0; i < shader_len; ++i)
+   {
+      usize frag_len = strlen("frag");
+      if(strncmp(shader_name+i, "frag", frag_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+         break;
+      }
+
+      usize vert_len = strlen("vert");
+      if(strncmp(shader_name+i, "vert", vert_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
+         break;
+      }
+
+      usize mesh_len = strlen("meshlet");
+      if(strncmp(shader_name+i, "meshlet", mesh_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+         break;
+      }
+   }
+
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_dev, &scratch, project_dir.beg, shader_name);
+
+   switch(shader_stage)
+   {
+      case VK_SHADER_STAGE_VERTEX_BIT:
+         shader_modules->vs = shader_module;
+         break;
+      case VK_SHADER_STAGE_FRAGMENT_BIT:
+         shader_modules->fs = shader_module;
+         break;
+      case VK_SHADER_STAGE_MESH_BIT_EXT:
+         shader_modules->ms = shader_module;
+         break;
+      default: break;
+   }
+
+   return true;
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
@@ -1483,20 +1575,73 @@ bool vk_initialize(hw* hw)
       return false;
 
    const char** shader_names = vk_shader_folder_read(&scratch, "bin\\assets\\shaders");
-   spv_hash_table shaders = {};
-   shaders.max_count = 10 /*shader_count*/;
 
-   for(const char** p = shader_names; p && *p; ++p)
+   // TODO: store this inside the context
+   spv_hash_table shader_hash_table = {};
+   shader_hash_table.max_count = 10 /*shader_count*/;
+
    {
-      debug_message("Loading spv shader: %s\n", *p);
-      //shaders[*p] = vk_shader_load(context->logical_dev, scratch, *p);
+      // TODO: make function for hash tables
+      arena keys = new(&scratch, const char*, shader_hash_table.max_count);
+      arena values = new(&scratch, vk_shader_modules, shader_hash_table.max_count);
+
+      if(is_stub(keys) || is_stub(values))
+         return 0;
+
+      shader_hash_table.keys = (const char**)keys.beg;
+      shader_hash_table.values = (vk_shader_modules*)values.beg;
+
+      memset(shader_hash_table.values, 0, shader_hash_table.max_count*sizeof(vk_shader_modules));
+
+      for(usize i = 0; i < shader_hash_table.max_count; ++i)
+         shader_hash_table.keys[i] = 0;
    }
+
+   spv_hash_insert(&shader_hash_table, "graphics", (vk_shader_modules){});
+   spv_hash_insert(&shader_hash_table, "axes", (vk_shader_modules){});
+   spv_hash_insert(&shader_hash_table, "frustum", (vk_shader_modules){});
+   spv_hash_insert(&shader_hash_table, "meshlet", (vk_shader_modules){});
+
+   // TODO: routine to iterate over hash values
+
+   //vk_shader_load(context->logical_dev, scratch, &gm);
 
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
-   // TODO: Cleanup this
-   //context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["graphics"]);
-   //context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["axis"]);
+
+   for(const char** p = shader_names; p && *p; ++p)
+   {
+      usize shader_len = strlen(*p);
+      const char* shader_name = *p;
+
+      for(usize i = 0; i < shader_len; ++i)
+      {
+         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
+         {
+            // TODO: cleanup this mess
+            vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
+            if(!vk_shader_load(context->logical_dev, scratch, *p, &gm))
+               return false;
+            spv_hash_insert(&shader_hash_table, "graphics", gm);
+            break;
+         }
+         if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
+         {
+            // TODO: cleanup this mess
+            vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
+            if(!vk_shader_load(context->logical_dev, scratch, *p, &am))
+               return false;
+            spv_hash_insert(&shader_hash_table, "axis", am);
+            break;
+         }
+      }
+   }
+
+   vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
+   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &gm);
+   vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
+   context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &am);
+
    //context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["frustum"]);
    context->pipeline_layout = layout;
 
@@ -1551,14 +1696,14 @@ bool vk_initialize(hw* hw)
       // only triangles allowed
       assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
 
-      const size index_count = attrib.num_faces;
+      const usize index_count = attrib.num_faces;
 
       obj_table.max_count = index_count;
 
       scratch_clear(scratch);
 
-      arena keys = new(&scratch, hash_key, index_count);
-      arena values = new(&scratch, hash_value, index_count);
+      arena keys = new(&scratch, hash_key, obj_table.max_count);
+      arena values = new(&scratch, hash_value, obj_table.max_count);
 
       if(is_stub(keys) || is_stub(values))
          return 0;
@@ -1566,19 +1711,19 @@ bool vk_initialize(hw* hw)
       obj_table.keys = (hash_key*)keys.beg;
       obj_table.values = (hash_value*)values.beg;
 
-      memset(obj_table.keys, -1, sizeof(hash_key)*index_count);
+      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
 
       u32 vertex_index = 0;
 
-      for(size f = 0; f < index_count; f += 3)
+      for(usize f = 0; f < obj_table.max_count; f += 3)
       {
          const tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
-         for(size i = 0; i < 3; ++i)
+         for(usize i = 0; i < 3; ++i)
          {
-            int vi = vidx[i].v_idx;
-            int vti = vidx[i].vt_idx;
-            int vni = vidx[i].vn_idx;
+            i32 vi = vidx[i].v_idx;
+            i32 vti = vidx[i].vt_idx;
+            i32 vni = vidx[i].vn_idx;
 
             hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
             hash_value key = hash_index(index) % obj_table.max_count;
@@ -1617,7 +1762,7 @@ bool vk_initialize(hw* hw)
          }
       }
 
-      context->index_count = (u32)index_count;
+      context->index_count = (u32)obj_table.max_count;
 
       tinyobj_materials_free(materials, material_count);
       tinyobj_shapes_free(shapes, shape_count);

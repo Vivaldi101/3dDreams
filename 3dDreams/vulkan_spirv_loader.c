@@ -3,40 +3,11 @@
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
-static vk_shader_modules vk_shader_spv_module_load(VkDevice logical_dev, arena* storage, const char* shader_dir, const char* shader_name)
+static VkShaderModule vk_shader_spv_module_load(VkDevice logical_dev, arena* storage, const char* shader_dir, const char* shader_name)
 {
-   vk_shader_modules spv = {};
-   VkShaderStageFlagBits shader_stage = 0;
+   VkShaderModule result = 0;
 
    char shader_path[MAX_PATH];
-
-   size shader_len = strlen(shader_name);
-   assert(shader_len != 0u);
-
-   for(size i = 0; i < shader_len; ++i)
-   {
-      usize frag_len = strlen("frag");
-      if(strncmp(shader_name+i, "frag", frag_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-         break;
-      }
-
-      usize vert_len = strlen("vert");
-      if(strncmp(shader_name+i, "vert", vert_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
-         break;
-      }
-
-      usize mesh_len = strlen("meshlet");
-      if(strncmp(shader_name+i, "meshlet", mesh_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-         break;
-      }
-   }
-
    wsprintf(shader_path, shader_dir, array_count(shader_path));
    wsprintf(shader_path, "%sbin\\assets\\shaders\\%s", shader_dir, shader_name);
 
@@ -45,20 +16,17 @@ static vk_shader_modules vk_shader_spv_module_load(VkDevice logical_dev, arena* 
    arena shader_file = win32_file_read(storage, shader_path);
 
    if(is_stub(shader_file))
-      return (vk_shader_modules){};
+      return 0;
 
    VkShaderModuleCreateInfo module_info = {};
    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
    module_info.pCode = (u32*)shader_file.beg;
    module_info.codeSize = scratch_size(shader_file);
 
-   if((vkCreateShaderModule(logical_dev,
-      &module_info,
-      0,
-      shader_stage == VK_SHADER_STAGE_VERTEX_BIT ? &spv.vs : &spv.fs)) != VK_SUCCESS)
-      return (vk_shader_modules) {};
+   if((vkCreateShaderModule(logical_dev, &module_info, 0, &result)) != VK_SUCCESS)
+      return 0;
 
-   return spv;
+   return result;
 }
 
 static arena vk_project_directory(arena* storage)
