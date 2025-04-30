@@ -1597,14 +1597,7 @@ bool vk_initialize(hw* hw)
          shader_hash_table.keys[i] = 0;
    }
 
-   spv_hash_insert(&shader_hash_table, "graphics", (vk_shader_modules){});
-   spv_hash_insert(&shader_hash_table, "axes", (vk_shader_modules){});
-   spv_hash_insert(&shader_hash_table, "frustum", (vk_shader_modules){});
-   spv_hash_insert(&shader_hash_table, "meshlet", (vk_shader_modules){});
-
    // TODO: routine to iterate over hash values
-
-   //vk_shader_load(context->logical_dev, scratch, &gm);
 
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
@@ -1616,9 +1609,9 @@ bool vk_initialize(hw* hw)
 
       for(usize i = 0; i < shader_len; ++i)
       {
+         // TODO: cleanup this mess
          if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
-            // TODO: cleanup this mess
             vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
             if(!vk_shader_load(context->logical_dev, scratch, *p, &gm))
                return false;
@@ -1627,7 +1620,6 @@ bool vk_initialize(hw* hw)
          }
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
-            // TODO: cleanup this mess
             vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
             if(!vk_shader_load(context->logical_dev, scratch, *p, &am))
                return false;
