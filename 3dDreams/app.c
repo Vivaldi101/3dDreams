@@ -14,28 +14,8 @@ typedef struct app_some_type
 } app_some_type;
 
 
-static void app_frame_draw_all(arena scratch)
-{
-   // take all the scratch space left
-   size scratch_count = scratch_left(scratch, app_some_type);
-
-   for(size i = 0; i < scratch_count; ++i)
-   {
-      app_some_type* p = arena_offset(i, scratch, app_some_type);
-      p->isvalid = true;
-   }
-}
-
 static void app_frame(arena scratch)
 {
-   // first draw 12 types
-   //app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 12));
-
-   // then draw 2412312313 types(will fail)
-   //app_frame_draw(arena_alloc(scratch, sizeof(app_some_type), 2412312313));
-
-   // will draw all possible types remaining
-   //app_frame_draw_all(scratch);
 }
 
 // do input handling

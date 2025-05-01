@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+//#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -928,7 +928,7 @@ void vk_present(vk_context* context)
 
       f32 radius = 10.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 5.0f;
+      f32 height = 24.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -946,16 +946,17 @@ void vk_present(vk_context* context)
           radius * sinf(theta)
       };
 
-      vec3 origin = {0.0f, height, 0.0f};
+      vec3 origin = {0.0f, height*0.75f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){-46.0f, 0.0f, -10.0f});
+      //mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 2.75f);
+      mvp.model = mat4_scale(mvp.model, 3.75f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1736,7 +1737,7 @@ bool vk_initialize(hw* hw)
    // build the meshlet buffer
 #endif
 
-   size buffer_size = MB(100);
+   size buffer_size = MB(1000);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #ifdef RTX 
@@ -1754,10 +1755,11 @@ bool vk_initialize(hw* hw)
 
  // semantic compress
    {
-      const char* filename = "teapot3.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
+      const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
