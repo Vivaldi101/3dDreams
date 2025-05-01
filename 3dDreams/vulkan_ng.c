@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-//#define RTX 1
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -245,8 +245,7 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    *buf = file_read.beg;
 }
 
-enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };
-enum { PIPELINE_GRAPHICS = 0, PIPELINE_AXIS, PIPELINE_FRUSTUM, PIPELINE_MESHLET };
+enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 
 #define vk_valid_handle(v) ((v) != VK_NULL_HANDLE)
 #define vk_valid_format(v) ((v) != VK_FORMAT_UNDEFINED)
@@ -1111,6 +1110,7 @@ void vk_present(vk_context* context)
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
 }
 
+// TODO: Change name to vk_shader_compile
 static bool vk_shader_load(VkDevice logical_dev, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
 {
    assert(vk_valid_handle(logical_dev));
@@ -1127,24 +1127,24 @@ static bool vk_shader_load(VkDevice logical_dev, arena scratch, const char* shad
 
    for(size i = 0; i < shader_len; ++i)
    {
-      usize frag_len = strlen("frag");
-      if(strncmp(shader_name+i, "frag", frag_len) == 0)
+      usize mesh_len = strlen("mesh.spv");
+      if(strncmp(shader_name+i, "mesh.spv", mesh_len) == 0)
       {
-         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
          break;
       }
 
-      usize vert_len = strlen("vert");
-      if(strncmp(shader_name+i, "vert", vert_len) == 0)
+      usize vert_len = strlen("vert.spv");
+      if(strncmp(shader_name+i, "vert.spv", vert_len) == 0)
       {
          shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
          break;
       }
 
-      usize mesh_len = strlen("meshlet");
-      if(strncmp(shader_name+i, "meshlet", mesh_len) == 0)
+      usize frag_len = strlen("frag.spv");
+      if(strncmp(shader_name+i, "frag.spv", frag_len) == 0)
       {
-         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
          break;
       }
    }
@@ -1153,14 +1153,14 @@ static bool vk_shader_load(VkDevice logical_dev, arena scratch, const char* shad
 
    switch(shader_stage)
    {
+      case VK_SHADER_STAGE_MESH_BIT_EXT:
+         shader_modules->ms = shader_module;
+         break;
       case VK_SHADER_STAGE_VERTEX_BIT:
          shader_modules->vs = shader_module;
          break;
       case VK_SHADER_STAGE_FRAGMENT_BIT:
          shader_modules->fs = shader_module;
-         break;
-      case VK_SHADER_STAGE_MESH_BIT_EXT:
-         shader_modules->ms = shader_module;
          break;
       default: break;
    }
@@ -1230,6 +1230,86 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
 }
 
 // TODO: Cleanup these pipelines
+static VkPipeline vk_mesh_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
+{
+   assert(vk_valid_handle(logical_dev));
+   assert(vk_valid_handle(shaders->ms));
+   assert(vk_valid_handle(shaders->fs));
+   assert(!vk_valid_handle(cache));
+
+   VkPipeline pipeline = 0;
+
+   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
+   stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+   stages[0].module = shaders->ms;
+   stages[0].pName = "main";
+   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   stages[1].module = shaders->fs;
+   stages[1].pName = "main";
+
+   VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
+   pipeline_info.stageCount = array_count(stages);
+   pipeline_info.pStages = stages;
+
+   VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
+
+   pipeline_info.pVertexInputState = &vertex_input_info;
+
+   VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
+   assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+   pipeline_info.pInputAssemblyState = &assembly_info;
+
+   VkPipelineViewportStateCreateInfo viewport_info = {vk_info(PIPELINE_VIEWPORT_STATE)};
+   viewport_info.scissorCount = 1;
+   viewport_info.viewportCount = 1;
+   pipeline_info.pViewportState = &viewport_info;
+
+   VkPipelineRasterizationStateCreateInfo raster_info = {vk_info(PIPELINE_RASTERIZATION_STATE)};
+   raster_info.lineWidth = 1.0f;
+   raster_info.cullMode = VK_CULL_MODE_BACK_BIT;
+   raster_info.polygonMode = VK_POLYGON_MODE_FILL;
+   raster_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+   pipeline_info.pRasterizationState = &raster_info;
+
+   VkPipelineMultisampleStateCreateInfo sample_info = {vk_info(PIPELINE_MULTISAMPLE_STATE)};
+   sample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+   pipeline_info.pMultisampleState = &sample_info;
+
+   VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
+   depth_stencil_info.depthTestEnable = true;
+   depth_stencil_info.depthWriteEnable = true;
+   depth_stencil_info.depthBoundsTestEnable = true;
+   depth_stencil_info.stencilTestEnable = true;
+   depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
+   depth_stencil_info.minDepthBounds = 0.0f;
+   depth_stencil_info.maxDepthBounds = 1.0f;
+   pipeline_info.pDepthStencilState = &depth_stencil_info;
+
+   VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+   color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+   VkPipelineColorBlendStateCreateInfo color_blend_info = {vk_info(PIPELINE_COLOR_BLEND_STATE)};
+   color_blend_info.attachmentCount = 1;
+   color_blend_info.pAttachments = &color_blend_attachment;
+   pipeline_info.pColorBlendState = &color_blend_info;
+
+   VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
+   dynamic_info.pDynamicStates = (VkDynamicState[3]){VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH};
+   dynamic_info.dynamicStateCount = 3;
+   pipeline_info.pDynamicState = &dynamic_info;
+
+   pipeline_info.renderPass = renderpass;
+   pipeline_info.layout = layout;
+
+   vk_test_return(vkCreateGraphicsPipelines(logical_dev, cache, 1, &pipeline_info, 0, &pipeline));
+
+   return pipeline;
+}
+
+// TODO: Cleanup these pipelines
 static VkPipeline vk_graphics_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
@@ -1240,15 +1320,10 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_dev, VkRenderPass
    VkPipeline pipeline = 0;
 
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
-
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-#ifdef RTX
-   stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-#else
    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-#endif
    stages[0].module = shaders->vs;
    stages[0].pName = "main";
+   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 
    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1599,9 +1674,7 @@ bool vk_initialize(hw* hw)
 
    // TODO: routine to iterate over hash values
 
-   VkPipelineCache cache = 0; // TODO: enable
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
-
+   // Compile all the shaders
    for(const char** p = shader_names; p && *p; ++p)
    {
       usize shader_len = strlen(*p);
@@ -1610,6 +1683,16 @@ bool vk_initialize(hw* hw)
       for(usize i = 0; i < shader_len; ++i)
       {
          // TODO: cleanup this mess
+#ifdef RTX
+         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
+         {
+            vk_shader_modules ms = spv_hash_lookup(&shader_hash_table, "meshlet");
+            if(!vk_shader_load(context->logical_dev, scratch, *p, &ms))
+               return false;
+            spv_hash_insert(&shader_hash_table, "meshlet", ms);
+            break;
+         }
+#else
          if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
             vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
@@ -1618,6 +1701,7 @@ bool vk_initialize(hw* hw)
             spv_hash_insert(&shader_hash_table, "graphics", gm);
             break;
          }
+#endif
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
             vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
@@ -1629,12 +1713,20 @@ bool vk_initialize(hw* hw)
       }
    }
 
+   VkPipelineCache cache = 0; // TODO: enable
+   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
+
+#ifdef RTX
+   vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
+   context->graphics_pipeline = vk_mesh_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &mm);
+#else
    vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
    context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &gm);
+#endif
+
    vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
    context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &am);
 
-   //context->frustum_pipeline = vk_frustum_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &shaders["frustum"]);
    context->pipeline_layout = layout;
 
    VkPhysicalDeviceMemoryProperties memory_props;

@@ -3,6 +3,7 @@
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
+// TODO: Change name to vk_spv_compile
 static VkShaderModule vk_shader_spv_module_load(VkDevice logical_dev, arena* storage, const char* shader_dir, const char* shader_name)
 {
    VkShaderModule result = 0;
