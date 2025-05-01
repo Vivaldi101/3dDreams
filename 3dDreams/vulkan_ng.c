@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-//#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -516,7 +516,7 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
       VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
       VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-#ifdef RTX
+#if RTX
       VK_EXT_MESH_SHADER_EXTENSION_NAME,
 #endif
    };
@@ -526,7 +526,7 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
    enabled_features.wideLines = true;
    enabled_features.fillModeNonSolid = true;
 
-#ifdef RTX
+#if RTX
    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
    mesh_features.meshShader = true;
 
@@ -1014,7 +1014,7 @@ void vk_present(vk_context* context)
       vb_info.offset = 0;
       vb_info.range = context->vb.size;
 
-#ifdef RTX
+#if RTX
       VkDescriptorBufferInfo mb_info = {};
       mb_info.buffer = context->meshlet.buffer.handle;
       mb_info.offset = 0;
@@ -1174,7 +1174,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
    assert(vk_valid_handle(logical_dev));
    VkDescriptorSetLayout set_layout = 0;
 
-#ifdef RTX
+#if RTX
    VkDescriptorSetLayoutBinding bindings[2] = {};
    bindings[0].binding = 0;
    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1684,7 +1684,7 @@ bool vk_initialize(hw* hw)
       for(usize i = 0; i < shader_len; ++i)
       {
          // TODO: cleanup this mess
-#ifdef RTX
+#if RTX
          if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
          {
             vk_shader_modules ms = spv_hash_lookup(&shader_hash_table, "meshlet");
@@ -1717,7 +1717,7 @@ bool vk_initialize(hw* hw)
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_dev);
 
-#ifdef RTX
+#if RTX
    vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
    context->graphics_pipeline = vk_mesh_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &mm);
 #else
@@ -1733,14 +1733,14 @@ bool vk_initialize(hw* hw)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-#ifdef RTX 
+#if RTX 
    // build the meshlet buffer
 #endif
 
    size buffer_size = MB(1000);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-#ifdef RTX 
+#if RTX 
    vk_buffer meshlet_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #endif
 
