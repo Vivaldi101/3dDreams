@@ -22,10 +22,12 @@ for %%F in (assets\shaders\*.frag.glsl) do (
 
 for %%F in (assets\shaders\*.mesh.glsl) do (
     echo Compiling %%F
-	 %VULKAN_SDK%\bin\glslc.exe --target-env=vulkan1.2 -fshader-stage=mesh -o bin\assets\shaders\%%~nF.spv %%F
+	 %VULKAN_SDK%\bin\glslangValidator.exe -V --target-env vulkan1.3 --target-env spirv1.5 -S mesh "%%F" -o "bin\assets\shaders\%%~nF.spv"
     IF %ERRORLEVEL% NEQ 0 (echo Error compiling %%F: %ERRORLEVEL%)
 )
 
 echo "Copying assets..."
 echo xcopy "assets\shaders" "bin\assets" /h /i /c /k /e /r /y
 xcopy "assets\shaders" "bin\assets" /h /i /c /k /e /r /y
+
+REM %VULKAN_SDK%\bin\glslc.exe --target-env=vulkan1.3 -fshader-stage=mesh -o bin\assets\shaders\%%~nF.spv %%F

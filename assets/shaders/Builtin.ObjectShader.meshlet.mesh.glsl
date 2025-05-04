@@ -18,6 +18,9 @@ layout(push_constant) uniform Transform
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 layout(triangles, max_vertices = 64, max_primitives = 42) out;
 
+const uint max_vertices = 64;
+const uint max_primitives = 42;
+
 struct Vertex
 {
    float vx, vy, vz;   // pos
@@ -49,6 +52,18 @@ layout(location = 0) out vec4 out_color[];
 void main()
 {
     uint mi = gl_WorkGroupID.x;
+    if(mi >= meshlets.length())
+    {
+      return;
+    }
+    if(meshlets[mi].vertex_count > max_vertices)
+    {
+      return;
+    }
+    if(meshlets[mi].triangle_count > max_primitives)
+    {
+      return;
+    }
 
     SetMeshOutputsEXT(meshlets[mi].vertex_count, meshlets[mi].triangle_count);
 
@@ -58,13 +73,20 @@ void main()
 
       Vertex v = verts[vi];
       vec4 vo = transform.projection * transform.view * transform.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      //vec4 vo = vec4(vec3(v.vx, v.vy, v.vz) + vec3(0, 0, 0.5), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
+
       out_color[i] = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.90, 1.0);
     }
 
-    for(uint i = 0; i < meshlets[mi].index_count; ++i)
+    for(uint i = 0; i < meshlets[mi].triangle_count; ++i)
     {
-      gl_PrimitiveIndicesEXT[i] = meshlets[mi].primitive_indices;
+      uint i0 = meshlets[mi].primitive_indices[3*i + 0];
+      uint i1 = meshlets[mi].primitive_indices[3*i + 1];
+      uint i2 = meshlets[mi].primitive_indices[3*i + 2];
+
+      gl_PrimitiveTriangleIndicesEXT[i] = uvec3(i0, i1, i2);
     }
+
 }

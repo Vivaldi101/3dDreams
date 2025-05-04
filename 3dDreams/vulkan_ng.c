@@ -36,6 +36,7 @@ typedef struct
    f32 tu, tv;       // texture
 } obj_vertex;
 
+#pragma pack(push, 16)  // Set alignment to 16 bytes
 typedef struct 
 {
    u32 vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
@@ -44,10 +45,10 @@ typedef struct
    u8 vertex_count;
    u8 index_count;
 } meshlet;
+#pragma pack(pop)  // Restore the previous alignment
 
 typedef struct 
 {
-   obj_vertex* vertex_buffer;
    size vertex_count;
    u32* index_buffer;         // vertex indices
    size index_count;
@@ -59,8 +60,6 @@ typedef struct
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
    meshlet current_meshlet = {};
-   size meshlet_index = 0;
-   size meshlet_count = 0;
 
    size vertex_count = m->vertex_count;
    size index_count = m->index_count;
@@ -68,15 +67,9 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    if(scratch_left(meshlet_scratch, u8) < index_count)
       return false;
 
-   // TODO: macro for these
-   // buffer for de-duplication for vertex indices
    u8* index_buffer = (u8*)new(&meshlet_scratch, u8, index_count).beg;
    // 0xff means the vertex index is not in use yet
-   memset(index_buffer, 0xff, index_count*sizeof(*index_buffer));
-
-   // TDOO: try to estimate the meshlet count beforehand
-   if(arena_left(meshlet_storage, meshlet) < meshlet_count)
-      return false;
+   memset(index_buffer, 0xff, index_count);
 
    for(size i = 0; i < index_count; i += 3)
    {
@@ -91,30 +84,36 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       bool mi2 = index_buffer[i2] == 0xff;
 
       // flush meshlet if vertexes overflow
-      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) > array_count(current_meshlet.vertex_index_buffer))
+      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) > 64)
       {
          meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         if(!pm) 
+            return false;
          *pm = current_meshlet;
 
-         meshlet_count++;
          memset(&current_meshlet, 0, sizeof(current_meshlet));
-         memset(index_buffer, 0xff, index_count * sizeof(*index_buffer));
+         memset(index_buffer, 0xff, index_count);
 
          m->meshlet_count++;
       }
 
       // flush meshlet if primitives overflow
-      if(current_meshlet.triangle_count + 1 > array_count(current_meshlet.primitive_indices) / 3)
+      if(current_meshlet.triangle_count + 1 > 42)
       {
          meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         if(!pm) 
+            return false;
          *pm = current_meshlet;
 
-         meshlet_count++;
          memset(&current_meshlet, 0, sizeof(current_meshlet));
-         memset(index_buffer, 0xff, index_count * sizeof(*index_buffer));
+         memset(index_buffer, 0xff, index_count);
 
          m->meshlet_count++;
       }
+
+      mi0 = index_buffer[i0] == 0xff;
+      mi1 = index_buffer[i1] == 0xff;
+      mi2 = index_buffer[i2] == 0xff;
 
       if(mi0)
       {
@@ -137,6 +136,13 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = index_buffer[i2];
 
       current_meshlet.triangle_count++;   // index triple done
+
+      assert(current_meshlet.triangle_count <= array_count(current_meshlet.primitive_indices)/3);
+      assert(current_meshlet.index_count <= array_count(current_meshlet.vertex_index_buffer));
+
+      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 0] != 0xff);
+      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 1] != 0xff);
+      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 2] != 0xff);
    }
 
    return true;
@@ -148,7 +154,6 @@ typedef struct
 {
    i32 vi, vti, vni;
 } hash_key;
-
 
 // Ordered open addressing with linear probing
 typedef u32 hash_value;
@@ -614,26 +619,44 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
       VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
 #if RTX
       VK_EXT_MESH_SHADER_EXTENSION_NAME,
+      VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
 #endif
    };
 
-   VkPhysicalDeviceFeatures enabled_features = {};
-   enabled_features.depthBounds = true;
-   enabled_features.wideLines = true;
-   enabled_features.fillModeNonSolid = true;
+   VkPhysicalDeviceVulkan12Features vk12 = {};
+   vk12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+   // enable your 8-bit storage
+   vk12.storageBuffer8BitAccess = VK_TRUE;
+   vk12.uniformAndStorageBuffer8BitAccess = VK_TRUE; // if needed
+   vk12.storagePushConstant8 = VK_TRUE; // if needed
+
+   VkPhysicalDeviceFeatures2 features2 = {};
+   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+   features2.pNext = &vk12;
+
+   // Query *all* core + 1.2 features from the device
+   vkGetPhysicalDeviceFeatures2(physical_dev, &features2);
+
+   // Now **enable** the core features you need:
+   features2.features.depthBounds = VK_TRUE;
+   features2.features.wideLines = VK_TRUE;
+   features2.features.fillModeNonSolid = VK_TRUE;
 
 #if RTX
-   VkPhysicalDeviceMeshShaderFeaturesEXT mesh_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
-   mesh_features.meshShader = true;
+   VkPhysicalDeviceMeshShaderFeaturesEXT meshF = {};
+   meshF.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+   meshF.meshShader = VK_TRUE;
+   meshF.taskShader = VK_TRUE; // if using task shaders
 
-   ldev_info.pNext = &mesh_features;
+   // Chain it *after* vk12
+   vk12.pNext = &meshF;
 #endif
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
    ldev_info.enabledExtensionCount = array_count(dev_ext_names);
    ldev_info.ppEnabledExtensionNames = dev_ext_names;
-   ldev_info.pEnabledFeatures = &enabled_features;
+   ldev_info.pNext = &features2;
 
    VkDevice logical_dev;
    vk_test_return_handle(vkCreateDevice(physical_dev, &ldev_info, 0, &logical_dev));
@@ -1077,9 +1100,16 @@ void vk_present(vk_context* context)
 
       vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
+#if RTX
+      vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+                   sizeof(mvp), &mvp);
+#else
+
       vkCmdPushConstants(command_buffer, context->pipeline_layout,
                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                    sizeof(mvp), &mvp);
+#endif
 
       VkViewport viewport = {};
 
@@ -1274,7 +1304,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_dev)
    bindings[0].binding = 0;
    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
    bindings[0].descriptorCount = 1;
-   bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+   bindings[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
 
    bindings[1].binding = 1;
    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1311,7 +1341,11 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_dev)
       return VK_NULL_HANDLE;
 
    VkPushConstantRange push_constants = {};
+#if RTX
+   push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
+#else
    push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+#endif
    push_constants.offset = 0;
    push_constants.size = sizeof(mvp_transform);
 
@@ -1336,10 +1370,10 @@ static VkPipeline vk_mesh_pipeline_create(VkDevice logical_dev, VkRenderPass ren
    VkPipeline pipeline = 0;
 
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
+   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
    stages[0].module = shaders->ms;
    stages[0].pName = "main";
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 
    stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1829,7 +1863,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(100);
+   size buffer_size = MB(2000);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #if RTX 
@@ -1852,8 +1886,8 @@ bool vk_initialize(hw* hw)
    {
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "san-miguel.obj";
 
@@ -1946,7 +1980,6 @@ bool vk_initialize(hw* hw)
 
       context->index_count = (u32)obj_table.max_count;
 
-      obj_mesh.vertex_buffer = context->vb.data;
       obj_mesh.index_buffer = context->ib.data;
       obj_mesh.index_count = context->index_count;
       obj_mesh.vertex_count = obj_table.count;
@@ -1958,6 +1991,7 @@ bool vk_initialize(hw* hw)
       return false;
 
    context->meshlet_count = obj_mesh.meshlet_count;
+   memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count*sizeof(meshlet));
 #endif
 
       tinyobj_materials_free(materials, material_count);
