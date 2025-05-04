@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -1045,7 +1045,7 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 1.0f;
+      f32 radius = 2.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1176,11 +1176,11 @@ void vk_present(vk_context* context)
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 #endif
 
-#if 0
       // draw axis
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
+#if 0
       // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
@@ -1886,8 +1886,8 @@ bool vk_initialize(hw* hw)
    {
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
-      const char* filename = "buddha.obj";
-      //const char* filename = "dragon.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "san-miguel.obj";
 

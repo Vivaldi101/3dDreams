@@ -50,6 +50,7 @@ void app_start(int argc, const char** argv, hw* hw)
    if(!vk_initialize(hw))
    {
       hw_message("Could not initialize Vulkan");
+      hw_window_close(hw);
       return;
    }
 
