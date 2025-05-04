@@ -23,7 +23,8 @@
 #define arena_end_count(p, a, n) (void*)(p)!=(a)->end?(p)+(n):(p)
 #define scratch_end_count(p, a, n) (void*)(p)!=(a).end?(p)+(n):(p)
 
-#define scratch_clear(a) memset((a).beg, 0, scratch_size((a)))
+#define scratch_clear_value(a, v) memset((a).beg, (v), scratch_size((a)))
+#define scratch_clear(a) scratch_clear_value(a, 0)
 
 #define set_arena_type(t) typedef t arena_type;
 
@@ -56,6 +57,7 @@
 
 typedef struct arena
 {
+   // void pointers?
    char* beg;
    char* end;  // one past the end
 } arena;

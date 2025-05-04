@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -38,11 +38,106 @@ typedef struct
 
 typedef struct 
 {
-   u32 verts[64];
-   u8 indices[126]; // 42 triangles
+   u32 vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
+   u8 primitive_indices[126];    // 42 triangles (primitives)
    u8 triangle_count;
    u8 vertex_count;
 } meshlet;
+
+typedef struct 
+{
+   obj_vertex* vertex_buffer;
+   size vertex_count;
+   u32* index_buffer;         // vertex indices
+   size index_count;
+   meshlet* meshlet_buffer;   // todo: arenas here
+} mesh;
+
+typedef struct
+{
+   uint32_t vertex_count; // number of vertices used
+   uint32_t prim_count;   // number of primitives (triangles) used
+   uint32_t vertex_begin; // offset into vertex indices
+   uint32_t prim_begin;   // offset into primitive indices
+} meshlet_desc;
+
+static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
+{
+   meshlet current_meshlet = {};
+   size meshlet_index = 0;
+   size meshlet_count = 0;
+
+   size vertex_count = m->vertex_count;
+   size index_count = m->index_count;
+
+   if(scratch_left(meshlet_scratch, u8) < index_count)
+      return false;
+
+   // TODO: macro for these
+   // buffer for de-duplication for vertex indices
+   u8* index_buffer = (u8*)new(&meshlet_scratch, u8, index_count).beg;
+   // 0xff means the vertex index is not in use yet
+   memset(index_buffer, 0xff, index_count*sizeof(*index_buffer));
+
+   // TDOO: try to estimate the meshlet count beforehand
+   if(arena_left(meshlet_storage, meshlet) < meshlet_count)
+      return false;
+
+   for(size i = 0; i < index_count; i += 3)
+   {
+      // original per primitive (triangle indices)
+      u32 i0 = m->index_buffer[i + 0];
+      u32 i1 = m->index_buffer[i + 1];
+      u32 i2 = m->index_buffer[i + 2];
+
+      // are the indices non-used
+      bool mi0 = index_buffer[i0] == 0xff;
+      bool mi1 = index_buffer[i1] == 0xff;
+      bool mi2 = index_buffer[i2] == 0xff;
+
+      // flush meshlet if vertexes overflow
+      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) >= array_count(current_meshlet.vertex_index_buffer))
+      {
+         meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         *pm = current_meshlet;
+         meshlet_count++;
+         memset(&current_meshlet, 0, sizeof(current_meshlet));
+      }
+
+      // flush meshlet if primitives overflow
+      if(current_meshlet.triangle_count + 1 >= array_count(current_meshlet.primitive_indices)/3)
+      {
+         meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         *pm = current_meshlet;
+         meshlet_count++;
+         memset(&current_meshlet, 0, sizeof(current_meshlet));
+      }
+
+      if(mi0)
+      {
+         index_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
+         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i0;
+      }
+      if(mi1)
+      {
+         index_buffer[i1] = current_meshlet.vertex_count;
+         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i1;
+      }
+      if(mi2)
+      {
+         index_buffer[i2] = current_meshlet.vertex_count;
+         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i2;
+      }
+
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = index_buffer[i0];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = index_buffer[i1];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = index_buffer[i2];
+
+      current_meshlet.triangle_count++;   // index triple done
+   }
+
+   return true;
+}
 
 // TODO: We need to cleanup these hash tables
 
@@ -51,15 +146,13 @@ typedef struct
    i32 vi, vti, vni;
 } hash_key;
 
-typedef u32 hash_value;
 
 // Ordered open addressing with linear probing
-// Currently we wont do double-hashing yet
+typedef u32 hash_value;
 typedef struct 
 {
    u32* values;
    hash_key* keys;
-   // Could be signed size
    usize max_count;
    usize count;
 } index_hash_table;
@@ -68,7 +161,6 @@ typedef struct
 {
    vk_shader_modules* values;
    const char** keys;
-   // Could be signed size
    usize max_count;
    usize count;
 } spv_hash_table;
@@ -331,13 +423,13 @@ align_struct
 
    // TODO: Pipelines into an array
    VkPipeline graphics_pipeline;
-   VkPipeline axes_pipeline;
+   VkPipeline axis_pipeline;
    VkPipeline frustum_pipeline;
    VkPipelineLayout pipeline_layout;
 
-   vk_buffer vb;  // vertex buffer
-   vk_buffer ib;  // index buffer
-   vk_meshlet meshlet;
+   vk_buffer vb;        // vertex buffer
+   vk_buffer ib;        // index buffer
+   vk_buffer mb;   // mesh buffer
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
@@ -926,9 +1018,9 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 10.0f;
+      f32 radius = 1.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 24.0f;
+      f32 height = 0.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -946,17 +1038,17 @@ void vk_present(vk_context* context)
           radius * sinf(theta)
       };
 
-      vec3 origin = {0.0f, height*0.75f, 0.0f};
+      vec3 origin = {0.0f, height, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
-      mat4 translate = mat4_translate((vec3){-46.0f, 0.0f, -10.0f});
-      //mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 3.75f);
+      //mvp.model = mat4_scale(mvp.model, 3.75f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1016,9 +1108,9 @@ void vk_present(vk_context* context)
 
 #if RTX
       VkDescriptorBufferInfo mb_info = {};
-      mb_info.buffer = context->meshlet.buffer.handle;
+      mb_info.buffer = context->mb.handle;
       mb_info.offset = 0;
-      mb_info.range = context->meshlet.buffer.size;
+      mb_info.range = context->mb.size;
 
       VkWriteDescriptorSet descriptors[2] = {};
       descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1034,7 +1126,7 @@ void vk_present(vk_context* context)
       descriptors[1].pBufferInfo = &mb_info;
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-      vkCmdDrawMeshTasksNV(command_buffer, context->meshlet.count, 0);
+      vkCmdDrawMeshTasksEXT(command_buffer, 1, 1, 1);
 #else
 
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1050,11 +1142,10 @@ void vk_present(vk_context* context)
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 #endif
 
-      // draw axes
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axes_pipeline);
-      vkCmdDraw(command_buffer, 18, 1, 0, 0);
-
 #if 0
+      // draw axis
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
+      vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
       // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
@@ -1726,18 +1817,15 @@ bool vk_initialize(hw* hw)
 #endif
 
    vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
-   context->axes_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &am);
+   context->axis_pipeline = vk_axis_pipeline_create(context->logical_dev, context->renderpass, cache, layout, &am);
 
    context->pipeline_layout = layout;
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
-#if RTX 
-   // build the meshlet buffer
-#endif
-
-   size buffer_size = MB(1000);
+   // TODO: fine tune these and get device memory limits
+   size buffer_size = MB(100);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #if RTX 
@@ -1750,16 +1838,20 @@ bool vk_initialize(hw* hw)
 
    context->vb = vertex_buffer;
    context->ib = index_buffer;
+#if RTX
+   context->mb = meshlet_buffer;
+#endif
 
    index_hash_table obj_table = {};
 
  // semantic compress
    {
+      mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
       //const char* filename = "buddha.obj";
-      //const char* filename = "dragon.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
-      const char* filename = "san-miguel.obj";
+      //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1849,6 +1941,18 @@ bool vk_initialize(hw* hw)
       }
 
       context->index_count = (u32)obj_table.max_count;
+
+      obj_mesh.vertex_buffer = context->vb.data;
+      obj_mesh.index_buffer = context->ib.data;
+      obj_mesh.index_count = context->index_count;
+      obj_mesh.vertex_count = obj_table.count;
+      obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
+
+#if RTX 
+   scratch_clear(scratch);
+   if(!meshlet_build(context->storage, scratch, &obj_mesh))
+      return false;
+#endif
 
       tinyobj_materials_free(materials, material_count);
       tinyobj_shapes_free(shapes, shape_count);

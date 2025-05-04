@@ -260,6 +260,7 @@ static void hw_virtual_memory_init()
    post(global_release);
 }
 
+// TODO: might wanna try page-fault handlers
 static arena arena_new(size cap)
 {
    arena a = {}; // stub arena
@@ -290,8 +291,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw_virtual_memory_init();
 
    // TODO: Pool these
-   arena base_storage = hw.vk_storage = arena_new(default_arena_size);
-   hw.vk_scratch = arena_new(default_arena_size*600);
+   arena base_storage = hw.vk_storage = arena_new(default_arena_size*20);
+   hw.vk_scratch = arena_new(default_arena_size*20);
    hw.misc_storage = arena_new(default_arena_size);
 
    hw.renderer.window.open = win32_window_open;
