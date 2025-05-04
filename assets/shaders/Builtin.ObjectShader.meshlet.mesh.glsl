@@ -1,20 +1,70 @@
 #version 460
+
 #extension GL_EXT_mesh_shader : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
 
-layout(local_size_x = 1) in;
+layout(push_constant) uniform Transform
+{
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+   float near;
+   float far;
+   float ar;
+} transform;
 
-layout(max_vertices = 3, max_primitives = 1) out;
-layout(triangles) out;
+// number of threads inside the work group
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 64, max_primitives = 42) out;
+
+struct Vertex
+{
+   float vx, vy, vz;   // pos
+   float nx, ny, nz;   // normal TODO: Use 8 bit normals in future
+   float tu, tv;       // texture
+};
+
+struct Meshlet
+{
+   uint32_t vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
+   uint8_t primitive_indices[126];    // 42 triangles (primitives)
+   uint8_t triangle_count;
+   uint8_t vertex_count;
+   uint8_t index_count;
+};
+
+layout(set = 0, binding = 0) readonly buffer Verts
+{
+   Vertex verts[];
+};
+
+layout(set = 0, binding = 1) readonly buffer Meshlets
+{
+   Meshlet meshlets[];
+};
+
+layout(location = 0) out vec4 out_color[];
 
 void main()
 {
-    SetMeshOutputsEXT(3, 1); // 3 vertices, 1 triangle
+    uint mi = gl_WorkGroupID.x;
 
-    // Define three vertices to form a triangle
-    gl_MeshVerticesEXT[0].gl_Position = vec4(-0.5, -0.5, 0.0, 1.0);
-    gl_MeshVerticesEXT[1].gl_Position = vec4(0.5, -0.5, 0.0, 1.0);
-    gl_MeshVerticesEXT[2].gl_Position = vec4(0.0, 0.5, 0.0, 1.0);
+    SetMeshOutputsEXT(meshlets[mi].vertex_count, meshlets[mi].triangle_count);
 
-    // Indices to form a triangle
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+    for(uint i = 0; i < meshlets[mi].vertex_count; ++i)
+    {
+      uint vi = meshlets[mi].vertex_index_buffer[i];
+
+      Vertex v = verts[vi];
+      vec4 vo = transform.projection * transform.view * transform.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+
+      gl_MeshVerticesEXT[i].gl_Position = vo;
+      out_color[i] = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.90, 1.0);
+    }
+
+    for(uint i = 0; i < meshlets[mi].index_count; ++i)
+    {
+      gl_PrimitiveIndicesEXT[i] = meshlets[mi].primitive_indices;
+    }
 }

@@ -22,7 +22,7 @@ for %%F in (assets\shaders\*.frag.glsl) do (
 
 for %%F in (assets\shaders\*.mesh.glsl) do (
     echo Compiling %%F
-	 %VULKAN_SDK%\bin\glslangValidator.exe -V --target-env vulkan1.2 -S mesh -o bin\assets\shaders\%%~nF.spv %%F
+	 %VULKAN_SDK%\bin\glslc.exe --target-env=vulkan1.2 -fshader-stage=mesh -o bin\assets\shaders\%%~nF.spv %%F
     IF %ERRORLEVEL% NEQ 0 (echo Error compiling %%F: %ERRORLEVEL%)
 )
 

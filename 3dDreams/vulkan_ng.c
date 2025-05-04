@@ -42,6 +42,7 @@ typedef struct
    u8 primitive_indices[126];    // 42 triangles (primitives)
    u8 triangle_count;
    u8 vertex_count;
+   u8 index_count;
 } meshlet;
 
 typedef struct 
@@ -50,17 +51,11 @@ typedef struct
    size vertex_count;
    u32* index_buffer;         // vertex indices
    size index_count;
-   meshlet* meshlet_buffer;   // todo: arenas here
+   meshlet* meshlet_buffer;   // TODO: arenas here
+   u32 meshlet_count;
 } mesh;
 
-typedef struct
-{
-   uint32_t vertex_count; // number of vertices used
-   uint32_t prim_count;   // number of primitives (triangles) used
-   uint32_t vertex_begin; // offset into vertex indices
-   uint32_t prim_begin;   // offset into primitive indices
-} meshlet_desc;
-
+// TODO: if RTX
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
    meshlet current_meshlet = {};
@@ -96,21 +91,29 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       bool mi2 = index_buffer[i2] == 0xff;
 
       // flush meshlet if vertexes overflow
-      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) >= array_count(current_meshlet.vertex_index_buffer))
+      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) > array_count(current_meshlet.vertex_index_buffer))
       {
          meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
          *pm = current_meshlet;
+
          meshlet_count++;
          memset(&current_meshlet, 0, sizeof(current_meshlet));
+         memset(index_buffer, 0xff, index_count * sizeof(*index_buffer));
+
+         m->meshlet_count++;
       }
 
       // flush meshlet if primitives overflow
-      if(current_meshlet.triangle_count + 1 >= array_count(current_meshlet.primitive_indices)/3)
+      if(current_meshlet.triangle_count + 1 > array_count(current_meshlet.primitive_indices) / 3)
       {
          meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
          *pm = current_meshlet;
+
          meshlet_count++;
          memset(&current_meshlet, 0, sizeof(current_meshlet));
+         memset(index_buffer, 0xff, index_count * sizeof(*index_buffer));
+
+         m->meshlet_count++;
       }
 
       if(mi0)
@@ -429,7 +432,8 @@ align_struct
 
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
-   vk_buffer mb;   // mesh buffer
+   vk_buffer mb;        // mesh buffer - todo wrap this in the meshlet structure
+   u32 meshlet_count;
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
@@ -1126,7 +1130,7 @@ void vk_present(vk_context* context)
       descriptors[1].pBufferInfo = &mb_info;
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-      vkCmdDrawMeshTasksEXT(command_buffer, 1, 1, 1);
+      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
 #else
 
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1952,6 +1956,8 @@ bool vk_initialize(hw* hw)
    scratch_clear(scratch);
    if(!meshlet_build(context->storage, scratch, &obj_mesh))
       return false;
+
+   context->meshlet_count = obj_mesh.meshlet_count;
 #endif
 
       tinyobj_materials_free(materials, material_count);
