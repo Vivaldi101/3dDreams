@@ -62,9 +62,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 {
    meshlet current_meshlet = {};
 
-   size vertex_count = m->vertex_count;
    size index_count = m->index_count;
-
    if(scratch_left(meshlet_scratch, u8) < index_count)
       return false;
 
@@ -138,9 +136,11 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
       current_meshlet.triangle_count++;   // index triple done
 
+      // within max bounds
       assert(current_meshlet.triangle_count <= array_count(current_meshlet.primitive_indices)/3);
       assert(current_meshlet.index_count <= array_count(current_meshlet.vertex_index_buffer));
 
+      // meshlet must have valid indices to vertex index buffer
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 0] != 0xff);
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 1] != 0xff);
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 2] != 0xff);
