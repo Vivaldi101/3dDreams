@@ -1942,8 +1942,6 @@ bool vk_initialize(hw* hw)
             i32 vni = vidx[i].vn_idx;
 
             hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-            hash_value key = hash_index(index) % obj_table.max_count;
-
             hash_value lookup = hash_lookup(&obj_table, index);
 
             if(lookup == ~0u)
