@@ -62,17 +62,19 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 {
    meshlet current_meshlet = {};
 
-   size index_count = m->index_count;
+   size vertex_count = m->vertex_count;
 
-   if(scratch_left(meshlet_scratch, u8) < index_count)
+   if(scratch_left(meshlet_scratch, u8) < vertex_count)
       return false;
 
-   u8* meshlet_index_buffer = (u8*)new(&meshlet_scratch, u8, index_count).beg;
+   u8* meshlet_vertex_buffer = (u8*)new(&meshlet_scratch, u8, vertex_count).beg;
    // 0xff means the vertex index is not in use yet
-   memset(meshlet_index_buffer, 0xff, index_count);
+   memset(meshlet_vertex_buffer, 0xff, vertex_count);
 
    usize max_vertex_count = array_count(current_meshlet.vertex_index_buffer);
    usize max_triangle_count = array_count(current_meshlet.primitive_indices)/3;
+
+   size index_count = m->index_count;
 
    for(size i = 0; i < index_count; i += 3)
    {
@@ -82,9 +84,9 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       u32 i2 = m->index_buffer[i + 2];
 
       // are the indices non-used
-      bool mi0 = meshlet_index_buffer[i0] == 0xff;
-      bool mi1 = meshlet_index_buffer[i1] == 0xff;
-      bool mi2 = meshlet_index_buffer[i2] == 0xff;
+      bool mi0 = meshlet_vertex_buffer[i0] == 0xff;
+      bool mi1 = meshlet_vertex_buffer[i1] == 0xff;
+      bool mi2 = meshlet_vertex_buffer[i2] == 0xff;
 
       // flush meshlet if vertexes or primitives overflow
       if((current_meshlet.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
@@ -96,34 +98,34 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
          *pm = current_meshlet;
 
          struct_clear(current_meshlet);
-         memset(meshlet_index_buffer, 0xff, index_count);
+         memset(meshlet_vertex_buffer, 0xff, vertex_count);
 
          m->meshlet_count++;
       }
 
-      mi0 = meshlet_index_buffer[i0] == 0xff;
-      mi1 = meshlet_index_buffer[i1] == 0xff;
-      mi2 = meshlet_index_buffer[i2] == 0xff;
+      mi0 = meshlet_vertex_buffer[i0] == 0xff;
+      mi1 = meshlet_vertex_buffer[i1] == 0xff;
+      mi2 = meshlet_vertex_buffer[i2] == 0xff;
 
       if(mi0)
       {
-         meshlet_index_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
+         meshlet_vertex_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i0;
       }
       if(mi1)
       {
-         meshlet_index_buffer[i1] = current_meshlet.vertex_count;
+         meshlet_vertex_buffer[i1] = current_meshlet.vertex_count;
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i1;
       }
       if(mi2)
       {
-         meshlet_index_buffer[i2] = current_meshlet.vertex_count;
+         meshlet_vertex_buffer[i2] = current_meshlet.vertex_count;
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i2;
       }
 
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = meshlet_index_buffer[i0];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = meshlet_index_buffer[i1];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = meshlet_index_buffer[i2];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = meshlet_vertex_buffer[i0];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = meshlet_vertex_buffer[i1];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = meshlet_vertex_buffer[i2];
 
       current_meshlet.triangle_count++;   // index triple done
 
@@ -1970,7 +1972,7 @@ bool vk_initialize(hw* hw)
       context->index_count = (u32)obj_table.max_count;
       obj_mesh.index_buffer = context->ib.data;
       obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = obj_table.count;
+      obj_mesh.vertex_count = attrib.num_face_num_verts;
       obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
 
 #if RTX 
