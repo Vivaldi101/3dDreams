@@ -36,8 +36,6 @@ typedef struct
    f32 tu, tv;       // texture
 } obj_vertex;
 
-// Align to 16 for mesh shaders
-#pragma pack(push, 16) 
 typedef struct 
 {
    u32 vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
@@ -45,7 +43,6 @@ typedef struct
    u8 triangle_count;
    u8 vertex_count;
 } meshlet;
-#pragma pack(pop)
 
 typedef struct 
 {
@@ -56,7 +53,6 @@ typedef struct
    u32 meshlet_count;
 } mesh;
 
-// TODO: if RTX
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
    meshlet current_meshlet = {};
@@ -108,7 +104,8 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
       if(mi0)
       {
-         meshlet_vertex_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
+         // store the current vertex index of meshlet for a unused vertex index
+         meshlet_vertex_buffer[i0] = current_meshlet.vertex_count;
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i0;
       }
       if(mi1)
@@ -126,7 +123,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = meshlet_vertex_buffer[i1];
       current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = meshlet_vertex_buffer[i2];
 
-      current_meshlet.triangle_count++;   // index triple done
+      current_meshlet.triangle_count++;   // primitive index triplet done
 
       // within max bounds
       assert(current_meshlet.vertex_count <= max_vertex_count);
