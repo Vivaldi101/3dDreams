@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -36,7 +36,8 @@ typedef struct
    f32 tu, tv;       // texture
 } obj_vertex;
 
-#pragma pack(push, 16)  // Set alignment to 16 bytes
+// Align to 16 for mesh shaders
+#pragma pack(push, 16) 
 typedef struct 
 {
    u32 vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
@@ -45,7 +46,7 @@ typedef struct
    u8 vertex_count;
    u8 index_count;
 } meshlet;
-#pragma pack(pop)  // Restore the previous alignment
+#pragma pack(pop)
 
 typedef struct 
 {
@@ -623,34 +624,33 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
 #endif
    };
 
-   VkPhysicalDeviceVulkan12Features vk12 = {};
-   vk12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-   // enable your 8-bit storage
-   vk12.storageBuffer8BitAccess = VK_TRUE;
-   vk12.uniformAndStorageBuffer8BitAccess = VK_TRUE; // if needed
-   vk12.storagePushConstant8 = VK_TRUE; // if needed
-
-   VkPhysicalDeviceFeatures2 features2 = {};
-   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-   features2.pNext = &vk12;
-
-   // Query *all* core + 1.2 features from the device
-   vkGetPhysicalDeviceFeatures2(physical_dev, &features2);
-
-   // Now **enable** the core features you need:
-   features2.features.depthBounds = VK_TRUE;
-   features2.features.wideLines = VK_TRUE;
-   features2.features.fillModeNonSolid = VK_TRUE;
+   VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
 #if RTX
-   VkPhysicalDeviceMeshShaderFeaturesEXT meshF = {};
-   meshF.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
-   meshF.meshShader = VK_TRUE;
-   meshF.taskShader = VK_TRUE; // if using task shaders
+   VkPhysicalDeviceVulkan12Features vk12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+   vk12.storageBuffer8BitAccess = true;
+   vk12.uniformAndStorageBuffer8BitAccess = true;
+   vk12.storagePushConstant8 = true;
 
-   // Chain it *after* vk12
-   vk12.pNext = &meshF;
+   VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+   mesh_shader_features.meshShader = true;
+   mesh_shader_features.taskShader = true;
+   mesh_shader_features.multiviewMeshShader = true;
+
+   VkPhysicalDeviceMultiviewFeatures multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
+   multiview.multiview = true;
+   multiview.pNext = &mesh_shader_features;
+
+   vk12.pNext = &multiview;
+   features2.pNext = &vk12;
 #endif
+
+   vkGetPhysicalDeviceFeatures2(physical_dev, &features2);
+
+   features2.features.depthBounds = true;
+   features2.features.wideLines = true;
+   features2.features.fillModeNonSolid = true;
+   features2.features.sampleRateShading = true;
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
