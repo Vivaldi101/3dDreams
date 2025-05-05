@@ -63,12 +63,16 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    meshlet current_meshlet = {};
 
    size index_count = m->index_count;
+
    if(scratch_left(meshlet_scratch, u8) < index_count)
       return false;
 
-   u8* index_buffer = (u8*)new(&meshlet_scratch, u8, index_count).beg;
+   u8* meshlet_index_buffer = (u8*)new(&meshlet_scratch, u8, index_count).beg;
    // 0xff means the vertex index is not in use yet
-   memset(index_buffer, 0xff, index_count);
+   memset(meshlet_index_buffer, 0xff, index_count);
+
+   usize max_vertex_count = array_count(current_meshlet.vertex_index_buffer);
+   usize max_triangle_count = array_count(current_meshlet.primitive_indices)/3;
 
    for(size i = 0; i < index_count; i += 3)
    {
@@ -78,69 +82,56 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       u32 i2 = m->index_buffer[i + 2];
 
       // are the indices non-used
-      bool mi0 = index_buffer[i0] == 0xff;
-      bool mi1 = index_buffer[i1] == 0xff;
-      bool mi2 = index_buffer[i2] == 0xff;
+      bool mi0 = meshlet_index_buffer[i0] == 0xff;
+      bool mi1 = meshlet_index_buffer[i1] == 0xff;
+      bool mi2 = meshlet_index_buffer[i2] == 0xff;
 
-      // flush meshlet if vertexes overflow
-      if(current_meshlet.vertex_count + (mi0 + mi1 + mi2) > 64)
+      // flush meshlet if vertexes or primitives overflow
+      if((current_meshlet.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
+         (current_meshlet.triangle_count + 1 > max_triangle_count))
       {
          meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
          if(!pm) 
             return false;
          *pm = current_meshlet;
 
-         memset(&current_meshlet, 0, sizeof(current_meshlet));
-         memset(index_buffer, 0xff, index_count);
+         struct_clear(current_meshlet);
+         memset(meshlet_index_buffer, 0xff, index_count);
 
          m->meshlet_count++;
       }
 
-      // flush meshlet if primitives overflow
-      if(current_meshlet.triangle_count + 1 > 42)
-      {
-         meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
-         if(!pm) 
-            return false;
-         *pm = current_meshlet;
-
-         memset(&current_meshlet, 0, sizeof(current_meshlet));
-         memset(index_buffer, 0xff, index_count);
-
-         m->meshlet_count++;
-      }
-
-      mi0 = index_buffer[i0] == 0xff;
-      mi1 = index_buffer[i1] == 0xff;
-      mi2 = index_buffer[i2] == 0xff;
+      mi0 = meshlet_index_buffer[i0] == 0xff;
+      mi1 = meshlet_index_buffer[i1] == 0xff;
+      mi2 = meshlet_index_buffer[i2] == 0xff;
 
       if(mi0)
       {
-         index_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
+         meshlet_index_buffer[i0] = current_meshlet.vertex_count;                           // store the current vertex index of meshlet for a unused vertex index
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i0;
       }
       if(mi1)
       {
-         index_buffer[i1] = current_meshlet.vertex_count;
+         meshlet_index_buffer[i1] = current_meshlet.vertex_count;
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i1;
       }
       if(mi2)
       {
-         index_buffer[i2] = current_meshlet.vertex_count;
+         meshlet_index_buffer[i2] = current_meshlet.vertex_count;
          current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i2;
       }
 
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = index_buffer[i0];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = index_buffer[i1];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = index_buffer[i2];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = meshlet_index_buffer[i0];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = meshlet_index_buffer[i1];
+      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = meshlet_index_buffer[i2];
 
       current_meshlet.triangle_count++;   // index triple done
 
       // within max bounds
-      assert(current_meshlet.triangle_count <= array_count(current_meshlet.primitive_indices)/3);
-      assert(current_meshlet.index_count <= array_count(current_meshlet.vertex_index_buffer));
+      assert(current_meshlet.vertex_count <= max_vertex_count);
+      assert(current_meshlet.triangle_count <= max_triangle_count);
 
-      // meshlet must have valid indices to vertex index buffer
+      // meshlet must have valid indices into the vertex index buffer
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 0] != 0xff);
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 1] != 0xff);
       assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 2] != 0xff);
@@ -1863,7 +1854,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(2000);
+   size buffer_size = MB(128);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #if RTX 
@@ -1977,7 +1968,6 @@ bool vk_initialize(hw* hw)
       }
 
       context->index_count = (u32)obj_table.max_count;
-
       obj_mesh.index_buffer = context->ib.data;
       obj_mesh.index_count = context->index_count;
       obj_mesh.vertex_count = obj_table.count;

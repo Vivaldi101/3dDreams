@@ -63,4 +63,6 @@ static const u64 default_arena_size = KB(4096*1);
 
 #define PI 3.14159265358979323846f
 
+#define struct_clear(s) memset(&(s), 0, sizeof(s))
+
 #endif
