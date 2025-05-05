@@ -34,7 +34,6 @@ struct Meshlet
    uint8_t primitive_indices[126];    // 42 triangles (primitives)
    uint8_t triangle_count;
    uint8_t vertex_count;
-   uint8_t index_count;
 };
 
 layout(set = 0, binding = 0) readonly buffer Verts

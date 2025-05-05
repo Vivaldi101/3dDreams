@@ -44,7 +44,6 @@ typedef struct
    u8 primitive_indices[126];    // 42 triangles (primitives)
    u8 triangle_count;
    u8 vertex_count;
-   u8 index_count;
 } meshlet;
 #pragma pack(pop)
 
@@ -97,8 +96,8 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
             return false;
          *pm = current_meshlet;
 
-         struct_clear(current_meshlet);
          memset(meshlet_vertex_buffer, 0xff, vertex_count);
+         struct_clear(current_meshlet);
 
          m->meshlet_count++;
       }
