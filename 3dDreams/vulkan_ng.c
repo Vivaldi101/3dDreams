@@ -38,8 +38,9 @@ typedef struct
 
 typedef struct 
 {
-   u32 vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
-   u8 primitive_indices[126];    // 42 triangles (primitives)
+   u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
+   u8 primitive_indices[126];    // 42 triangles (primitives) into the above buffer
+   u8 primitive_index_count;
    u8 triangle_count;
    u8 vertex_count;
 } meshlet;
@@ -53,21 +54,35 @@ typedef struct
    u32 meshlet_count;
 } mesh;
 
+static void meshlet_add_new_vertex_index(u32 i, u8* meshlet_vertices, meshlet* ml)
+{
+   if(meshlet_vertices[i] == 0xff)
+   {
+      meshlet_vertices[i] = ml->vertex_count;
+
+      assert(ml->vertex_count < array_count(ml->vertex_index_buffer));
+      // store index into the main vertex buffer
+      ml->vertex_index_buffer[meshlet_vertices[i]] = i;
+      ml->vertex_count++;
+   }
+}
+
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
-   meshlet current_meshlet = {};
+   meshlet ml = {};
 
    size vertex_count = m->vertex_count;
 
    if(scratch_left(meshlet_scratch, u8) < vertex_count)
       return false;
 
-   u8* meshlet_vertex_buffer = (u8*)new(&meshlet_scratch, u8, vertex_count).beg;
+   u8* meshlet_vertices = (u8*)new(&meshlet_scratch, u8, vertex_count).beg;
    // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertex_buffer, 0xff, vertex_count);
+   memset(meshlet_vertices, 0xff, vertex_count);
 
-   usize max_vertex_count = array_count(current_meshlet.vertex_index_buffer);
-   usize max_triangle_count = array_count(current_meshlet.primitive_indices)/3;
+   usize max_index_count = array_count(ml.primitive_indices);
+   usize max_vertex_count = array_count(ml.vertex_index_buffer);
+   usize max_triangle_count = max_index_count/3;
 
    size index_count = m->index_count;
 
@@ -78,61 +93,53 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       u32 i1 = m->index_buffer[i + 1];
       u32 i2 = m->index_buffer[i + 2];
 
-      // are the indices non-used
-      bool mi0 = meshlet_vertex_buffer[i0] == 0xff;
-      bool mi1 = meshlet_vertex_buffer[i1] == 0xff;
-      bool mi2 = meshlet_vertex_buffer[i2] == 0xff;
+      // are the mesh vertex indices not used yet
+      bool mi0 = meshlet_vertices[i0] == 0xff;
+      bool mi1 = meshlet_vertices[i1] == 0xff;
+      bool mi2 = meshlet_vertices[i2] == 0xff;
 
       // flush meshlet if vertexes or primitives overflow
-      if((current_meshlet.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
-         (current_meshlet.triangle_count + 1 > max_triangle_count))
+      if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
+         (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pm = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
-         if(!pm) 
+         meshlet* pml = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         if(!pml) 
             return false;
-         *pm = current_meshlet;
+         *pml = ml;
 
-         memset(meshlet_vertex_buffer, 0xff, vertex_count);
-         struct_clear(current_meshlet);
+         memset(meshlet_vertices, 0xff, vertex_count);
+         struct_clear(ml);
 
          m->meshlet_count++;
       }
 
-      mi0 = meshlet_vertex_buffer[i0] == 0xff;
-      mi1 = meshlet_vertex_buffer[i1] == 0xff;
-      mi2 = meshlet_vertex_buffer[i2] == 0xff;
+      meshlet_add_new_vertex_index(i0, meshlet_vertices, &ml);
+      meshlet_add_new_vertex_index(i1, meshlet_vertices, &ml);
+      meshlet_add_new_vertex_index(i2, meshlet_vertices, &ml);
 
-      if(mi0)
-      {
-         // store the current vertex index of meshlet for a unused vertex index
-         meshlet_vertex_buffer[i0] = current_meshlet.vertex_count;
-         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i0;
-      }
-      if(mi1)
-      {
-         meshlet_vertex_buffer[i1] = current_meshlet.vertex_count;
-         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i1;
-      }
-      if(mi2)
-      {
-         meshlet_vertex_buffer[i2] = current_meshlet.vertex_count;
-         current_meshlet.vertex_index_buffer[current_meshlet.vertex_count++] = i2;
-      }
+      assert(ml.triangle_count*3 + 2 < array_count(ml.primitive_indices));
 
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 0] = meshlet_vertex_buffer[i0];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 1] = meshlet_vertex_buffer[i1];
-      current_meshlet.primitive_indices[current_meshlet.triangle_count * 3 + 2] = meshlet_vertex_buffer[i2];
+      assert(meshlet_vertices[i0] >= 0);
+      assert(meshlet_vertices[i1] >= 0);
+      assert(meshlet_vertices[i2] >= 0);
 
-      current_meshlet.triangle_count++;   // primitive index triplet done
+      assert(meshlet_vertices[i0] < ml.vertex_count);
+      assert(meshlet_vertices[i1] < ml.vertex_count);
+      assert(meshlet_vertices[i2] < ml.vertex_count);
+
+      ml.primitive_indices[ml.triangle_count * 3 + 0] = meshlet_vertices[i0];
+      ml.primitive_indices[ml.triangle_count * 3 + 1] = meshlet_vertices[i1];
+      ml.primitive_indices[ml.triangle_count * 3 + 2] = meshlet_vertices[i2];
+
+      assert(ml.vertex_index_buffer[ml.vertex_count-1] < vertex_count);
+
+      ml.triangle_count++;   // primitive index triplet done
+      ml.primitive_index_count += 3;
 
       // within max bounds
-      assert(current_meshlet.vertex_count <= max_vertex_count);
-      assert(current_meshlet.triangle_count <= max_triangle_count);
-
-      // meshlet must have valid indices into the vertex index buffer
-      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 0] != 0xff);
-      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 1] != 0xff);
-      assert(current_meshlet.primitive_indices[current_meshlet.triangle_count*3 + 2] != 0xff);
+      assert(ml.vertex_count <= max_vertex_count);
+      assert(ml.triangle_count <= max_triangle_count);
+      assert(ml.primitive_index_count <= max_index_count);
    }
 
    return true;
@@ -1034,7 +1041,7 @@ void vk_present(vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 2.0f;
+      f32 radius = 1.5f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1057,14 +1064,14 @@ void vk_present(vk_context* context)
       vec3 origin = {0.0f, height, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
-      mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
+      mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
       //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
       //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 3.75f);
+      //mvp.model = mat4_scale(mvp.model, 0.15f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1875,9 +1882,10 @@ bool vk_initialize(hw* hw)
    {
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
+      //const char* filename = "sponza.obj";
       //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
