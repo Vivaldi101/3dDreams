@@ -32,7 +32,6 @@ struct Meshlet
 {
    uint32_t vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
    uint8_t primitive_indices[126];    // 42 triangles (primitives)
-   uint8_t index_count;
    uint8_t triangle_count;
    uint8_t vertex_count;
 };

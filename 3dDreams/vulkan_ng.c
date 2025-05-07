@@ -40,7 +40,6 @@ typedef struct
 {
    u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
    u8 primitive_indices[126];    // 42 triangles (primitives) into the above buffer
-   u8 primitive_index_count;
    u8 triangle_count;
    u8 vertex_count;
 } meshlet;
@@ -130,23 +129,29 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       assert(meshlet_vertices[i1] >= 0);
       assert(meshlet_vertices[i2] >= 0);
 
-      assert(meshlet_vertices[i0] < ml.vertex_count);
-      assert(meshlet_vertices[i1] < ml.vertex_count);
-      assert(meshlet_vertices[i2] < ml.vertex_count);
+      assert(meshlet_vertices[i0] <= ml.vertex_count);
+      assert(meshlet_vertices[i1] <= ml.vertex_count);
+      assert(meshlet_vertices[i2] <= ml.vertex_count);
 
       ml.primitive_indices[ml.triangle_count * 3 + 0] = meshlet_vertices[i0];
       ml.primitive_indices[ml.triangle_count * 3 + 1] = meshlet_vertices[i1];
       ml.primitive_indices[ml.triangle_count * 3 + 2] = meshlet_vertices[i2];
 
-      assert(ml.vertex_index_buffer[ml.vertex_count-1] < vertex_count);
-
       ml.triangle_count++;   // primitive index triplet done
-      ml.primitive_index_count += 3;
 
       // within max bounds
       assert(ml.vertex_count <= max_vertex_count);
       assert(ml.triangle_count <= max_triangle_count);
-      assert(ml.primitive_index_count <= max_index_count);
+   }
+
+   if(ml.vertex_count > 0)
+   {
+      meshlet* pml = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+      if(!pml)
+         return false;
+
+      *pml = ml;
+      m->meshlet_count++;
    }
 
    return true;
@@ -1048,7 +1053,7 @@ void vk_present(hw* hw, vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 1.5f;
+      f32 radius = 3.5f;
       f32 theta = DEG2RAD(rot);
       f32 height = 2.0f;
 
@@ -1078,7 +1083,7 @@ void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 0.15f);
+      //mvp.model = mat4_scale(mvp.model, 0.05f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1891,7 +1896,7 @@ bool vk_initialize(hw* hw)
  // semantic compress
    {
       mesh obj_mesh = {};
-      const char* filename = "teapot3.obj";
+      const char* filename = "cube.obj";
       //const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
