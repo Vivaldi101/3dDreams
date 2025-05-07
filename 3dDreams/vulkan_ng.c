@@ -144,6 +144,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       assert(ml.triangle_count <= max_triangle_count);
    }
 
+   // add any left over meshlets
    if(ml.vertex_count > 0)
    {
       meshlet* pml = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
