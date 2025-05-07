@@ -37,11 +37,30 @@ static u32 win32_time()
 
 static void win32_fps(hw_window window, u32 fps)
 {
+   // TODO: arena buffer
    static char title[512];
 
    sprintf_s(title, array_count(title), "FPS: %u", fps);
 
    SetWindowText(window.handle, title);
+}
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <windows.h>
+
+static void win32_log(hw* hw, s8 message, ...)
+{
+   static char buffer[512];
+
+   va_list args;
+   va_start(args, message);
+
+   vsprintf_s(buffer, sizeof(buffer), (const char*)message.data, args);
+
+   SetWindowText(hw->renderer.window.handle, buffer);
+
+   va_end(args);
 }
 
 static bool win32_platform_loop()
@@ -304,6 +323,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw.timer.fps = win32_fps;
 
    hw.platform_loop = win32_platform_loop;
+
+   hw.log = win32_log;
 
    timeBeginPeriod(1);
    app_start(argc, argv, &hw);

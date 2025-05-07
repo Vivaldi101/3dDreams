@@ -7,7 +7,7 @@
 align_struct hw_renderer
 {
    void* backends[renderer_count];
-   void(*frame_present)(void* renderer);
+   void(*frame_present)(hw* hw, void* renderer);
    void(*frame_resize)(void* renderer, u32 width, u32 height);
    void(*frame_wait)(void* renderer);
    void* (*window_surface_create)(void* instance, void* window_handle);
@@ -29,6 +29,7 @@ align_struct hw
    arena vk_scratch;
    arena misc_storage;
    hw_timer timer;
+   void (*log)(hw* hw, s8 message, ...);
    bool(*platform_loop)();
    bool finished;
 } hw;
@@ -160,12 +161,17 @@ static void hw_frame_render(hw* hw)
       return;
 
    pre(renderer_index < (u32)renderer_count);
-   hw->renderer.frame_present(renderers[renderer_index]);
+   hw->renderer.frame_present(hw, renderers[renderer_index]);
 }
 
 static void hw_print_fps(hw* hw, u32 fps)
 {
    hw->timer.fps(hw->renderer.window, fps);
+}
+
+static void hw_log(hw* hw, s8 message, ...)
+{
+   hw->log(hw, message);
 }
 
 void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void (*app_input_function)(struct app_input* input))
@@ -191,9 +197,10 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void
 
       t = hw->timer.time();
 
+      // TODO: Remove
       if((hw->timer.time() - s) > 500)
       {
-         hw_print_fps(hw, (u32)(fps + 0.5f));
+         //hw_print_fps(hw, (u32)(fps + 0.5f));
          s = hw->timer.time();
       }
    }

@@ -54,15 +54,15 @@ typedef struct
    u32 meshlet_count;
 } mesh;
 
-__forceinline static void meshlet_add_new_vertex_index(u32 i, u8* meshlet_vertices, meshlet* ml)
+__forceinline static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshlet* ml)
 {
-   if(meshlet_vertices[i] == 0xff)
+   if(meshlet_vertices[index] == 0xff)
    {
-      meshlet_vertices[i] = ml->vertex_count;
+      meshlet_vertices[index] = ml->vertex_count;
 
-      assert(ml->vertex_count < array_count(ml->vertex_index_buffer));
+      assert(meshlet_vertices[index] < array_count(ml->vertex_index_buffer));
       // store index into the main vertex buffer
-      ml->vertex_index_buffer[meshlet_vertices[i]] = i;
+      ml->vertex_index_buffer[meshlet_vertices[index]] = index;
       ml->vertex_count++;
    }
 }
@@ -109,7 +109,10 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
+         {
+            assert(ml.vertex_index_buffer[j] < vertex_count);
             meshlet_vertices[ml.vertex_index_buffer[j]] = 0xff;
+         }
 
          m->meshlet_count++;
 
@@ -997,7 +1000,7 @@ void vk_resize(void* renderer, u32 width, u32 height)
    vk_swapchain_update(context);
 }
 
-void vk_present(vk_context* context)
+void vk_present(hw* hw, vk_context* context)
 {
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->logical_dev, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
@@ -1047,7 +1050,7 @@ void vk_present(vk_context* context)
 
       f32 radius = 1.5f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 0.0f;
+      f32 height = 2.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -1065,7 +1068,7 @@ void vk_present(vk_context* context)
           radius * sinf(theta)
       };
 
-      vec3 origin = {0.0f, height, 0.0f};
+      vec3 origin = {0.0f, 0.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
@@ -1075,7 +1078,7 @@ void vk_present(vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.15f);
+      mvp.model = mat4_scale(mvp.model, 0.15f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1234,6 +1237,9 @@ void vk_present(vk_context* context)
    // wait until all queue ops are done
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
+
+   // TODO: FPS
+   hw->log(hw, s8("# Meshlets: %d"), context->meshlet_count);
 }
 
 // TODO: Change name to vk_shader_compile
@@ -1885,9 +1891,9 @@ bool vk_initialize(hw* hw)
  // semantic compress
    {
       mesh obj_mesh = {};
-      //const char* filename = "teapot3.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "buddha.obj";
-      const char* filename = "dragon.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "sponza.obj";
       //const char* filename = "san-miguel.obj";
