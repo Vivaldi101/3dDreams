@@ -64,7 +64,7 @@ void main()
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 
-      out_color[i] = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.90, 1.0);
+      out_color[i] = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.85, 1.0);
     }
 
     for(uint i = 0; i < meshlets[mi].triangle_count; ++i)

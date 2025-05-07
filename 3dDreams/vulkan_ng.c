@@ -54,7 +54,7 @@ typedef struct
    u32 meshlet_count;
 } mesh;
 
-static void meshlet_add_new_vertex_index(u32 i, u8* meshlet_vertices, meshlet* ml)
+__forceinline static void meshlet_add_new_vertex_index(u32 i, u8* meshlet_vertices, meshlet* ml)
 {
    if(meshlet_vertices[i] == 0xff)
    {
@@ -107,10 +107,14 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
             return false;
          *pml = ml;
 
-         memset(meshlet_vertices, 0xff, vertex_count);
-         struct_clear(ml);
+         // clear the vertex indices used for this meshlet so that they can be used for the next one
+         for(u32 j = 0; j < ml.vertex_count; ++j)
+            meshlet_vertices[ml.vertex_index_buffer[j]] = 0xff;
 
          m->meshlet_count++;
+
+         // begin another meshlet
+         struct_clear(ml);
       }
 
       meshlet_add_new_vertex_index(i0, meshlet_vertices, &ml);
@@ -1882,8 +1886,8 @@ bool vk_initialize(hw* hw)
    {
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
-      const char* filename = "buddha.obj";
-      //const char* filename = "dragon.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "sponza.obj";
       //const char* filename = "san-miguel.obj";
