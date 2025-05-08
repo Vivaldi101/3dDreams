@@ -1071,7 +1071,7 @@ void vk_present(hw* hw, vk_context* context)
       mvp.f = 10000.0f;
       mvp.ar = ar;
 
-      f32 radius = 2.5f;
+      f32 radius = 6.5f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1186,7 +1186,7 @@ void vk_present(hw* hw, vk_context* context)
       descriptors[1].pBufferInfo = &mb_info;
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
+      vkCmdDrawMeshTasksEXT(command_buffer, 0xffff/10, 1, 1);
 #else
 
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1920,7 +1920,8 @@ bool vk_initialize(hw* hw)
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "erato.obj";
