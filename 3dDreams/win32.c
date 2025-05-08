@@ -310,7 +310,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw_virtual_memory_init();
 
    // TODO: Pool these
-   arena base_storage = hw.vk_storage = arena_new(default_arena_size*20);
+   arena base_storage = hw.vk_storage = arena_new(default_arena_size*200);
    hw.vk_scratch = arena_new(default_arena_size*600);
    hw.misc_storage = arena_new(default_arena_size);
 

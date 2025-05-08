@@ -447,6 +447,8 @@ align_struct
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
    vk_buffer mb;        // mesh buffer - todo wrap this in the meshlet structure
+
+   u32 max_meshlet_count;
    u32 meshlet_count;
    u32 index_count;
 
@@ -605,8 +607,24 @@ static VkPhysicalDevice vk_pdevice_select(VkInstance instance)
 
 static u32 vk_ldevice_select_family_index()
 {
-   // placeholder
+   // TODO: placeholder
    return 0;
+}
+
+static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_dev)
+{
+   VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = {};
+   mesh_shader_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT;
+
+   VkPhysicalDeviceProperties2 device_props2 = {};
+   device_props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+   device_props2.pNext = &mesh_shader_props;
+
+   vkGetPhysicalDeviceProperties2(physical_dev, &device_props2);
+
+   u32 max_mesh_tasks = mesh_shader_props.maxTaskWorkGroupCount[0];
+
+   return max_mesh_tasks;
 }
 
 static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_family_index)
@@ -1050,12 +1068,12 @@ void vk_present(hw* hw, vk_context* context)
       mvp_transform mvp = {};
 
       mvp.n = 0.1f;
-      mvp.f = 1000.0f;
+      mvp.f = 10000.0f;
       mvp.ar = ar;
 
-      f32 radius = 3.5f;
+      f32 radius = 2.5f;
       f32 theta = DEG2RAD(rot);
-      f32 height = -2.0f;
+      f32 height = 0.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -1083,7 +1101,7 @@ void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.05f);
+      //mvp.model = mat4_scale(mvp.model, 0.25f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1783,6 +1801,10 @@ bool vk_initialize(hw* hw)
    context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
    context->renderpass = vk_renderpass_create(context->logical_dev, context->swapchain_info.format, VK_FORMAT_D32_SFLOAT);
 
+#if RTX
+   context->max_meshlet_count = vk_mesh_shader_max_tasks(context->physical_dev);
+#endif
+
    VkExtent3D depth_extent = {context->swapchain_info.image_width, context->swapchain_info.image_height, 1};
    for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
       context->swapchain_info.depths[i] = vk_depth_image_create(context->logical_dev, context->physical_dev, VK_FORMAT_D32_SFLOAT, depth_extent);
@@ -1896,10 +1918,12 @@ bool vk_initialize(hw* hw)
  // semantic compress
    {
       mesh obj_mesh = {};
-      const char* filename = "cube.obj";
-      //const char* filename = "buddha.obj";
+      //const char* filename = "teapot3.obj";
+      //const char* filename = "cube.obj";
+      const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
+      //const char* filename = "erato.obj";
       //const char* filename = "sponza.obj";
       //const char* filename = "san-miguel.obj";
 
