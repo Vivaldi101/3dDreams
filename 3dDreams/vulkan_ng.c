@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -1875,7 +1875,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_dev, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(128);
+   size buffer_size = MB(1280);
    vk_buffer index_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_dev, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 #if RTX 
@@ -1897,8 +1897,8 @@ bool vk_initialize(hw* hw)
  // semantic compress
    {
       mesh obj_mesh = {};
-      const char* filename = "cube.obj";
-      //const char* filename = "buddha.obj";
+      //const char* filename = "cube.obj";
+      const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "sponza.obj";
@@ -1923,7 +1923,7 @@ bool vk_initialize(hw* hw)
       }
 
       // only triangles allowed
-      assert(attrib.face_num_verts > 0 && (*attrib.face_num_verts % 3) == 0);
+      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
 
       const usize index_count = attrib.num_faces;
 
@@ -1944,7 +1944,7 @@ bool vk_initialize(hw* hw)
 
       u32 vertex_index = 0;
 
-      for(usize f = 0; f < obj_table.max_count; f += 3)
+      for(usize f = 0; f < index_count; f += 3)
       {
          const tinyobj_vertex_index_t* vidx = attrib.faces + f;
 
@@ -1989,13 +1989,13 @@ bool vk_initialize(hw* hw)
          }
       }
 
-      context->index_count = (u32)obj_table.max_count;
-      obj_mesh.index_buffer = context->ib.data;
-      obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = attrib.num_face_num_verts;
-      obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
+      context->index_count = (u32)index_count;
 
 #if RTX 
+      obj_mesh.index_buffer = context->ib.data;
+      obj_mesh.index_count = context->index_count;
+      obj_mesh.vertex_count = obj_table.count;
+      obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
    scratch_clear(scratch);
    if(!meshlet_build(context->storage, scratch, &obj_mesh))
       return false;
