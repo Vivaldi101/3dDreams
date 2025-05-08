@@ -19,7 +19,7 @@ align_struct
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -190,7 +190,7 @@ static bool key_equals(hash_key a, hash_key b)
 
 static bool key_less(hash_key a, hash_key b)
 {
-   return a.vi < b.vi && a.vni < b.vni && a.vti < b.vti;
+   return memcmp(&a, &b, sizeof(hash_key)) < 0;
 }
 
 static inline bool key_is_empty(hash_key k)
@@ -245,7 +245,6 @@ static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
          table->values[index] = value; // update
          return;
       }
-
       if(key_less(key, table->keys[index]))
       {
          hash_key tmp_key = table->keys[index];
@@ -1056,7 +1055,7 @@ void vk_present(hw* hw, vk_context* context)
 
       f32 radius = 3.5f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 2.0f;
+      f32 height = -2.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -1897,8 +1896,8 @@ bool vk_initialize(hw* hw)
  // semantic compress
    {
       mesh obj_mesh = {};
-      //const char* filename = "cube.obj";
-      const char* filename = "buddha.obj";
+      const char* filename = "cube.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "sponza.obj";
@@ -1994,14 +1993,16 @@ bool vk_initialize(hw* hw)
 #if RTX 
       obj_mesh.index_buffer = context->ib.data;
       obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = obj_table.count;
+      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
       obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
-   scratch_clear(scratch);
-   if(!meshlet_build(context->storage, scratch, &obj_mesh))
-      return false;
 
-   context->meshlet_count = obj_mesh.meshlet_count;
-   memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count*sizeof(meshlet));
+      scratch_clear(scratch);
+
+      if(!meshlet_build(context->storage, scratch, &obj_mesh))
+         return false;
+
+      context->meshlet_count = obj_mesh.meshlet_count;
+      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
 #endif
 
       tinyobj_materials_free(materials, material_count);
