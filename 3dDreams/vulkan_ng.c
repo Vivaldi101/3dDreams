@@ -72,10 +72,10 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
    size vertex_count = m->vertex_count;
 
-   if(scratch_left(meshlet_scratch, u8) < vertex_count)
+   u8* meshlet_vertices = new(&meshlet_scratch, u8, vertex_count).beg;
+   if(!meshlet_vertices)
       return false;
 
-   u8* meshlet_vertices = (u8*)new(&meshlet_scratch, u8, vertex_count).beg;
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
 
@@ -101,7 +101,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pml = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+         meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
          if(!pml) 
             return false;
          *pml = ml;
@@ -147,7 +147,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      meshlet* pml = (meshlet*)new(meshlet_storage, meshlet, 1).beg;
+      meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
       if(!pml)
          return false;
 
@@ -1722,14 +1722,14 @@ VkInstance vk_instance_create(arena scratch)
    if(scratch_left(scratch, VkExtensionProperties) < ext_count)
       return 0;
 
-   VkExtensionProperties* extensions = (VkExtensionProperties*)new(&scratch, VkExtensionProperties, ext_count).beg;
+   VkExtensionProperties* extensions = new(&scratch, VkExtensionProperties, ext_count).beg;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
       return 0;
 
    if(scratch_left(scratch, const char*) < ext_count)
       return 0;
 
-   const char** ext_names = (const char**)new(&scratch, const char*, ext_count).beg;
+   const char** ext_names = new(&scratch, const char*, ext_count).beg;
 
    for(size_t i = 0; i < ext_count; ++i)
       ext_names[i] = extensions[i].extensionName;
@@ -1760,7 +1760,7 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   vk_context* context = (vk_context*)new(&hw->vk_storage, vk_context).beg;
+   vk_context* context = new(&hw->vk_storage, vk_context).beg;
    if(!context)
       return false;
 
@@ -1831,8 +1831,8 @@ bool vk_initialize(hw* hw)
       if(is_stub(keys) || is_stub(values))
          return 0;
 
-      shader_hash_table.keys = (const char**)keys.beg;
-      shader_hash_table.values = (vk_shader_modules*)values.beg;
+      shader_hash_table.keys = keys.beg;
+      shader_hash_table.values = values.beg;
 
       memset(shader_hash_table.values, 0, shader_hash_table.max_count*sizeof(vk_shader_modules));
 
@@ -1966,8 +1966,8 @@ bool vk_initialize(hw* hw)
       if(is_stub(keys) || is_stub(values))
          return 0;
 
-      obj_table.keys = (hash_key*)keys.beg;
-      obj_table.values = (hash_value*)values.beg;
+      obj_table.keys = keys.beg;
+      obj_table.values = values.beg;
 
       memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
 
@@ -2024,7 +2024,7 @@ bool vk_initialize(hw* hw)
       obj_mesh.index_buffer = context->ib.data;
       obj_mesh.index_count = context->index_count;
       obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-      obj_mesh.meshlet_buffer = (meshlet*)context->storage->beg;
+      obj_mesh.meshlet_buffer = context->storage->beg;
 
       scratch_clear(scratch);
 

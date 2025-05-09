@@ -291,7 +291,7 @@ static arena arena_new(size cap)
 
    // set the base pointer and size on success
    a.beg = base;
-   a.end = a.beg ? a.beg + cap : 0;
+   a.end = a.beg ? (char*)a.beg + cap : 0;
 
    return a;
 }

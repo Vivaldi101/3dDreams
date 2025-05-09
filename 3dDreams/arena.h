@@ -10,8 +10,8 @@
 #define arena_loop(i, a, p) for(size (i) = 0; (i) < scratch_left((a), *(p)); ++(i))
 #define arena_offset(i, a, t) (t*)a.beg + (i)
 
-#define scratch_size(a) (size)((a).end - (a).beg)
-#define arena_size(a) (size)((a)->end - (a)->beg)
+#define scratch_size(a) (size)((char*)(a).end - (char*)(a).beg)
+#define arena_size(a) (size)((char*)(a)->end - (char*)(a)->beg)
 
 #define scratch_left(a,t)  (size)(scratch_size(a) / sizeof(t))
 #define arena_left(a,t)    (size)(arena_size(a) / sizeof(t))
@@ -28,7 +28,7 @@
 #define set_arena_type(t) typedef t arena_type;
 
 #define scratch_invariant(s, a, t) assert((s) <= scratch_left((a), t))
-#define scratch_shrink(a, s, t) (a).end = (a).beg + (s)*sizeof(t)
+#define scratch_shrink(a, s, t) (a).end = (char*)(a).beg + (s)*sizeof(t)
 
 #define arena_invariant(s, a, t) assert((s) <= arena_left((a), t))
 #define arena_shrink(a, s, t) (a)->end = (a)->beg + (s)*sizeof(t)
@@ -56,9 +56,8 @@
 
 typedef struct arena
 {
-   // void pointers?
-   char* beg;
-   char* end;  // one past the end
+   void* beg;
+   void* end;  // one past the end
 } arena;
 
 static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
@@ -66,7 +65,7 @@ static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(count <= 0 || count > (a->end - (char*)p) / alloc_size)
+   if(count <= 0 || count > ((char*)a->end - (char*)p) / alloc_size)
       return (arena){};
 
    a->beg = (char*)p + (count * alloc_size);          // advance arena 
@@ -75,16 +74,3 @@ static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    return (arena){p, a->end};
 }
-
-#if 0
-static arena_result arena_alloc(arena scratch, size objsize, size count)
-{
-   arena_result result = {};
-
-   size last_count = scratch_size(scratch) / objsize;
-   result.data = newsize(&scratch, objsize, count);
-   result.count = last_count - (scratch_size(scratch) / objsize);
-
-   return result;
-}
-#endif
