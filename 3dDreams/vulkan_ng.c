@@ -1817,11 +1817,14 @@ bool vk_initialize(hw* hw)
    if(!vk_swapchain_update(context))
       return false;
 
+   u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(&scratch, "bin\\assets\\shaders");
+   for(const char **p = shader_names; p && *p; ++p)
+      shader_count++;
 
    // TODO: store this inside the context
    spv_hash_table shader_hash_table = {};
-   shader_hash_table.max_count = 10 /*shader_count*/;
+   shader_hash_table.max_count = shader_count;
 
    {
       // TODO: make function for hash tables
