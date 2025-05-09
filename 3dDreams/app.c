@@ -35,8 +35,6 @@ void app_start(int argc, const char** argv, hw* hw)
 {
    pre(implies(argc > 0, argv[argc - 1]));
 
-   g_frustum frustum = {0};
-
 #ifdef FULLSCREEN
 	int w = 1920, h = 1080;
 	int x = 0, y = 0;

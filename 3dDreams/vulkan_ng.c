@@ -1553,86 +1553,6 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_dev, VkRenderPass
    return pipeline;
 }
 
-static VkPipeline vk_frustum_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
-{
-   assert(vk_valid_handle(logical_dev));
-   assert(vk_valid_handle(shaders->vs));
-   assert(vk_valid_handle(shaders->fs));
-   assert(!vk_valid_handle(cache));
-
-   VkPipeline pipeline = 0;
-
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
-
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   stages[0].module = shaders->vs;
-   stages[0].pName = "main";
-
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
-
-   VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
-
-   VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
-   pipeline_info.pVertexInputState = &vertex_input_info;
-
-   VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
-   assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-   pipeline_info.pInputAssemblyState = &assembly_info;
-
-   VkPipelineViewportStateCreateInfo viewport_info = {vk_info(PIPELINE_VIEWPORT_STATE)};
-   viewport_info.scissorCount = 1;
-   viewport_info.viewportCount = 1;
-   pipeline_info.pViewportState = &viewport_info;
-
-   VkPipelineRasterizationStateCreateInfo raster_info = {vk_info(PIPELINE_RASTERIZATION_STATE)};
-   raster_info.lineWidth = 1.0f;
-   raster_info.cullMode = VK_CULL_MODE_NONE;
-   raster_info.polygonMode = VK_POLYGON_MODE_FILL;
-   raster_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-   pipeline_info.pRasterizationState = &raster_info;
-
-   VkPipelineMultisampleStateCreateInfo sample_info = {vk_info(PIPELINE_MULTISAMPLE_STATE)};
-   sample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-   pipeline_info.pMultisampleState = &sample_info;
-
-   VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
-   depth_stencil_info.depthTestEnable = true;
-   depth_stencil_info.depthWriteEnable = true;
-   depth_stencil_info.depthBoundsTestEnable = true;
-   depth_stencil_info.stencilTestEnable = true;
-   depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
-   depth_stencil_info.minDepthBounds = 0.0f;
-   depth_stencil_info.maxDepthBounds = 1.0f;
-   pipeline_info.pDepthStencilState = &depth_stencil_info;
-
-   VkPipelineColorBlendAttachmentState color_blend_attachment = {};
-   color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-   VkPipelineColorBlendStateCreateInfo color_blend_info = {vk_info(PIPELINE_COLOR_BLEND_STATE)};
-   color_blend_info.attachmentCount = 1;
-   color_blend_info.pAttachments = &color_blend_attachment;
-   pipeline_info.pColorBlendState = &color_blend_info;
-
-   VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
-   dynamic_info.pDynamicStates = (VkDynamicState[3]){VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH};
-   dynamic_info.dynamicStateCount = 3;
-   pipeline_info.pDynamicState = &dynamic_info;
-
-   pipeline_info.renderPass = renderpass;
-   pipeline_info.layout = layout;
-
-   vk_test_return(vkCreateGraphicsPipelines(logical_dev, cache, 1, &pipeline_info, 0, &pipeline));
-
-   return pipeline;
-
-}
-
 static VkPipeline vk_axis_pipeline_create(VkDevice logical_dev, VkRenderPass renderpass, VkPipelineCache cache, VkPipelineLayout layout, const vk_shader_modules* shaders)
 {
    assert(vk_valid_handle(logical_dev));
@@ -2055,9 +1975,9 @@ bool vk_initialize(hw* hw)
 bool vk_uninitialize(hw* hw)
 {
    // TODO:
-#if 0
    vk_context* context = hw->renderer.backends[vk_renderer_index];
 
+#if 0
    vkDestroySwapchainKHR(context->logical_dev, context->swapchain, 0);
    vkDestroySurfaceKHR(context->instance, context->surface, 0);
    vkDestroyDevice(context->logical_dev, 0);
