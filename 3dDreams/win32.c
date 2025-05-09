@@ -309,10 +309,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 
    hw_virtual_memory_init();
 
-   // TODO: Pool these
-   arena base_storage = hw.vk_storage = arena_new(default_arena_size*200);
-   hw.vk_scratch = arena_new(default_arena_size*600);
-   hw.misc_storage = arena_new(default_arena_size);
+   arena base_storage = arena_new(default_arena_size*800);
+   assert(arena_size(&base_storage) == default_arena_size*800);
+
+   hw.vk_storage.beg = base_storage.beg;
+   hw.vk_storage.end = (char*)hw.vk_storage.beg + default_arena_size*200;
+
+   hw.vk_scratch.beg = hw.vk_storage.end;
+   hw.vk_scratch.end = (char*)hw.vk_scratch.beg + default_arena_size*200;
+
+   hw.misc_storage.beg = hw.vk_scratch.end;
+   hw.misc_storage.end = (char*)hw.misc_storage.beg + default_arena_size*400;
+
+   assert(hw.misc_storage.end == base_storage.end);
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
@@ -331,8 +340,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    timeEndPeriod(1);
 
    arena_free(&base_storage);
-   arena_free(&hw.vk_scratch);
-   arena_free(&hw.misc_storage);
 
    return 0;
 }
