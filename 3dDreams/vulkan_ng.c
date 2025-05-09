@@ -1067,11 +1067,11 @@ void vk_present(hw* hw, vk_context* context)
 
       mvp_transform mvp = {};
 
-      mvp.n = 0.1f;
-      mvp.f = 10000.0f;
+      mvp.n = 0.01f;
+      mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 6.5f;
+      f32 radius = 8.5f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1186,8 +1186,12 @@ void vk_present(hw* hw, vk_context* context)
       descriptors[1].pBufferInfo = &mb_info;
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-      // 0xffff max meshlet count
-      vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
+      // TODO: testing 
+      static u32 meshlet_count = 0;
+      meshlet_count += 50;
+      // max meshlet count
+      meshlet_count %= 0xffff;
+      vkCmdDrawMeshTasksEXT(command_buffer, meshlet_count, 1, 1);
 #else
 
       VkWriteDescriptorSet descriptors[1] = {};
