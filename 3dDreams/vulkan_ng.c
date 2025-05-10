@@ -1,11 +1,10 @@
 #include "arena.h"
 #include "common.h"
 #include "graphics.h"
-#include "priority_queue.h"
-
-#include "vulkan_ng.h"
 
 #include <volk.c>
+
+#include "vulkan_ng.h"
 #include "win32_file_io.c"
 
 align_struct
@@ -1672,6 +1671,131 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
+// TOOD: move into own file
+static bool obj_load(vk_context* context, arena scratch)
+{
+      index_hash_table obj_table = {};
+
+      mesh obj_mesh = {};
+      //const char* filename = "teapot3.obj";
+      //const char* filename = "cube.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "hairball.obj";
+      //const char* filename = "dragon.obj";
+      //const char* filename = "exterior.obj";
+      //const char* filename = "erato.obj";
+      //const char* filename = "sponza.obj";
+      //const char* filename = "san-miguel.obj";
+
+      tinyobj_shape_t* shapes = 0;
+      tinyobj_material_t* materials = 0;
+      tinyobj_attrib_t attrib = {};
+
+      size_t shape_count = 0;
+      size_t material_count = 0;
+
+      tinyobj_attrib_init(&attrib);
+
+      obj_user_ctx user_data = {};
+      user_data.scratch = scratch;
+
+      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      {
+         hw_message("Could not load .obj file");
+         return false;
+      }
+
+      // only triangles allowed
+      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
+
+      const usize index_count = attrib.num_faces;
+
+      obj_table.max_count = index_count;
+
+      scratch_clear(scratch);
+
+      arena keys = new(&scratch, hash_key, obj_table.max_count);
+      arena values = new(&scratch, hash_value, obj_table.max_count);
+
+      if(is_stub(keys) || is_stub(values))
+         return 0;
+
+      obj_table.keys = keys.beg;
+      obj_table.values = values.beg;
+
+      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
+
+      u32 vertex_index = 0;
+
+      for(usize f = 0; f < index_count; f += 3)
+      {
+         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
+
+         for(usize i = 0; i < 3; ++i)
+         {
+            i32 vi = vidx[i].v_idx;
+            i32 vti = vidx[i].vt_idx;
+            i32 vni = vidx[i].vn_idx;
+
+            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+            hash_value lookup = hash_lookup(&obj_table, index);
+
+            if(lookup == ~0u)
+            {
+               obj_vertex v = {};
+               if(vi >= 0)
+               {
+                  v.vx = attrib.vertices[vi * 3 + 0];
+                  v.vy = attrib.vertices[vi * 3 + 1];
+                  v.vz = attrib.vertices[vi * 3 + 2];
+               }
+
+               if(vni >= 0)
+               {
+                  v.nx = attrib.normals[vni * 3 + 0];
+                  v.ny = attrib.normals[vni * 3 + 1];
+                  v.nz = attrib.normals[vni * 3 + 2];
+               }
+
+               if(vti >= 0)
+               {
+                  v.tu = attrib.texcoords[vti * 2 + 0];
+                  v.tv = attrib.texcoords[vti * 2 + 1];
+               }
+
+               hash_insert(&obj_table, index, vertex_index);
+               ((u32*)context->ib.data)[f + i] = vertex_index;
+               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
+            }
+            else
+               ((u32*)context->ib.data)[f + i] = lookup;
+         }
+      }
+
+      context->index_count = (u32)index_count;
+
+#if RTX 
+      obj_mesh.index_buffer = context->ib.data;
+      obj_mesh.index_count = context->index_count;
+      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
+      obj_mesh.meshlet_buffer = context->storage->beg;
+
+      scratch_clear(scratch);
+
+      if(!meshlet_build(context->storage, scratch, &obj_mesh))
+         return false;
+
+      context->meshlet_count = obj_mesh.meshlet_count;
+      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
+#endif
+
+      tinyobj_materials_free(materials, material_count);
+      tinyobj_shapes_free(shapes, shape_count);
+      tinyobj_attrib_free(&attrib);
+
+      return true;
+}
+
 bool vk_initialize(hw* hw)
 {
    if(!hw->renderer.window.handle)
@@ -1841,127 +1965,8 @@ bool vk_initialize(hw* hw)
    context->mb = meshlet_buffer;
 #endif
 
-   index_hash_table obj_table = {};
-
- // semantic compress
-   {
-      mesh obj_mesh = {};
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "cube.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
-      //const char* filename = "exterior.obj";
-      //const char* filename = "erato.obj";
-      //const char* filename = "sponza.obj";
-      //const char* filename = "san-miguel.obj";
-
-      tinyobj_shape_t* shapes = 0;
-      tinyobj_material_t* materials = 0;
-      tinyobj_attrib_t attrib = {};
-
-      size_t shape_count = 0;
-      size_t material_count = 0;
-
-      tinyobj_attrib_init(&attrib);
-
-      obj_user_ctx user_data = {};
-      user_data.scratch = scratch;
-
-      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
-      {
-         hw_message("Could not load .obj file");
-         return false;
-      }
-
-      // only triangles allowed
-      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
-
-      const usize index_count = attrib.num_faces;
-
-      obj_table.max_count = index_count;
-
-      scratch_clear(scratch);
-
-      arena keys = new(&scratch, hash_key, obj_table.max_count);
-      arena values = new(&scratch, hash_value, obj_table.max_count);
-
-      if(is_stub(keys) || is_stub(values))
-         return 0;
-
-      obj_table.keys = keys.beg;
-      obj_table.values = values.beg;
-
-      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
-
-      u32 vertex_index = 0;
-
-      for(usize f = 0; f < index_count; f += 3)
-      {
-         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
-
-         for(usize i = 0; i < 3; ++i)
-         {
-            i32 vi = vidx[i].v_idx;
-            i32 vti = vidx[i].vt_idx;
-            i32 vni = vidx[i].vn_idx;
-
-            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-            hash_value lookup = hash_lookup(&obj_table, index);
-
-            if(lookup == ~0u)
-            {
-               obj_vertex v = {};
-               if(vi >= 0)
-               {
-                  v.vx = attrib.vertices[vi * 3 + 0];
-                  v.vy = attrib.vertices[vi * 3 + 1];
-                  v.vz = attrib.vertices[vi * 3 + 2];
-               }
-
-               if(vni >= 0)
-               {
-                  v.nx = attrib.normals[vni * 3 + 0];
-                  v.ny = attrib.normals[vni * 3 + 1];
-                  v.nz = attrib.normals[vni * 3 + 2];
-               }
-
-               if(vti >= 0)
-               {
-                  v.tu = attrib.texcoords[vti * 2 + 0];
-                  v.tv = attrib.texcoords[vti * 2 + 1];
-               }
-
-               hash_insert(&obj_table, index, vertex_index);
-               ((u32*)context->ib.data)[f + i] = vertex_index;
-               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
-            }
-            else
-               ((u32*)context->ib.data)[f + i] = lookup;
-         }
-      }
-
-      context->index_count = (u32)index_count;
-
-#if RTX 
-      obj_mesh.index_buffer = context->ib.data;
-      obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-      obj_mesh.meshlet_buffer = context->storage->beg;
-
-      scratch_clear(scratch);
-
-      if(!meshlet_build(context->storage, scratch, &obj_mesh))
-         return false;
-
-      context->meshlet_count = obj_mesh.meshlet_count;
-      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
-#endif
-
-      tinyobj_materials_free(materials, material_count);
-      tinyobj_shapes_free(shapes, shape_count);
-      tinyobj_attrib_free(&attrib);
-   }
+   if(!obj_load(context, scratch))
+      return false;
 
    // app callbacks
    hw->renderer.backends[vk_renderer_index] = context;
