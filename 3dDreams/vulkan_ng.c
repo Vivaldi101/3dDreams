@@ -5,15 +5,9 @@
 #include <volk.c>
 
 #include "vulkan_ng.h"
+
+#include "hash.c"
 #include "win32_file_io.c"
-
-align_struct
-{
-   VkShaderModule vs;
-   VkShaderModule fs;
-   VkShaderModule ms;
-} vk_shader_modules;
-
 #include "vulkan_spirv_loader.c"
 
 #pragma comment(lib,	"vulkan-1.lib")
@@ -52,7 +46,7 @@ typedef struct
    u32 meshlet_count;
 } mesh;
 
-__forceinline static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshlet* ml)
+static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshlet* ml)
 {
    if(meshlet_vertices[index] == 0xff)
    {
@@ -155,202 +149,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    }
 
    return true;
-}
-
-// TODO: We need to cleanup these hash tables
-
-typedef struct 
-{
-   i32 vi, vti, vni;
-} hash_key;
-
-// Ordered open addressing with linear probing
-typedef u32 hash_value;
-typedef struct 
-{
-   u32* values;
-   hash_key* keys;
-   usize max_count;
-   usize count;
-} index_hash_table;
-
-typedef struct 
-{
-   vk_shader_modules* values;
-   const char** keys;
-   usize max_count;
-   usize count;
-} spv_hash_table;
-
-static bool key_equals(hash_key a, hash_key b)
-{
-   return memcmp(&a, &b, sizeof(hash_key)) == 0;
-}
-
-static bool key_less(hash_key a, hash_key b)
-{
-   return memcmp(&a, &b, sizeof(hash_key)) < 0;
-}
-
-static inline bool key_is_empty(hash_key k)
-{
-   hash_key empty = {-1, -1, -1};
-   return memcmp(&k, &empty, sizeof(hash_key)) == 0;
-}
-
-static u32 hash_index(hash_key k)
-{
-   u32 hash = 2166136261u;
-
-#define HASH(f) do {          \
-        u32 bits = (f);       \
-        hash ^= bits;         \
-        hash *= 16777619u;    \
-    } while(0)
-
-   HASH(k.vi); 
-   HASH(k.vni); 
-   HASH(k.vti);
-
-#undef HASH
-
-   return hash;
-}
-
-static u32 spv_hash(const char* key)
-{
-   uint32_t hash = 2166136261U;
-   while(*key)
-   {
-      hash *= 16777619U;
-      hash ^= (uint8_t)(*key);
-      key++;
-   }
-
-   return hash;
-}
-
-static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
-{
-   if(table->count == table->max_count)
-      return;
-
-   u32 index = hash_index(key) % table->max_count;
-
-   while(!key_is_empty(table->keys[index]))
-   {
-      if(key_equals(table->keys[index], key))
-      {
-         table->values[index] = value; // update
-         return;
-      }
-      if(key_less(key, table->keys[index]))
-      {
-         hash_key tmp_key = table->keys[index];
-         hash_value tmp_value = table->values[index];
-
-         table->keys[index] = key;
-         table->values[index] = value;
-
-         key = tmp_key;
-         value = tmp_value;
-      }
-
-      index = (index + 1) % table->max_count;
-   }
-
-   table->keys[index] = key;
-   table->values[index] = value;
-   table->count++;
-}
-
-static hash_value hash_lookup(index_hash_table* table, hash_key key)
-{
-   u32 index = hash_index(key) % table->max_count;
-
-   while(!key_is_empty(table->keys[index]) && key_less(table->keys[index], key))
-      index = (index + 1) % table->max_count;
-
-   if(key_equals(table->keys[index], key))
-      return table->values[index];
-
-   return ~0u;
-}
-
-static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
-{
-   u32 index = spv_hash(key) % table->max_count;
-
-   while(table->keys[index] && strcmp(table->keys[index], key) < 0)
-      index = (index + 1) % table->max_count;
-
-   if(table->keys[index] && strcmp(table->keys[index], key) == 0)
-      return table->values[index];
-
-   return (vk_shader_modules){};
-}
-
-static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_modules value)
-{
-   if(table->count == table->max_count)
-      return;
-
-   u32 index = spv_hash(key) % table->max_count;
-
-   while(table->keys[index])
-   {
-      if(strcmp(table->keys[index], key) > 0)
-      {
-         const char* tmp_key = table->keys[index];
-         vk_shader_modules tmp_value = table->values[index];
-
-         table->keys[index] = key;
-         table->values[index] = value;
-
-         key = tmp_key;
-         value = tmp_value;
-      }
-      else if(strcmp(table->keys[index], key) == 0)
-      {
-         table->values[index] = value;
-         return;
-      }
-
-      index = (index + 1) % table->max_count;
-   }
-
-   table->keys[index] = key;
-   table->values[index] = value;
-   table->count++;
-}
-
-static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
-{
-   char shader_path[MAX_PATH];
-
-   obj_user_ctx* user_data = (obj_user_ctx*)ctx;
-
-   arena project_dir = vk_project_directory(&user_data->scratch);
-
-   if(is_stub(project_dir))
-   {
-      *len = 0; *buf = 0;
-      return;
-   }
-
-   wsprintf(shader_path, project_dir.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, obj_filename);
-
-   arena file_read = win32_file_read(&user_data->scratch, shader_path);
-
-   if(is_stub(file_read))
-   {
-      *len = 0; *buf = 0;
-      return;
-   }
-
-   *len = scratch_size(file_read);
-   *buf = file_read.beg;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
@@ -456,6 +254,160 @@ align_struct
    arena* storage;
    u32 queue_family_index;
 } vk_context;
+
+static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
+{
+   char shader_path[MAX_PATH];
+
+   obj_user_ctx* user_data = (obj_user_ctx*)ctx;
+
+   arena project_dir = vk_project_directory(&user_data->scratch);
+
+   if(is_stub(project_dir))
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
+
+   wsprintf(shader_path, project_dir.beg, array_count(shader_path));
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, obj_filename);
+
+   arena file_read = win32_file_read(&user_data->scratch, shader_path);
+
+   if(is_stub(file_read))
+   {
+      *len = 0; *buf = 0;
+      return;
+   }
+
+   *len = scratch_size(file_read);
+   *buf = file_read.beg;
+}
+
+// TOOD: move into own file
+static bool obj_load(vk_context* context, arena scratch)
+{
+      index_hash_table obj_table = {};
+
+      mesh obj_mesh = {};
+      //const char* filename = "teapot3.obj";
+      //const char* filename = "cube.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "hairball.obj";
+      //const char* filename = "dragon.obj";
+      //const char* filename = "exterior.obj";
+      //const char* filename = "erato.obj";
+      //const char* filename = "sponza.obj";
+      //const char* filename = "san-miguel.obj";
+
+      tinyobj_shape_t* shapes = 0;
+      tinyobj_material_t* materials = 0;
+      tinyobj_attrib_t attrib = {};
+
+      size_t shape_count = 0;
+      size_t material_count = 0;
+
+      tinyobj_attrib_init(&attrib);
+
+      obj_user_ctx user_data = {};
+      user_data.scratch = scratch;
+
+      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      {
+         hw_message("Could not load .obj file");
+         return false;
+      }
+
+      // only triangles allowed
+      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
+
+      const usize index_count = attrib.num_faces;
+
+      obj_table.max_count = index_count;
+
+      scratch_clear(scratch);
+
+      arena keys = new(&scratch, hash_key, obj_table.max_count);
+      arena values = new(&scratch, hash_value, obj_table.max_count);
+
+      if(is_stub(keys) || is_stub(values))
+         return 0;
+
+      obj_table.keys = keys.beg;
+      obj_table.values = values.beg;
+
+      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
+
+      u32 vertex_index = 0;
+
+      for(usize f = 0; f < index_count; f += 3)
+      {
+         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
+
+         for(usize i = 0; i < 3; ++i)
+         {
+            i32 vi = vidx[i].v_idx;
+            i32 vti = vidx[i].vt_idx;
+            i32 vni = vidx[i].vn_idx;
+
+            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+            hash_value lookup = hash_lookup(&obj_table, index);
+
+            if(lookup == ~0u)
+            {
+               obj_vertex v = {};
+               if(vi >= 0)
+               {
+                  v.vx = attrib.vertices[vi * 3 + 0];
+                  v.vy = attrib.vertices[vi * 3 + 1];
+                  v.vz = attrib.vertices[vi * 3 + 2];
+               }
+
+               if(vni >= 0)
+               {
+                  v.nx = attrib.normals[vni * 3 + 0];
+                  v.ny = attrib.normals[vni * 3 + 1];
+                  v.nz = attrib.normals[vni * 3 + 2];
+               }
+
+               if(vti >= 0)
+               {
+                  v.tu = attrib.texcoords[vti * 2 + 0];
+                  v.tv = attrib.texcoords[vti * 2 + 1];
+               }
+
+               hash_insert(&obj_table, index, vertex_index);
+               ((u32*)context->ib.data)[f + i] = vertex_index;
+               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
+            }
+            else
+               ((u32*)context->ib.data)[f + i] = lookup;
+         }
+      }
+
+      context->index_count = (u32)index_count;
+
+#if RTX 
+      obj_mesh.index_buffer = context->ib.data;
+      obj_mesh.index_count = context->index_count;
+      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
+      obj_mesh.meshlet_buffer = context->storage->beg;
+
+      scratch_clear(scratch);
+
+      if(!meshlet_build(context->storage, scratch, &obj_mesh))
+         return false;
+
+      context->meshlet_count = obj_mesh.meshlet_count;
+      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
+#endif
+
+      tinyobj_materials_free(materials, material_count);
+      tinyobj_shapes_free(shapes, shape_count);
+      tinyobj_attrib_free(&attrib);
+
+      return true;
+}
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage)
 {
@@ -1669,131 +1621,6 @@ VkInstance vk_instance_create(arena scratch)
    vk_test_return(vkCreateInstance(&instance_info, 0, &instance));
 
    return instance;
-}
-
-// TOOD: move into own file
-static bool obj_load(vk_context* context, arena scratch)
-{
-      index_hash_table obj_table = {};
-
-      mesh obj_mesh = {};
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "cube.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
-      //const char* filename = "exterior.obj";
-      //const char* filename = "erato.obj";
-      //const char* filename = "sponza.obj";
-      //const char* filename = "san-miguel.obj";
-
-      tinyobj_shape_t* shapes = 0;
-      tinyobj_material_t* materials = 0;
-      tinyobj_attrib_t attrib = {};
-
-      size_t shape_count = 0;
-      size_t material_count = 0;
-
-      tinyobj_attrib_init(&attrib);
-
-      obj_user_ctx user_data = {};
-      user_data.scratch = scratch;
-
-      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
-      {
-         hw_message("Could not load .obj file");
-         return false;
-      }
-
-      // only triangles allowed
-      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
-
-      const usize index_count = attrib.num_faces;
-
-      obj_table.max_count = index_count;
-
-      scratch_clear(scratch);
-
-      arena keys = new(&scratch, hash_key, obj_table.max_count);
-      arena values = new(&scratch, hash_value, obj_table.max_count);
-
-      if(is_stub(keys) || is_stub(values))
-         return 0;
-
-      obj_table.keys = keys.beg;
-      obj_table.values = values.beg;
-
-      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
-
-      u32 vertex_index = 0;
-
-      for(usize f = 0; f < index_count; f += 3)
-      {
-         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
-
-         for(usize i = 0; i < 3; ++i)
-         {
-            i32 vi = vidx[i].v_idx;
-            i32 vti = vidx[i].vt_idx;
-            i32 vni = vidx[i].vn_idx;
-
-            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-            hash_value lookup = hash_lookup(&obj_table, index);
-
-            if(lookup == ~0u)
-            {
-               obj_vertex v = {};
-               if(vi >= 0)
-               {
-                  v.vx = attrib.vertices[vi * 3 + 0];
-                  v.vy = attrib.vertices[vi * 3 + 1];
-                  v.vz = attrib.vertices[vi * 3 + 2];
-               }
-
-               if(vni >= 0)
-               {
-                  v.nx = attrib.normals[vni * 3 + 0];
-                  v.ny = attrib.normals[vni * 3 + 1];
-                  v.nz = attrib.normals[vni * 3 + 2];
-               }
-
-               if(vti >= 0)
-               {
-                  v.tu = attrib.texcoords[vti * 2 + 0];
-                  v.tv = attrib.texcoords[vti * 2 + 1];
-               }
-
-               hash_insert(&obj_table, index, vertex_index);
-               ((u32*)context->ib.data)[f + i] = vertex_index;
-               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
-            }
-            else
-               ((u32*)context->ib.data)[f + i] = lookup;
-         }
-      }
-
-      context->index_count = (u32)index_count;
-
-#if RTX 
-      obj_mesh.index_buffer = context->ib.data;
-      obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-      obj_mesh.meshlet_buffer = context->storage->beg;
-
-      scratch_clear(scratch);
-
-      if(!meshlet_build(context->storage, scratch, &obj_mesh))
-         return false;
-
-      context->meshlet_count = obj_mesh.meshlet_count;
-      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
-#endif
-
-      tinyobj_materials_free(materials, material_count);
-      tinyobj_shapes_free(shapes, shape_count);
-      tinyobj_attrib_free(&attrib);
-
-      return true;
 }
 
 bool vk_initialize(hw* hw)

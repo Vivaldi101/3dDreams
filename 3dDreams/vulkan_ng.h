@@ -8,6 +8,7 @@
 #endif
 
 #include "common.h"
+#include <vulkan/vulkan.h>
 
 bool vk_uninitialize(struct hw* hw);
 bool vk_initialize(struct hw* hw);
