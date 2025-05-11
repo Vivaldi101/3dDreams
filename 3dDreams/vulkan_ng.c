@@ -270,7 +270,7 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    }
 
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, obj_filename);
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, filename);
 
    arena file_read = win32_file_read(&user_data->scratch, shader_path);
 
@@ -290,14 +290,13 @@ static bool obj_load(vk_context* context, arena scratch)
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "cube.obj";
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "erato.obj";
-      //const char* filename = "sponza.obj";
+      const char* obj_filename = "sponza.obj";
+      const char* mtl_filename = "sponza.mtl";
       //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -312,7 +311,15 @@ static bool obj_load(vk_context* context, arena scratch)
       obj_user_ctx user_data = {};
       user_data.scratch = scratch;
 
-      if(!tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) == TINYOBJ_SUCCESS)
+      scratch_clear(user_data.scratch);
+      if(tinyobj_parse_mtl_file(&materials, &material_count, mtl_filename, obj_filename, obj_file_read, &user_data) != TINYOBJ_SUCCESS)
+      {
+         hw_message("Could not load .mtl file");
+         return false;
+      }
+
+      scratch_clear(user_data.scratch);
+      if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, obj_filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       {
          hw_message("Could not load .obj file");
          return false;
@@ -1019,7 +1026,7 @@ void vk_present(hw* hw, vk_context* context)
       mvp_transform mvp = {};
 
       mvp.n = 0.01f;
-      mvp.f = 1000.0f;
+      mvp.f = 100000.0f;
       mvp.ar = ar;
 
       f32 radius = 1.5f;
@@ -1052,7 +1059,7 @@ void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.25f);
+      mvp.model = mat4_scale(mvp.model, 0.15f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
