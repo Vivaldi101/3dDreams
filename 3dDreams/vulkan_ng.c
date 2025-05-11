@@ -617,10 +617,14 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_dev, u32 queue_famil
    vk12.uniformAndStorageBuffer8BitAccess = true;
    vk12.storagePushConstant8 = true;
 
+   VkPhysicalDeviceFragmentShadingRateFeaturesKHR frag_shading_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
+   frag_shading_features.primitiveFragmentShadingRate = VK_TRUE;
+
    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
    mesh_shader_features.meshShader = true;
    mesh_shader_features.taskShader = true;
    mesh_shader_features.multiviewMeshShader = true;
+   mesh_shader_features.pNext = &frag_shading_features;
 
    VkPhysicalDeviceMultiviewFeatures multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
    multiview.multiview = true;
