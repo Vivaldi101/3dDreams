@@ -1711,29 +1711,27 @@ bool vk_initialize(hw* hw)
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(&scratch, "bin\\assets\\shaders");
-   for(const char **p = shader_names; p && *p; ++p)
+   for(const char** p = shader_names; p && *p; ++p)
       shader_count++;
 
    // TODO: store this inside the context
    spv_hash_table shader_hash_table = {};
    shader_hash_table.max_count = shader_count;
 
-   {
-      // TODO: make function for hash tables
-      arena keys = new(&scratch, const char*, shader_hash_table.max_count);
-      arena values = new(&scratch, vk_shader_modules, shader_hash_table.max_count);
+   // TODO: make function for hash tables
+   arena keys = new(&scratch, const char*, shader_hash_table.max_count);
+   arena values = new(&scratch, vk_shader_modules, shader_hash_table.max_count);
 
-      if(is_stub(keys) || is_stub(values))
-         return 0;
+   if(is_stub(keys) || is_stub(values))
+      return 0;
 
-      shader_hash_table.keys = keys.beg;
-      shader_hash_table.values = values.beg;
+   shader_hash_table.keys = keys.beg;
+   shader_hash_table.values = values.beg;
 
-      memset(shader_hash_table.values, 0, shader_hash_table.max_count*sizeof(vk_shader_modules));
+   memset(shader_hash_table.values, 0, shader_hash_table.max_count * sizeof(vk_shader_modules));
 
-      for(usize i = 0; i < shader_hash_table.max_count; ++i)
-         shader_hash_table.keys[i] = 0;
-   }
+   for(usize i = 0; i < shader_hash_table.max_count; ++i)
+      shader_hash_table.keys[i] = 0;
 
    // TODO: routine to iterate over hash values
 
@@ -1827,7 +1825,7 @@ bool vk_initialize(hw* hw)
 
 bool vk_uninitialize(hw* hw)
 {
-   // TODO:
+   // TODO: uninitialize
    vk_context* context = hw->renderer.backends[vk_renderer_index];
 
 #if 0
