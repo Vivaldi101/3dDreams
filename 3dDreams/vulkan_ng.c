@@ -296,7 +296,6 @@ static bool obj_load(vk_context* context, arena scratch)
       //const char* filename = "exterior.obj";
       //const char* filename = "erato.obj";
       const char* obj_filename = "sponza.obj";
-      const char* mtl_filename = "sponza.mtl";
       //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -312,11 +311,13 @@ static bool obj_load(vk_context* context, arena scratch)
       user_data.scratch = scratch;
 
       scratch_clear(user_data.scratch);
+#if 0
       if(tinyobj_parse_mtl_file(&materials, &material_count, mtl_filename, obj_filename, obj_file_read, &user_data) != TINYOBJ_SUCCESS)
       {
          hw_message("Could not load .mtl file");
          return false;
       }
+#endif
 
       scratch_clear(user_data.scratch);
       if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, obj_filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
