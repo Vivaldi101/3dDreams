@@ -24,7 +24,7 @@ const uint max_primitives = 42;
 struct Vertex
 {
    float vx, vy, vz;   // pos
-   float nx, ny, nz;   // normal TODO: Use 8 bit normals in future
+   uint8_t nx, ny, nz;   // normal
    float tu, tv;       // texture
 };
 
@@ -63,7 +63,9 @@ void main()
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 
-      out_color[i] = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.85, 1.0);
+      vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+
+      out_color[i] = vec4(vec3(normal) * 0.85, 1.0);
     }
 
     for(uint i = 0; i < meshlets[mi].triangle_count; ++i)

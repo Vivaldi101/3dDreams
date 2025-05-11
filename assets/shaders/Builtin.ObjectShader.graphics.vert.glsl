@@ -1,5 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
 
 layout(push_constant) uniform Transform
 {
@@ -14,7 +16,7 @@ layout(push_constant) uniform Transform
 struct Vertex
 {
    float vx, vy, vz;   // pos
-   float nx, ny, nz;   // normal TODO: Use 8 bit normals in future
+   uint8_t nx, ny, nz;   // normal
    float tu, tv;       // texture
 };
 
@@ -31,5 +33,7 @@ void main()
 
    gl_Position = transform.projection * transform.view * transform.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
-   out_color = vec4(vec3(v.nx*1.0, v.ny*1.0, v.nz*1.0) * 0.90, 1.0);
+   vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+
+   out_color = vec4(vec3(normal), 1.0);
 }

@@ -25,7 +25,7 @@ typedef struct
 typedef struct 
 {
    f32 vx, vy, vz;   // pos
-   f32 nx, ny, nz;   // normal
+   u8 nx, ny, nz;   // normal
    f32 tu, tv;       // texture
 } obj_vertex;
 
@@ -373,9 +373,12 @@ static bool obj_load(vk_context* context, arena scratch)
 
                if(vni >= 0)
                {
-                  v.nx = attrib.normals[vni * 3 + 0];
-                  v.ny = attrib.normals[vni * 3 + 1];
-                  v.nz = attrib.normals[vni * 3 + 2];
+                  f32 nx = attrib.normals[vni * 3 + 0];
+                  f32 ny = attrib.normals[vni * 3 + 1];
+                  f32 nz = attrib.normals[vni * 3 + 2];
+                  v.nx = (u8)(nx * 127.f + 127.f);
+                  v.ny = (u8)(ny * 127.f + 127.f);
+                  v.nz = (u8)(nz * 127.f + 127.f);
                }
 
                if(vti >= 0)
