@@ -291,11 +291,11 @@ static bool obj_load(vk_context* context, arena scratch)
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      //const char* filename = "hairball.obj";
+      const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "erato.obj";
-      const char* obj_filename = "sponza.obj";
+      //const char* filename = "sponza.obj";
       //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
@@ -320,7 +320,7 @@ static bool obj_load(vk_context* context, arena scratch)
 #endif
 
       scratch_clear(user_data.scratch);
-      if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, obj_filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+      if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       {
          hw_message("Could not load .obj file");
          return false;
@@ -1229,7 +1229,11 @@ void vk_present(hw* hw, vk_context* context)
 
    if(hw->timer.time() - timer > 1000)
    {
-      hw->log(hw, s8("Frame time: %u #Meshlets: %d"), end - begin, context->meshlet_count);
+#if RTX
+      hw->log(hw, s8("cpu: %u ms; #Meshlets: %d"), end - begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+#else
+      hw->log(hw, s8("cpu: %u ms"), end - begin);
+#endif
       timer = hw->timer.time();
    }
    begin = end;
@@ -1239,7 +1243,6 @@ void vk_present(hw* hw, vk_context* context)
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
 }
 
-// TODO: Change name to vk_shader_compile
 static bool vk_shader_load(VkDevice logical_dev, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
 {
    assert(vk_valid_handle(logical_dev));
