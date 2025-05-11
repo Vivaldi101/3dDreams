@@ -292,8 +292,8 @@ static bool obj_load(vk_context* context, arena scratch)
       mesh obj_mesh = {};
       //const char* filename = "teapot3.obj";
       //const char* filename = "cube.obj";
-      //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "exterior.obj";
       //const char* filename = "erato.obj";
@@ -1022,7 +1022,7 @@ void vk_present(hw* hw, vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 8.5f;
+      f32 radius = 1.5f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1142,7 +1142,7 @@ void vk_present(hw* hw, vk_context* context)
       meshlet_count += 50;
       // max meshlet count
       meshlet_count %= 0xffff;
-      vkCmdDrawMeshTasksEXT(command_buffer, meshlet_count, 1, 1);
+      vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
 #else
 
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1158,11 +1158,11 @@ void vk_present(hw* hw, vk_context* context)
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 #endif
 
+#if 0
       // draw axis
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
       vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
-#if 0
       // draw frustum
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
       vkCmdDraw(command_buffer, 12, 1, 0, 0);
@@ -1187,7 +1187,6 @@ void vk_present(hw* hw, vk_context* context)
 
    submit_info.pWaitDstStageMask = &(VkPipelineStageFlags) { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
-   // add more command buffers here
    submit_info.commandBufferCount = 1;
    submit_info.pCommandBuffers = &command_buffer;
 
@@ -1213,12 +1212,23 @@ void vk_present(hw* hw, vk_context* context)
    if(present_result != VK_SUCCESS)
       return;
 
+   static u32 begin = 0;
+   static u32 timer = 0;
+   u32 time = hw->timer.time();
+   if(begin == 0)
+      begin = time;
+   u32 end = hw->timer.time();
+
+   if(hw->timer.time() - timer > 1000)
+   {
+      hw->log(hw, s8("Frame time: %u #Meshlets: %d"), end - begin, context->meshlet_count);
+      timer = hw->timer.time();
+   }
+   begin = end;
+
    // wait until all queue ops are done
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->logical_dev));
-
-   // TODO: FPS
-   hw->log(hw, s8("# Meshlets: %d"), context->meshlet_count);
 }
 
 // TODO: Change name to vk_shader_compile

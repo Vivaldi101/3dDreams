@@ -19,7 +19,6 @@ align_struct hw_timer
 {
    void(*sleep)(u32 ms);
    u32(*time)();
-   void(*fps)(hw_window window, u32 fps);
 } hw_timer;
 
 align_struct hw
@@ -162,11 +161,6 @@ static void hw_frame_render(hw* hw)
 
    pre(renderer_index < (u32)renderer_count);
    hw->renderer.frame_present(hw, renderers[renderer_index]);
-}
-
-static void hw_print_fps(hw* hw, u32 fps)
-{
-   hw->timer.fps(hw->renderer.window, fps);
 }
 
 static void hw_log(hw* hw, s8 message, ...)

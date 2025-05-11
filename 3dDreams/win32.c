@@ -35,16 +35,6 @@ static u32 win32_time()
    return timeGetTime() - sys_time_base;
 }
 
-static void win32_fps(hw_window window, u32 fps)
-{
-   // TODO: arena buffer
-   static char title[512];
-
-   sprintf_s(title, array_count(title), "FPS: %u", fps);
-
-   SetWindowText(window.handle, title);
-}
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <windows.h>
@@ -329,7 +319,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 
    hw.timer.sleep = win32_sleep;
    hw.timer.time = win32_time;
-   hw.timer.fps = win32_fps;
 
    hw.platform_loop = win32_platform_loop;
 
