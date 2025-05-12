@@ -43,7 +43,7 @@ void app_start(int argc, const char** argv, hw* hw)
 	int x = 100, y = 100;
 #endif
 
-   hw_window_open(hw, "Vulkan", x, y, w, h);
+   hw_window_open(hw, "Vulkan App", x, y, w, h);
 
    if(!vk_initialize(hw))
    {

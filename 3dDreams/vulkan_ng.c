@@ -199,6 +199,7 @@ align_struct
 {
    VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
 
+   VkInstance instance;
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
    VkSurfaceKHR surface;
@@ -207,6 +208,7 @@ align_struct
    VkSemaphore image_done_semaphore;
    VkQueue graphics_queue;
    VkCommandPool command_pool;
+   VkQueryPool query_pool;
    VkCommandBuffer command_buffer;
    VkRenderPass renderpass;
 
@@ -228,6 +230,8 @@ align_struct
 
    arena* storage;
    u32 queue_family_index;
+
+   f32 time_period;
 } vk_context;
 
 static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -517,7 +521,7 @@ static swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice 
    return result;
 }
 
-static VkPhysicalDevice vk_pdevice_select(VkInstance instance)
+static VkPhysicalDevice vk_pdevice_select(vk_context* context, VkInstance instance)
 {
    assert(vk_valid_handle(instance));
 
@@ -533,12 +537,17 @@ static VkPhysicalDevice vk_pdevice_select(VkInstance instance)
       if(props.apiVersion < VK_VERSION_1_1)
          continue;
 
+      if(!props.limits.timestampComputeAndGraphics)
+         continue;
+
       if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+      {
+         context->time_period = props.limits.timestampPeriod;
          return devs[i];
+      }
    }
 
-   if(dev_count > 0)
-      return devs[0];
+   assert(false);
    return 0;
 }
 
@@ -964,11 +973,13 @@ static void vk_resize(void* renderer, u32 width, u32 height)
    vk_swapchain_update(context);
 }
 
-static VkQueryPool vk_query_pool(VkDevice device, size pool_size)
+static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
 {
    VkQueryPool result = 0;
 
    VkQueryPoolCreateInfo info = {vk_info(QUERY_POOL)};
+   info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+   info.queryCount = pool_size;
 
    vk_assert(vkCreateQueryPool(device, &info, 0, &result));
 
@@ -1000,6 +1011,9 @@ static void vk_present(hw* hw, vk_context* context)
    VkCommandBuffer command_buffer = context->command_buffer;
    {
       vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
+
+      vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, 128);
+      vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0); 
 
       const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
 
@@ -1179,6 +1193,8 @@ static void vk_present(hw* hw, vk_context* context)
       //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                            //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_end_barrier);
 
+      vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1); 
+
       vk_assert(vkEndCommandBuffer(command_buffer));
    }
 
@@ -1213,6 +1229,17 @@ static void vk_present(hw* hw, vk_context* context)
    if(present_result != VK_SUCCESS)
       return;
 
+   // wait until all queue ops are done
+   // essentialy run gpu and cpu in sync
+   // TODO: This is bad way to do sync but who cares for now
+   vk_assert(vkDeviceWaitIdle(context->logical_device));
+
+   u64 query_results[2];
+   vk_assert(vkGetQueryPoolResults(context->logical_device, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
+
+   f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
+   f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
+
    static u32 begin = 0;
    static u32 timer = 0;
    u32 time = hw->timer.time();
@@ -1223,17 +1250,13 @@ static void vk_present(hw* hw, vk_context* context)
    if(hw->timer.time() - timer > 1000)
    {
 #if RTX
-      hw->log(hw, s8("cpu: %u ms; #Meshlets: %d"), end - begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
 #else
-      hw->log(hw, s8("cpu: %u ms"), end - begin);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
 #endif
       timer = hw->timer.time();
    }
    begin = end;
-
-   // wait until all queue ops are done
-   // TODO: This is bad way to do sync but who cares for now
-   vk_assert(vkDeviceWaitIdle(context->logical_device));
 }
 
 static bool vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
@@ -1659,6 +1682,8 @@ bool vk_initialize(hw* hw)
 
    volkLoadInstance(instance);
 
+   context->instance = instance;
+
 #ifdef _DEBUG
    {
       VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
@@ -1680,12 +1705,13 @@ bool vk_initialize(hw* hw)
 #endif
 
    context->queue_family_index = vk_ldevice_select_family_index();
-   context->physical_device = vk_pdevice_select(instance);
+   context->physical_device = vk_pdevice_select(context, instance);
    context->logical_device = vk_ldevice_create(context->physical_device, context->queue_family_index);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
    context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
+   context->query_pool = vk_query_pool_create(context->logical_device, 128);
    context->command_pool = vk_command_pool_create(context->logical_device, context->queue_family_index);
    context->command_buffer = vk_command_buffer_create(context->logical_device, context->command_pool);
    context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
@@ -1818,15 +1844,30 @@ bool vk_initialize(hw* hw)
 
 bool vk_uninitialize(hw* hw)
 {
-   // TODO: uninitialize
+   // TODO: initialize
    vk_context* context = hw->renderer.backends[vk_renderer_index];
 
-#if 0
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain, 0);
+   vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
+   vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
+
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_info.swapchain, 0);
+   vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
+   vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
+   vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
+
+   // TODO this
+   //vkDestroyShaderModule(context->logical_device, context->sha
+   //vkDestroyShaderModule(context->logical_device, context->sha
+
+   vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
+   vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
+   vkDestroySemaphore(context->logical_device, context->image_ready_semaphore, 0);
+
    vkDestroySurfaceKHR(context->instance, context->surface, 0);
-   vkDestroyDevice(context->logical_device, 0);
-   vkDestroyInstance(context->instance, 0);
-#endif
+
+   // TODO this - must destroy all buffers before instance
+   //vkDestroyDevice(context->logical_device, 0);
+   //vkDestroyInstance(context->instance, 0);
 
    return true;
 }
