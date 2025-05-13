@@ -48,6 +48,15 @@ layout(set = 0, binding = 1) readonly buffer Meshlets
 
 layout(location = 0) out vec4 out_color[];
 
+vec3 renormalize_normal(vec3 n)
+{
+   //float a = 2.f/255.f;
+   float a = 255.f/2.f;
+   float b = -1.f;
+
+   return n/a + b;
+}
+
 void main()
 {
     uint mi = gl_WorkGroupID.x;
@@ -63,9 +72,10 @@ void main()
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 
-      vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+      //vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+      vec3 normal = renormalize_normal(vec3(v.nx, v.ny, v.nz));
 
-      out_color[i] = vec4(vec3(normal) * 0.85, 1.0);
+      out_color[i] = vec4(vec3(normal), 1.0);
     }
 
     for(uint i = 0; i < meshlets[mi].triangle_count; ++i)
