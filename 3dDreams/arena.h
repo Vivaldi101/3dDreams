@@ -25,8 +25,6 @@
 #define scratch_clear_value(a, v) memset((a).beg, (v), scratch_size((a)))
 #define scratch_clear(a) scratch_clear_value(a, 0)
 
-#define set_arena_type(t) typedef t arena_type;
-
 #define scratch_invariant(s, a, t) assert((s) <= scratch_left((a), t))
 #define scratch_shrink(a, s, t) (a).end = (char*)(a).beg + (s)*sizeof(t)
 
@@ -72,5 +70,5 @@ static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    post(((uptr)p & (align - 1)) == 0);   // aligned result
 
-   return (arena){p, a->end};
+   return (arena){p, a->beg};
 }
