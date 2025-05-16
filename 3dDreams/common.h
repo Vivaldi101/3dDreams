@@ -55,7 +55,7 @@ typedef struct
 #define MB(m) (1024ull)*KB((m))
 #define GB(g) (1024ull)*MB((g))
 
-static const size default_arena_size = KB(4096);
+//static const size default_arena_size = KB(4096);
 
 #define clamp(t, min, max) ((t) <= (min) ? (min) : (t) >= (max) ? (max) : (t))
 
