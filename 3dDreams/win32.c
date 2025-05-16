@@ -288,7 +288,7 @@ static arena arena_new(size cap)
 
 static void arena_free(arena* a)
 {
-   hw_virtual_memory_release(a->beg, arena_size(a));
+   hw_virtual_memory_release(a->beg, arena_left(a));
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
@@ -300,7 +300,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    hw_virtual_memory_init();
 
    arena base_storage = arena_new(default_arena_size*800);
-   assert(arena_size(&base_storage) == default_arena_size*800);
+   assert(arena_left(&base_storage) == default_arena_size*800);
 
    hw.vk_storage.beg = base_storage.beg;
    hw.vk_storage.end = (char*)hw.vk_storage.beg + default_arena_size*200;
@@ -328,6 +328,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
    app_start(argc, argv, &hw);
    timeEndPeriod(1);
 
+   assert(arena_left(&base_storage) == default_arena_size*800);
    arena_free(&base_storage);
 
    return 0;

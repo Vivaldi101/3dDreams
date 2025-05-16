@@ -22,7 +22,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    VkShaderModuleCreateInfo module_info = {};
    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
    module_info.pCode = (u32*)shader_file.beg;
-   module_info.codeSize = scratch_size(shader_file);
+   module_info.codeSize = scratch_left(shader_file);
 
    if((vkCreateShaderModule(logical_device, &module_info, 0, &result)) != VK_SUCCESS)
       return 0;

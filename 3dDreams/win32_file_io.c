@@ -21,7 +21,7 @@ static arena win32_file_read(arena* file_arena, const char* path)
    if(file_size_32 == 0)
       return (arena) {};
 
-   if(arena_left(file_arena, byte) < file_size_32)
+   if(arena_left(file_arena) < file_size_32)
    {
       hw_message("Cannot allocate enough for .obj file");
       return (arena) {};

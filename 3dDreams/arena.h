@@ -10,11 +10,11 @@
 #define arena_loop(i, a, p) for(size (i) = 0; (i) < scratch_left((a), *(p)); ++(i))
 #define arena_offset(i, a, t) (t*)a.beg + (i)
 
-#define scratch_size(a) (size)((char*)(a).end - (char*)(a).beg)
-#define arena_size(a) (size)((char*)(a)->end - (char*)(a)->beg)
+#define scratch_left(a) (size)((char*)(a).end - (char*)(a).beg)
+#define arena_left(a) (size)((char*)(a)->end - (char*)(a)->beg)
 
-#define scratch_left(a,t)  (size)(scratch_size(a) / sizeof(t))
-#define arena_left(a,t)    (size)(arena_size(a) / sizeof(t))
+#define scratch_count_left(a,t)  (size)(scratch_left(a) / sizeof(t))
+#define arena_count_left(a,t)    (size)(arena_left(a) / sizeof(t))
 
 #define arena_stub(p, a) ((p) == (a)->end)
 #define scratch_stub(p, a) arena_stub(p, &a)
@@ -22,7 +22,7 @@
 #define arena_end_count(p, a, n) (void*)(p)!=(a)->end?(p)+(n):(p)
 #define scratch_end_count(p, a, n) (void*)(p)!=(a).end?(p)+(n):(p)
 
-#define scratch_clear_value(a, v) memset((a).beg, (v), scratch_size((a)))
+#define scratch_clear_value(a, v) memset((a).beg, (v), scratch_left((a)))
 #define scratch_clear(a) scratch_clear_value(a, 0)
 
 #define scratch_invariant(s, a, t) assert((s) <= scratch_left((a), t))

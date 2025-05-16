@@ -12,7 +12,6 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-// TODO: Should work for meshlets currently but not for old FF IA
 #define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
@@ -263,7 +262,7 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
       return;
    }
 
-   *len = scratch_size(file_read);
+   *len = scratch_left(file_read);
    *buf = file_read.beg;
 }
 
@@ -288,9 +287,10 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      const char* filename = "buddha.obj";
-      //const char* filename = "hairball.obj";
+      //const char* filename = "buddha.obj";
+      const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
+      //const char* filename = "teapot3.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1090,7 +1090,7 @@ static void vk_present(hw* hw, vk_context* context)
 
       f32 radius = 4.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 0.0f;
+      f32 height = 3.0f;
 
 #if 0
       f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
@@ -1118,7 +1118,7 @@ static void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 4.15f);
+      mvp.model = mat4_scale(mvp.model, 1.f*0.5f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1678,14 +1678,14 @@ VkInstance vk_instance_create(arena scratch)
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
       return 0;
 
-   if(scratch_left(scratch, VkExtensionProperties) < ext_count)
+   if(scratch_count_left(scratch, VkExtensionProperties) < ext_count)
       return 0;
 
    VkExtensionProperties* extensions = new(&scratch, VkExtensionProperties, ext_count).beg;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
       return 0;
 
-   if(scratch_left(scratch, const char*) < ext_count)
+   if(scratch_count_left(scratch, const char*) < ext_count)
       return 0;
 
    const char** ext_names = new(&scratch, const char*, ext_count).beg;
@@ -1864,7 +1864,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(128);
+   size buffer_size = MB(256);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -1885,10 +1885,11 @@ bool vk_initialize(hw* hw)
 #endif
    // TODO: semcompress
    scratch = hw->vk_scratch;
-   obj_vertex* vb_data = new(&scratch, obj_vertex, MB(8)).beg;
+   size scratch_size = scratch_left(scratch);
+   obj_vertex* vb_data = new(&scratch, obj_vertex, MB(4)).beg;
    size vb_size = 0;
 
-   u32* ib_data = new(&scratch, u32, MB(8)).beg;
+   u32* ib_data = new(&scratch, u32, MB(16)).beg;
    size ib_size = 0;
 
    if(!vb_data || !ib_data)
