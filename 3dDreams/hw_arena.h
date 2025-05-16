@@ -37,13 +37,6 @@ static VirtualReleasePtr global_release;
 #define arena_index(arena, type, index) ((type*)(arena)->base + index)
 
 // TODO: arena chaining and or lookups
-align_struct hw_arena
-{
-   byte* base;
-   usize max_size, bytes_used;
-   usize count;
-} hw_arena;
-
 static void hw_global_reserve_available()
 {
    MEMORYSTATUSEX memory_status;

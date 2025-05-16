@@ -12,6 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
+// TODO: Should work for meshlets currently but not for old FF IA
 #define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
@@ -61,6 +62,8 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
 
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
+   scratch_clear(meshlet_scratch);
+
    meshlet ml = {};
 
    size vertex_count = m->vertex_count;
@@ -185,8 +188,8 @@ align_struct
 {
    VkBuffer handle;
    VkDeviceMemory memory;
-   void* data;
-   size size;
+   void* data; // host or local memory
+   usize size;
 } vk_buffer;
 
 align_struct
@@ -220,10 +223,11 @@ align_struct
 
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
-   vk_buffer mb;        // mesh buffer - todo wrap this in the meshlet structure
+   vk_buffer mb;        // mesh buffer
 
    u32 max_meshlet_count;
    u32 meshlet_count;
+   meshlet* meshlet_buffer;
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
@@ -263,19 +267,30 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    *buf = file_read.beg;
 }
 
-// TOOD: move into own file
-static bool obj_load(vk_context* context, arena scratch)
+#if 0
+thing* p = scratch.beg;
+while(p != scratch.end)
 {
+   size i = p - (typeof(p))scratch.beg;
+   p->a = 123;
+   ++p;
+}
+
+// arena was drained
+assert(p == scratch.end);
+#endif
+
+// TOOD: move into own file
+static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
+{
+      scratch_clear(scratch);
+
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
       const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      //const char* filename = "exterior.obj";
-      //const char* filename = "erato.obj";
-      //const char* filename = "sponza.obj";
-      //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -289,16 +304,6 @@ static bool obj_load(vk_context* context, arena scratch)
       obj_user_ctx user_data = {};
       user_data.scratch = scratch;
 
-      scratch_clear(user_data.scratch);
-#if 0
-      if(tinyobj_parse_mtl_file(&materials, &material_count, mtl_filename, obj_filename, obj_file_read, &user_data) != TINYOBJ_SUCCESS)
-      {
-         hw_message("Could not load .mtl file");
-         return false;
-      }
-#endif
-
-      scratch_clear(user_data.scratch);
       if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       {
          hw_message("Could not load .obj file");
@@ -367,29 +372,34 @@ static bool obj_load(vk_context* context, arena scratch)
                }
 
                hash_insert(&obj_table, index, vertex_index);
-               ((u32*)context->ib.data)[f + i] = vertex_index;
-               ((obj_vertex*)context->vb.data)[vertex_index++] = v;
+               //((u32*)context->ib.data)[f + i] = vertex_index;
+               //((obj_vertex*)context->vb.data)[vertex_index++] = v;
+               ib_data[f+i] = vertex_index;
+               vb_data[vertex_index++] = v;
             }
             else
-               ((u32*)context->ib.data)[f + i] = lookup;
+               //((u32*)context->ib.data)[f + i] = lookup;
+               ib_data[f+i] = lookup;
          }
       }
 
       context->index_count = (u32)index_count;
+      *ib_size = index_count*sizeof(u32);
+      *vb_size = vertex_index*sizeof(obj_vertex);
 
 #if RTX 
-      obj_mesh.index_buffer = context->ib.data;
+      obj_mesh.index_buffer = ib_data;
       obj_mesh.index_count = context->index_count;
       obj_mesh.vertex_count = obj_table.count;  // unique vertex count
       obj_mesh.meshlet_buffer = context->storage->beg;
-
-      scratch_clear(scratch);
 
       if(!meshlet_build(context->storage, scratch, &obj_mesh))
          return false;
 
       context->meshlet_count = obj_mesh.meshlet_count;
-      memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
+      context->meshlet_buffer = obj_mesh.meshlet_buffer;
+      // this was for host memory
+      //memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
 #endif
 
       tinyobj_materials_free(materials, material_count);
@@ -399,7 +409,46 @@ static bool obj_load(vk_context* context, arena scratch)
       return true;
 }
 
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage)
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
+{
+   assert(scratch.data && scratch.size >= size);
+   memcpy(scratch.data, data, size);
+
+   vk_assert(vkResetCommandPool(device, cmd_pool, 0));
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
+   {
+
+      VkBufferCopy buffer_region = {0, 0, size};
+      vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
+
+      VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+      copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      copy_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      copy_barrier.buffer = buffer.handle;
+      copy_barrier.size = size;
+      copy_barrier.offset = 0;
+
+      vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
+   }
+
+   vk_assert(vkEndCommandBuffer(cmd_buffer));
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &cmd_buffer;
+
+   vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
+   vk_assert(vkDeviceWaitIdle(device));
+}
+
+static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
    vk_buffer buffer = {};
 
@@ -413,13 +462,12 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    VkMemoryRequirements memory_reqs;
    vkGetBufferMemoryRequirements(device, buffer.handle, &memory_reqs);
 
-   VkMemoryPropertyFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
    u32 memory_index = memory_properties.memoryTypeCount;
    u32 i = 0;
 
    while(i < memory_index)
    {
-      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == flags))
+      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags))
          memory_index = i;
 
       ++i;
@@ -439,8 +487,9 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    if(!vk_valid(vkBindBufferMemory(device, buffer.handle, memory, 0)))
       return (vk_buffer){};
 
-   if(!vk_valid(vkMapMemory(device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
-      return (vk_buffer){};
+   if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+      if(!vk_valid(vkMapMemory(device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
+         return (vk_buffer) {};
 
    buffer.size = allocate_info.allocationSize;
    buffer.memory = memory;
@@ -598,7 +647,6 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_device, u32 queue_fa
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
-#if RTX
    VkPhysicalDeviceVulkan12Features vk12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
    vk12.storageBuffer8BitAccess = true;
    vk12.uniformAndStorageBuffer8BitAccess = true;
@@ -607,19 +655,22 @@ static VkDevice vk_ldevice_create(VkPhysicalDevice physical_device, u32 queue_fa
    VkPhysicalDeviceFragmentShadingRateFeaturesKHR frag_shading_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
    frag_shading_features.primitiveFragmentShadingRate = VK_TRUE;
 
+#if RTX
    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
    mesh_shader_features.meshShader = true;
    mesh_shader_features.taskShader = true;
    mesh_shader_features.multiviewMeshShader = true;
    mesh_shader_features.pNext = &frag_shading_features;
+#endif
 
    VkPhysicalDeviceMultiviewFeatures multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
    multiview.multiview = true;
+#if RTX
    multiview.pNext = &mesh_shader_features;
+#endif
 
    vk12.pNext = &multiview;
    features2.pNext = &vk12;
-#endif
 
    vkGetPhysicalDeviceFeatures2(physical_device, &features2);
 
@@ -1037,7 +1088,7 @@ static void vk_present(hw* hw, vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 1.5f;
+      f32 radius = 4.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 0.0f;
 
@@ -1067,7 +1118,7 @@ static void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      //mvp.model = mat4_scale(mvp.model, 0.15f);
+      mvp.model = mat4_scale(mvp.model, 4.15f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1813,14 +1864,17 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(1280);
-   vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-#if RTX 
-   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-#endif
+   size buffer_size = MB(128);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   // valid gpu buffers
+   vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+#if RTX
+   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   if(meshlet_buffer.handle == VK_NULL_HANDLE)
+      return false;
+#endif
    if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE)
       return false;
 
@@ -1829,9 +1883,33 @@ bool vk_initialize(hw* hw)
 #if RTX
    context->mb = meshlet_buffer;
 #endif
+   // TODO: semcompress
+   scratch = hw->vk_scratch;
+   obj_vertex* vb_data = new(&scratch, obj_vertex, MB(8)).beg;
+   size vb_size = 0;
 
-   if(!obj_load(context, scratch))
+   u32* ib_data = new(&scratch, u32, MB(8)).beg;
+   size ib_size = 0;
+
+   if(!vb_data || !ib_data)
       return false;
+
+   // Load meshes
+   if(!obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size))
+      return false;
+
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb, 
+      scratch_buffer, vb_data, vb_size);
+   memset(scratch_buffer.data, 0, scratch_buffer.size);
+
+#if RTX
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
+   memset(scratch_buffer.data, 0, scratch_buffer.size);
+#else
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
+      scratch_buffer, ib_data, ib_size);
+#endif
 
    // app callbacks
    hw->renderer.backends[vk_renderer_index] = context;
