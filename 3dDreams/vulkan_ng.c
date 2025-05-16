@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -288,9 +288,10 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
+      //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
+      const char* filename = "sponza.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -398,8 +399,6 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       context->meshlet_count = obj_mesh.meshlet_count;
       context->meshlet_buffer = obj_mesh.meshlet_buffer;
-      // this was for host memory
-      //memcpy(context->mb.data, obj_mesh.meshlet_buffer, context->meshlet_count * sizeof(meshlet));
 #endif
 
       tinyobj_materials_free(materials, material_count);
@@ -420,23 +419,21 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
    vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
-   {
 
-      VkBufferCopy buffer_region = {0, 0, size};
-      vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
+   VkBufferCopy buffer_region = {0, 0, size};
+   vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
 
-      VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
-      copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-      copy_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-      copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      copy_barrier.buffer = buffer.handle;
-      copy_barrier.size = size;
-      copy_barrier.offset = 0;
+   VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+   copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+   copy_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+   copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   copy_barrier.buffer = buffer.handle;
+   copy_barrier.size = size;
+   copy_barrier.offset = 0;
 
-      vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-   }
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 
    vk_assert(vkEndCommandBuffer(cmd_buffer));
 
@@ -602,7 +599,7 @@ static VkPhysicalDevice vk_pdevice_select(vk_context* context, VkInstance instan
 
 static u32 vk_ldevice_select_family_index()
 {
-   // TODO: placeholder
+   // TODO: select the queue family
    return 0;
 }
 
@@ -1088,7 +1085,7 @@ static void vk_present(hw* hw, vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 4.0f;
+      f32 radius = 2.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 3.0f;
 
@@ -1108,7 +1105,7 @@ static void vk_present(hw* hw, vk_context* context)
           radius * sinf(theta)
       };
 
-      vec3 origin = {0.0f, 0.0f, 0.0f};
+      vec3 origin = {0.0f, 2.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
@@ -1118,7 +1115,7 @@ static void vk_present(hw* hw, vk_context* context)
       mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 1.f*0.5f);
+      mvp.model = mat4_scale(mvp.model, 0.005f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
@@ -1923,7 +1920,6 @@ bool vk_initialize(hw* hw)
 
 bool vk_uninitialize(hw* hw)
 {
-   // TODO: initialize
    vk_context* context = hw->renderer.backends[vk_renderer_index];
 
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
@@ -1937,6 +1933,10 @@ bool vk_uninitialize(hw* hw)
    // TODO this
    //vkDestroyShaderModule(context->logical_device, context->sha
    //vkDestroyShaderModule(context->logical_device, context->sha
+
+   vkDestroyBuffer(context->logical_device, context->ib.handle, 0);
+   vkDestroyBuffer(context->logical_device, context->vb.handle, 0);
+   vkDestroyBuffer(context->logical_device, context->mb.handle, 0);
 
    vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
    vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
