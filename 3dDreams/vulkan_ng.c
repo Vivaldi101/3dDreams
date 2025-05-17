@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -289,9 +289,11 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
-      const char* filename = "sponza.obj";
+      //const char* filename = "erato.obj";
+      //const char* filename = "living_room.obj";
+      //const char* filename = "san-miguel.obj";
 
       tinyobj_shape_t* shapes = 0;
       tinyobj_material_t* materials = 0;
@@ -1067,17 +1069,7 @@ static void vk_present(hw* hw, vk_context* context)
 
       f32 delta = 0.75f;
       static f32 rot = 0.0f;
-      static f32 originz = -10.0f;
-      static f32 cameraz = 0.0f;
-      static f32 t = 0.0f;                 // current time
-
-      if(originz > 1.0f)
-         originz = -10.0f;
-
-      cameraz = sinf(rot/30)*4;
-
       rot += delta;
-      originz += delta/4;
 
       mvp_transform mvp = {};
 
@@ -1087,16 +1079,7 @@ static void vk_present(hw* hw, vk_context* context)
 
       f32 radius = 2.0f;
       f32 theta = DEG2RAD(rot);
-      f32 height = 3.0f;
-
-#if 0
-      f32 A = PI / 2.0f;            // amplitude: half of pi (90 degrees swing)
-      f32 omega = 3.0f;           // angular speed (radians per second)
-      f32 theta = A * sinf(omega * t) + A;  // oscillating between 0 and PI
-      f32 cos_theta = cosf(theta);
-      f32 sin_theta = sinf(theta);
-      t += 0.001f;
-#endif
+      f32 height = 2.0f;
 
       vec3 eye = 
       {
@@ -1109,13 +1092,11 @@ static void vk_present(hw* hw, vk_context* context)
       vec3 dir = vec3_sub(&eye, &origin);
 
       mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
-      //mvp.view = mat4_view((vec3){0.0f, 2.0f, 4.0f}, (vec3){0.0f, 0.0f, -1.0f});
       mvp.view = mat4_view(eye, dir);
       //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
-      mat4 translate = mat4_translate((vec3){0.0f, 0.0f, 0.0f});
+      mat4 translate = mat4_translate((vec3){0.0f, 2.0f, 0.0f});
 
       mvp.model = mat4_identity();
-      mvp.model = mat4_scale(mvp.model, 0.005f);
       mvp.model = mat4_mul(translate, mvp.model);
 
       const f32 c = 255.0f;
