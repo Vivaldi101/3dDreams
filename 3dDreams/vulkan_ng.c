@@ -318,6 +318,10 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       const usize index_count = attrib.num_faces;
 
+      // TODO: Do wp on ib_size and vb_size
+      if(index_count > (u32)~0u)
+         return false;
+
       obj_table.max_count = index_count;
 
       scratch_clear(scratch);
@@ -334,6 +338,7 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
 
       u32 vertex_index = 0;
+      u32 primitive_index = 0;
 
       for(usize f = 0; f < index_count; f += 3)
       {
@@ -375,14 +380,11 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
                }
 
                hash_insert(&obj_table, index, vertex_index);
-               //((u32*)context->ib.data)[f + i] = vertex_index;
-               //((obj_vertex*)context->vb.data)[vertex_index++] = v;
-               ib_data[f+i] = vertex_index;
+               ib_data[primitive_index++] = vertex_index;
                vb_data[vertex_index++] = v;
             }
             else
-               //((u32*)context->ib.data)[f + i] = lookup;
-               ib_data[f+i] = lookup;
+               ib_data[primitive_index++] = lookup;
          }
       }
 
