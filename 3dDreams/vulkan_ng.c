@@ -211,6 +211,7 @@ align_struct
    VkQueue graphics_queue;
    VkCommandPool command_pool;
    VkQueryPool query_pool;
+   u32 query_pool_size;
    VkCommandBuffer command_buffer;
    VkRenderPass renderpass;
 
@@ -1064,7 +1065,7 @@ static void vk_present(hw* hw, vk_context* context)
    {
       vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
 
-      vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, 128);
+      vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
       vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0); 
 
       const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
@@ -1742,7 +1743,8 @@ bool vk_initialize(hw* hw)
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
    context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
-   context->query_pool = vk_query_pool_create(context->logical_device, 128);
+   context->query_pool_size = 128;
+   context->query_pool = vk_query_pool_create(context->logical_device, context->query_pool_size);
    context->command_pool = vk_command_pool_create(context->logical_device, context->queue_family_index);
    context->command_buffer = vk_command_buffer_create(context->logical_device, context->command_pool);
    context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
