@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -289,8 +289,8 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      //const char* filename = "hairball.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "hairball.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
@@ -437,8 +437,13 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.size = size;
    copy_barrier.offset = 0;
 
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+#if RTX
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
+#else
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
+#endif
 
    vk_assert(vkEndCommandBuffer(cmd_buffer));
 
@@ -447,6 +452,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    submit_info.pCommandBuffers = &cmd_buffer;
 
    vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
+   // instead of explicit memory sync between queue submissions we wait all gpu jobs to complete
    vk_assert(vkDeviceWaitIdle(device));
 }
 
