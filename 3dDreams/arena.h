@@ -3,8 +3,19 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <assert.h>
-#include <setjmp.h>
 #include "common.h"
+
+#define arena_iterate(a, type, s, var, code_block) \
+do { \
+    arena scratch_ = new(&(a), type, (s)); \
+    type* p_ = scratch_.beg; \
+    size_t count_ = scratch_size(scratch_) / sizeof(type); \
+    for (size_t i = 0; i < count_; ++i) { \
+        type* var = &p_[i]; \
+        code_block \
+    } \
+} while (0)
+
 
 #define arena_full(a)      ((a)->beg == (a)->end)   // or empty for stub arenas
 #define arena_loop(i, a, p) for(size (i) = 0; (i) < scratch_left((a), *(p)); ++(i))
