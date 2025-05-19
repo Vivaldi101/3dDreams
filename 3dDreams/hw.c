@@ -24,7 +24,7 @@ align_struct hw_timer
 align_struct hw
 {
    hw_renderer renderer;
-   arena vk_storage; // should all be called scratches
+   arena vk_storage;
    arena vk_scratch;
    arena misc_storage;
    hw_timer timer;

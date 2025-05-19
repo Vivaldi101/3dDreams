@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -67,7 +67,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
    size vertex_count = m->vertex_count;
 
-   u8* meshlet_vertices = new(&meshlet_scratch, u8, vertex_count).beg;
+   u8* meshlet_vertices = scratch_group(meshlet_scratch, vertex_count, u8);
    if(!meshlet_vertices)
       return false;
 
@@ -96,7 +96,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
+         meshlet* pml = arena_single(meshlet_storage, meshlet);
          if(!pml) 
             return false;
          *pml = ml;
@@ -289,8 +289,8 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
+      //const char* filename = "hairball.obj";
+      const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
@@ -1288,9 +1288,9 @@ static void vk_present(hw* hw, vk_context* context)
    if(hw->timer.time() - timer > 1000)
    {
 #if RTX
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.4f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
 #else
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.4f ms"), end - begin, gpu_end - gpu_begin);
 #endif
       timer = hw->timer.time();
    }
@@ -1706,7 +1706,7 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   vk_context* context = new(&hw->vk_storage, vk_context).beg;
+   vk_context* context = arena_single(&hw->vk_storage, vk_context);
    if(!context)
       return false;
 
