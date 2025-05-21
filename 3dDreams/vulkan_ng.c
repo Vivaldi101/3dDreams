@@ -1086,7 +1086,7 @@ static void vk_present(hw* hw, vk_context* context)
       mvp.f = 1000.0f;
       mvp.ar = ar;
 
-      f32 radius = 2.0f;
+      f32 radius = 7.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 2.0f;
 
