@@ -8,20 +8,14 @@
 #define arena_iterate(a, type, s, var, code_block) \
 do { \
     arena scratch_ = new(&(a), type, (s)); \
-    type* (var) = scratch_.beg; \
+    type* p_ = scratch_.beg; \
     size_t count_ = scratch_size(scratch_) / sizeof(type); \
-    for (size_t i = 0; i < count_; ++i) code_block \
+    for (size_t i = 0; i < count_; ++i) { \
+        type* var = &p_[i]; \
+        code_block \
+    } \
 } while (0)
 
-#define arena_group(a, s, type) \
-    ((type*) new((a), type, (s)).beg)
-#define arena_single(a, type) \
-    arena_group(a, 1, type)
-
-#define scratch_group(a, s, type) \
-    ((type*) new(&(a), type, (s)).beg)
-#define scratch_single(a, type) \
-    scratch_group(a, 1, type)
 
 #define arena_full(a)      ((a)->beg == (a)->end)   // or empty for stub arenas
 #define arena_loop(i, a, p) for(size (i) = 0; (i) < scratch_left((a), *(p)); ++(i))

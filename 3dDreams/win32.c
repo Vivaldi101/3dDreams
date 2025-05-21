@@ -270,7 +270,7 @@ static void hw_virtual_memory_init()
 }
 
 // TODO: might wanna try page-fault handlers
-static arena arena_allocate(size cap)
+static arena arena_new(size cap)
 {
    arena a = {}; // stub arena
    if(cap <= 0)
@@ -299,7 +299,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 
    hw_virtual_memory_init();
 
-   arena base_storage = arena_allocate(GB(8));
+   arena base_storage = arena_new(GB(8));
    assert(arena_left(&base_storage) == GB(8));
 
    hw.vk_storage.beg = base_storage.beg;
