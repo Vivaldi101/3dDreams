@@ -246,22 +246,10 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 
    arena project_dir = vk_project_directory(&user_data->scratch);
 
-   if(is_stub(project_dir))
-   {
-      *len = 0; *buf = 0;
-      return;
-   }
-
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
    wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, filename);
 
    arena file_read = win32_file_read(&user_data->scratch, shader_path);
-
-   if(is_stub(file_read))
-   {
-      *len = 0; *buf = 0;
-      return;
-   }
 
    *len = scratch_left(file_read);
    *buf = file_read.beg;
@@ -289,9 +277,9 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
+      //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      //const char* filename = "teapot3.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -329,9 +317,6 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       arena keys = new(&scratch, hash_key, obj_table.max_count);
       arena values = new(&scratch, hash_value, obj_table.max_count);
-
-      if(is_stub(keys) || is_stub(values))
-         return 0;
 
       obj_table.keys = keys.beg;
       obj_table.values = values.beg;
@@ -1303,9 +1288,6 @@ static bool vk_shader_load(VkDevice logical_device, arena scratch, const char* s
 
    arena project_dir = vk_project_directory(&scratch);
 
-   if(is_stub(project_dir))
-      return false;
-
    size shader_len = strlen(shader_name);
    assert(shader_len != 0u);
 
@@ -1779,9 +1761,6 @@ bool vk_initialize(hw* hw)
    // TODO: make function for hash tables
    arena keys = new(&scratch, const char*, shader_hash_table.max_count);
    arena values = new(&scratch, vk_shader_modules, shader_hash_table.max_count);
-
-   if(is_stub(keys) || is_stub(values))
-      return 0;
 
    shader_hash_table.keys = keys.beg;
    shader_hash_table.values = values.beg;

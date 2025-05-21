@@ -16,9 +16,6 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
 
    arena shader_file = win32_file_read(storage, shader_path);
 
-   if(is_stub(shader_file))
-      return 0;
-
    VkShaderModuleCreateInfo module_info = {};
    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
    module_info.pCode = (u32*)shader_file.beg;
@@ -68,8 +65,6 @@ static arena vk_project_directory(arena* storage)
 static const char** vk_shader_folder_read(arena* files, const char* shader_folder_path)
 {
    arena project_dir = vk_project_directory(files);
-   if(is_stub(project_dir))
-      return 0;
 
    WIN32_FIND_DATA file_data;
 

@@ -29,9 +29,6 @@ static arena win32_file_read(arena* file_arena, const char* path)
 
    result = newsize(file_arena, file_size_32);
 
-   if(is_stub(result))
-      return (arena){};
-
    DWORD bytes_read = 0;
    if(!(ReadFile(file, result.beg, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
       return (arena) {};

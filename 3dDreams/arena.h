@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <stddef.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
 #include "common.h"
@@ -38,8 +39,6 @@ do { \
 #define arena_invariant(s, a, t) assert((s) <= arena_left((a), t))
 #define arena_shrink(a, s, t) (a)->end = (a)->beg + (s)*sizeof(t)
 
-#define is_stub(a) ((a).beg == (a).end)
-
 // TODO: Different news for scratch and storage arenas
 
 #define newx(a,b,c,d,e,...) e
@@ -65,13 +64,25 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
+enum { ARENA_SOFT_FAIL };
+
+static arena arena_get_stub()
+{
+   static char dummy[1];
+   return (arena){dummy, dummy};
+}
+
 static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(count <= 0 || count > ((char*)a->end - (char*)p) / alloc_size)
-      return (arena){};
+   if(count <= 0 || (count > ((char*)a->end - (char*)p) / alloc_size))
+   {
+      //if(flag & ARENA_SOFT_FAIL)
+         return arena_get_stub();
+      //abort();
+   }
 
    a->beg = (char*)p + (count * alloc_size);          // advance arena 
 
