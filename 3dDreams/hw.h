@@ -14,6 +14,7 @@
 #define hw_assert(p) if(!(p)) hw_message(p)
 
 // TODO: Move this to general renderer.h
+// TODO: all caps
 enum
 {
    vk_renderer_index, 

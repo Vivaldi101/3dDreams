@@ -410,4 +410,16 @@ static mat4 mat4_rotation_z(f32 rotz)
    return result;
 }
 
+#pragma pack(push, 1)
+typedef struct mvp_transform
+{
+    mat4 projection;
+    mat4 view;
+    mat4 model;
+    f32 n;
+    f32 f;
+    f32 ar;
+} mvp_transform;
+#pragma pack(pop)
+
 #endif

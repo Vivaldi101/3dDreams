@@ -68,8 +68,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    size vertex_count = m->vertex_count;
 
    u8* meshlet_vertices = new(&meshlet_scratch, u8, vertex_count).beg;
-   if(!meshlet_vertices)
-      return false;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
@@ -96,9 +94,8 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
+         assert(arena_left(meshlet_storage) >= sizeof(meshlet));
          meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
-         if(!pml) 
-            return false;
          *pml = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
@@ -142,10 +139,8 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
+      assert(arena_left(meshlet_storage) >= sizeof(meshlet));
       meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
-      if(!pml)
-         return false;
-
       *pml = ml;
       m->meshlet_count++;
    }
@@ -154,18 +149,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
-
-#pragma pack(push, 1)
-typedef struct mvp_transform
-{
-    mat4 projection;
-    mat4 view;
-    mat4 model;
-    f32 n;
-    f32 f;
-    f32 ar;
-} mvp_transform;
-#pragma pack(pop)
 
 align_struct swapchain_surface_info
 {
@@ -255,19 +238,6 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    *buf = file_read.beg;
 }
 
-#if 0
-thing* p = scratch.beg;
-while(p != scratch.end)
-{
-   size i = p - (typeof(p))scratch.beg;
-   p->a = 123;
-   ++p;
-}
-
-// arena was drained
-assert(p == scratch.end);
-#endif
-
 // TOOD: move into own file
 static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
 {
@@ -278,8 +248,8 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
-      const char* filename = "teapot3.obj";
+      const char* filename = "dragon.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -910,6 +880,9 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color
 
 static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, swapchain_surface_info* surface_info, VkImageView* attachments, u32 attachment_count)
 {
+   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(renderpass));
+
    VkFramebuffer framebuffer = 0;
 
    VkFramebufferCreateInfo framebuffer_info = {vk_info(FRAMEBUFFER)};
@@ -1004,14 +977,28 @@ static bool vk_swapchain_update(vk_context* context)
    return true;
 }
 
-static void vk_resize(void* renderer, u32 width, u32 height)
+static void vk_resize(hw* hw, u32 width, u32 height)
 {
    if(width == 0 || height == 0)
       return;
 
-   vk_context* context = (vk_context*)renderer;
+   u32 renderer_index = hw->renderer.renderer_index;
+   assert(renderer_index < renderer_count);
+
+   vk_context* context = hw->renderer.backends[renderer_index];
+
+   mvp_transform mvp = {};
+   const f32 ar = (f32)width / height;
+
+   mvp.n = 0.01f;
+   mvp.f = 1000.0f;
+   mvp.ar = ar;
+
+   mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
+   hw->renderer.mvp = mvp;
 
    vkDeviceWaitIdle(context->logical_device);
+
    vk_swapchain_destroy(context);
    context->swapchain_info = vk_swapchain_info_create(context, width, height, context->queue_family_index);
    vk_swapchain_update(context);
@@ -1036,7 +1023,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(context, context->swapchain_info.image_width, context->swapchain_info.image_height);
+      vk_resize(hw, context->swapchain_info.image_width, context->swapchain_info.image_height);
 
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
@@ -1065,13 +1052,16 @@ static void vk_present(hw* hw, vk_context* context)
       static f32 rot = 0.0f;
       rot += delta;
 
-      mvp_transform mvp = {};
-
+      mvp_transform mvp = hw->renderer.mvp;
+      assert(mvp.n > 0.0f);
+      assert(mvp.ar != 0.0f);
+#if 0
       mvp.n = 0.01f;
       mvp.f = 1000.0f;
       mvp.ar = ar;
+#endif
 
-      f32 radius = 7.0f;
+      f32 radius = 2.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 2.0f;
 
@@ -1085,7 +1075,7 @@ static void vk_present(hw* hw, vk_context* context)
       vec3 origin = {0.0f, 2.0f, 0.0f};
       vec3 dir = vec3_sub(&eye, &origin);
 
-      mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
+      //mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
       mvp.view = mat4_view(eye, dir);
       //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
       mat4 translate = mat4_translate((vec3){0.0f, 2.0f, 0.0f});
@@ -1212,6 +1202,7 @@ static void vk_present(hw* hw, vk_context* context)
       vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
                            VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_end_barrier);
 
+      // TODO: Enable depth image barriers
       //VkImageMemoryBarrier depth_image_end_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED);
       //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                            //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_end_barrier);
@@ -1247,7 +1238,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(context, context->swapchain_info.image_width, context->swapchain_info.image_height);
+      vk_resize(hw, context->swapchain_info.image_width, context->swapchain_info.image_height);
 
    if(present_result != VK_SUCCESS)
       return;
@@ -1692,6 +1683,12 @@ bool vk_initialize(hw* hw)
    if(!context)
       return false;
 
+   // app callbacks
+   hw->renderer.backends[vk_renderer_index] = context;
+   hw->renderer.frame_present = vk_present;
+   hw->renderer.frame_resize = vk_resize;
+   hw->renderer.renderer_index = vk_renderer_index;
+
    context->storage = &hw->vk_storage;
 
    arena scratch = hw->vk_scratch;
@@ -1728,6 +1725,7 @@ bool vk_initialize(hw* hw)
    context->physical_device = vk_pdevice_select(context, instance);
    context->logical_device = vk_ldevice_create(context->physical_device, context->queue_family_index);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
+
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
    context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
@@ -1737,6 +1735,8 @@ bool vk_initialize(hw* hw)
    context->command_buffer = vk_command_buffer_create(context->logical_device, context->command_pool);
    context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
    context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_info.format, VK_FORMAT_D32_SFLOAT);
+
+   hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
 #if RTX
    context->max_meshlet_count = vk_mesh_shader_max_tasks(context->physical_device);
@@ -1767,7 +1767,7 @@ bool vk_initialize(hw* hw)
 
    memset(shader_hash_table.values, 0, shader_hash_table.max_count * sizeof(vk_shader_modules));
 
-   for(usize i = 0; i < shader_hash_table.max_count; ++i)
+   for(size i = 0; i < shader_hash_table.max_count; ++i)
       shader_hash_table.keys[i] = 0;
 
    // TODO: routine to iterate over hash values
@@ -1831,7 +1831,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(256);
+   size buffer_size = MB(32);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -1852,15 +1852,12 @@ bool vk_initialize(hw* hw)
 #endif
    // TODO: semcompress
    scratch = hw->vk_scratch;
-   size scratch_size = scratch_left(scratch);
+
    obj_vertex* vb_data = new(&scratch, obj_vertex, MB(4)).beg;
    size vb_size = 0;
 
    u32* ib_data = new(&scratch, u32, MB(16)).beg;
    size ib_size = 0;
-
-   if(!vb_data || !ib_data)
-      return false;
 
    // Load meshes
    if(!obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size))
@@ -1878,12 +1875,6 @@ bool vk_initialize(hw* hw)
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
       scratch_buffer, ib_data, ib_size);
 #endif
-
-   // app callbacks
-   hw->renderer.backends[vk_renderer_index] = context;
-   hw->renderer.frame_present = vk_present;
-   hw->renderer.frame_resize = vk_resize;
-   hw->renderer.renderer_index = vk_renderer_index;
 
    return true;
 }

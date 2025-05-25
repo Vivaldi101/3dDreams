@@ -78,11 +78,7 @@ static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
    if(count <= 0 || (count > ((char*)a->end - (char*)p) / alloc_size))
-   {
-      //if(flag & ARENA_SOFT_FAIL)
-         return arena_get_stub();
-      //abort();
-   }
+      hw_message("Could not allocate arena memory");
 
    a->beg = (char*)p + (count * alloc_size);          // advance arena 
 

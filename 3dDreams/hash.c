@@ -11,16 +11,16 @@ typedef struct
 {
    u32* values;
    hash_key* keys;
-   usize max_count;
-   usize count;
+   size max_count;
+   size count;
 } index_hash_table;
 
 typedef struct 
 {
    vk_shader_modules* values;
    const char** keys;
-   usize max_count;
-   usize count;
+   size max_count;
+   size count;
 } spv_hash_table;
 
 static bool key_equals(hash_key a, hash_key b)

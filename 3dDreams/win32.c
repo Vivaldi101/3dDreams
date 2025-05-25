@@ -68,7 +68,7 @@ static bool win32_platform_loop()
 }
 
 static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam) {
-   hw_renderer* renderer = (hw_renderer*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+   hw* win32_hw = (hw*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
    switch(umsg)
    {
@@ -78,11 +78,11 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          int width = pCreate->cx;
          int height = pCreate->cy;
 
-         if(renderer)
+         if(win32_hw)
          {
-            renderer->window.width = width;
-            renderer->window.height = height;
-            renderer->frame_resize(renderer->backends[renderer->renderer_index], renderer->window.width, renderer->window.height);
+            win32_hw->renderer.window.width = width;
+            win32_hw->renderer.window.height = height;
+            win32_hw->renderer.frame_resize(win32_hw, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
          }
 
          return 0;
@@ -105,11 +105,11 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
       case WM_SIZE:
       {
-         if(renderer)
+         if(win32_hw)
          {
-            renderer->window.width = LOWORD(lparam);
-            renderer->window.height = HIWORD(lparam);
-            renderer->frame_resize(renderer->backends[renderer->renderer_index], renderer->window.width, renderer->window.height);
+            win32_hw->renderer.window.width = LOWORD(lparam);
+            win32_hw->renderer.window.height = HIWORD(lparam);
+            win32_hw->renderer.frame_resize(win32_hw, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
          }
          return 0;
       }
@@ -123,8 +123,8 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          GetClientRect(hwnd, &rect);
          int width = rect.right - rect.left;
          int height = rect.bottom - rect.top;
-         if(renderer)
-            renderer->frame_resize(renderer->backends[renderer->renderer_index], width, height);
+         if(win32_hw)
+            win32_hw->renderer.frame_resize(win32_hw, width, height);
 
          return 0;
       }
@@ -291,7 +291,7 @@ static void arena_free(arena* a)
    hw_virtual_memory_release(a->beg, arena_left(a));
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, int nCmdShow)
+int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
    const char** argv = 0;
    int argc = 0;

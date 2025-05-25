@@ -1,6 +1,7 @@
 #include "hw.h"
 #include "common.h"
 #include "app.h"
+#include "graphics.h"
 
 #define MAX_ARGV 32
 
@@ -8,11 +9,12 @@ align_struct hw_renderer
 {
    void* backends[renderer_count];
    void(*frame_present)(hw* hw, void* renderer);
-   void(*frame_resize)(void* renderer, u32 width, u32 height);
+   void(*frame_resize)(hw* hw, u32 width, u32 height);
    void(*frame_wait)(void* renderer);
    void* (*window_surface_create)(void* instance, void* window_handle);
-   u32 renderer_index;
    hw_window window;
+   mvp_transform mvp;
+   u32 renderer_index;
 } hw_renderer;
 
 align_struct hw_timer
@@ -24,7 +26,7 @@ align_struct hw_timer
 align_struct hw
 {
    hw_renderer renderer;
-   arena vk_storage; // should all be called scratches
+   arena vk_storage;
    arena vk_scratch;
    arena misc_storage;
    hw_timer timer;
@@ -54,7 +56,6 @@ static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
    return surface;
 }
 
-
 void hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)
 {
    hw->renderer.window.handle = hw->renderer.window.open(title, x, y, w, h);
@@ -62,7 +63,7 @@ void hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)
    hw->renderer.window.height = h;
 
    inv(hw->renderer.window.handle);
-   SetWindowLongPtr(hw->renderer.window.handle, GWLP_USERDATA, (LONG_PTR)&hw->renderer);
+   SetWindowLongPtr(hw->renderer.window.handle, GWLP_USERDATA, (LONG_PTR)hw);
 }
 
 void hw_window_close(hw* hw)
