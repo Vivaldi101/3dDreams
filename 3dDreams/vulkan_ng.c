@@ -1725,7 +1725,6 @@ bool vk_initialize(hw* hw)
    context->physical_device = vk_pdevice_select(context, instance);
    context->logical_device = vk_ldevice_create(context->physical_device, context->queue_family_index);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
-
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
    context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
@@ -1741,10 +1740,6 @@ bool vk_initialize(hw* hw)
 #if RTX
    context->max_meshlet_count = vk_mesh_shader_max_tasks(context->physical_device);
 #endif
-
-   VkExtent3D depth_extent = {context->swapchain_info.image_width, context->swapchain_info.image_height, 1};
-   for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
-      context->swapchain_info.depths[i] = vk_depth_image_create(context->logical_device, context->physical_device, VK_FORMAT_D32_SFLOAT, depth_extent);
 
    if(!vk_swapchain_update(context))
       return false;
