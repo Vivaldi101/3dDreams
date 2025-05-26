@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -237,10 +237,9 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 }
 
 // TOOD: move into own file
-static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
+static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
 {
-      //scratch_clear(scratch);
-
+      arena scratch = obj_scratch;
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
@@ -262,7 +261,7 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       tinyobj_attrib_init(&attrib);
 
       obj_user_ctx user_data = {};
-      user_data.scratch = scratch;
+      user_data.scratch = arena_new(MB(1000));
 
       if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       {
@@ -352,6 +351,7 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       obj_mesh.vertex_count = obj_table.count;  // unique vertex count
       obj_mesh.meshlet_buffer = context->storage->beg;
 
+      scratch = obj_scratch;
       if(!meshlet_build(context->storage, scratch, &obj_mesh))
          return false;
 
@@ -1169,7 +1169,7 @@ static void vk_present(hw* hw, vk_context* context)
    meshlet_count += 10;
    // max meshlet count
    meshlet_count %= 0xffff;
-   vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
+   vkCmdDrawMeshTasksEXT(command_buffer, 0xffff-10, 1, 1);
 #else
 
    VkWriteDescriptorSet descriptors[1] = {};
@@ -1638,14 +1638,8 @@ VkInstance vk_instance_create(arena scratch)
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
       return 0;
 
-   //if(scratch_count_left(scratch, VkExtensionProperties) < ext_count)
-      //return 0;
-
    VkExtensionProperties* extensions = new(&scratch, VkExtensionProperties, ext_count).beg;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
-      return 0;
-
-   if(scratch_count_left(scratch, const char*) < ext_count)
       return 0;
 
    const char** ext_names = new(&scratch, const char*, ext_count).beg;
@@ -1824,7 +1818,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(1024);
+   size buffer_size = MB(16);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);

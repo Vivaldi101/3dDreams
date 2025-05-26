@@ -21,20 +21,13 @@ static arena win32_file_read(arena* file_arena, const char* path)
    if(file_size_32 == 0)
       return (arena) {};
 
-   // TODO: Fix this for dynamic arenas
-   //if(arena_left(file_arena) < file_size_32)
-   {
-      //hw_message("Cannot allocate enough for .obj file");
-      //return (arena) {};
-   }
-
    result = newsize(file_arena, file_size_32);
 
    DWORD bytes_read = 0;
    if(!(ReadFile(file, result.beg, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
       return (arena) {};
 
-   scratch_shrink(result, bytes_read, char);
+   //scratch_shrink(result, bytes_read, char);
 
    CloseHandle(file);
 
