@@ -66,12 +66,6 @@ typedef struct arena
 
 enum { ARENA_SOFT_FAIL };
 
-static arena arena_get_stub()
-{
-   static char dummy[1];
-   return (arena){dummy, dummy};
-}
-
 static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    // align allocation to next aligned boundary

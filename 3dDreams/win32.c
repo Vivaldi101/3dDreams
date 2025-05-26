@@ -299,17 +299,18 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
    hw_virtual_memory_init();
 
-   arena base_storage = arena_new(GB(8));
-   assert(arena_left(&base_storage) == GB(8));
+   size total_arena_size = MB(4096);
+   arena base_storage = arena_new(total_arena_size);
+   assert(arena_left(&base_storage) == total_arena_size);
 
    hw.vk_storage.beg = base_storage.beg;
-   hw.vk_storage.end = (char*)hw.vk_storage.beg + GB(2);
+   hw.vk_storage.end = (char*)hw.vk_storage.beg + total_arena_size/4;
 
    hw.vk_scratch.beg = hw.vk_storage.end;
-   hw.vk_scratch.end = (char*)hw.vk_scratch.beg + GB(2);
+   hw.vk_scratch.end = (char*)hw.vk_scratch.beg + total_arena_size/4;
 
    hw.misc_storage.beg = hw.vk_scratch.end;
-   hw.misc_storage.end = (char*)hw.misc_storage.beg + GB(4);
+   hw.misc_storage.end = (char*)hw.misc_storage.beg + total_arena_size/2;
 
    assert(hw.misc_storage.end == base_storage.end);
 
@@ -328,7 +329,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    app_start(argc, argv, &hw);
    timeEndPeriod(1);
 
-   assert(arena_left(&base_storage) == GB(8));
+   assert(arena_left(&base_storage) == total_arena_size);
    arena_free(&base_storage);
 
    return 0;

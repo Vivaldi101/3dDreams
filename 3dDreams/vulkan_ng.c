@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -61,7 +61,7 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
 
 static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
-   scratch_clear(meshlet_scratch);
+   //scratch_clear(meshlet_scratch);
 
    meshlet ml = {};
 
@@ -94,7 +94,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         assert(arena_left(meshlet_storage) >= sizeof(meshlet));
          meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
          *pml = ml;
 
@@ -139,7 +138,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      assert(arena_left(meshlet_storage) >= sizeof(meshlet));
       meshlet* pml = new(meshlet_storage, meshlet, 1).beg;
       *pml = ml;
       m->meshlet_count++;
@@ -241,14 +239,14 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 // TOOD: move into own file
 static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
 {
-      scratch_clear(scratch);
+      //scratch_clear(scratch);
 
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
       //const char* filename = "buddha.obj";
-      //const char* filename = "hairball.obj";
-      const char* filename = "dragon.obj";
+      const char* filename = "hairball.obj";
+      //const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
@@ -283,7 +281,7 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
 
       obj_table.max_count = index_count;
 
-      scratch_clear(scratch);
+      //scratch_clear(scratch);
 
       arena keys = new(&scratch, hash_key, obj_table.max_count);
       arena values = new(&scratch, hash_value, obj_table.max_count);
@@ -1061,7 +1059,7 @@ static void vk_present(hw* hw, vk_context* context)
       mvp.ar = ar;
 #endif
 
-      f32 radius = 2.0f;
+      f32 radius = 12.0f;
       f32 theta = DEG2RAD(rot);
       f32 height = 2.0f;
 
@@ -1638,8 +1636,8 @@ VkInstance vk_instance_create(arena scratch)
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
       return 0;
 
-   if(scratch_count_left(scratch, VkExtensionProperties) < ext_count)
-      return 0;
+   //if(scratch_count_left(scratch, VkExtensionProperties) < ext_count)
+      //return 0;
 
    VkExtensionProperties* extensions = new(&scratch, VkExtensionProperties, ext_count).beg;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
@@ -1826,7 +1824,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(32);
+   size buffer_size = MB(128);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
