@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -244,8 +244,8 @@ static bool obj_load(vk_context* context, arena scratch, obj_vertex* vb_data, si
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      //const char* filename = "buddha.obj";
-      const char* filename = "hairball.obj";
+      const char* filename = "buddha.obj";
+      //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
       //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
@@ -1038,177 +1038,178 @@ static void vk_present(hw* hw, vk_context* context)
    {context->swapchain_info.image_width, context->swapchain_info.image_height};
 
    VkCommandBuffer command_buffer = context->command_buffer;
+   // begin command buffer
+
+   vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
+
+   vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
+   vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
+
+   const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
+
+   f32 delta = 0.75f;
+   static f32 rot = 0.0f;
+   rot += delta;
+
+   mvp_transform mvp = hw->renderer.mvp;
+   assert(mvp.n > 0.0f);
+   assert(mvp.ar != 0.0f);
+#if 0
+   mvp.n = 0.01f;
+   mvp.f = 1000.0f;
+   mvp.ar = ar;
+#endif
+
+   f32 radius = 2.0f;
+   f32 theta = DEG2RAD(rot);
+   f32 height = 2.0f;
+
+   vec3 eye =
    {
-      vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
+       radius * cosf(theta),
+       height,
+       radius * sinf(theta)
+   };
 
-      vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
-      vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0); 
+   vec3 origin = {0.0f, 2.0f, 0.0f};
+   vec3 dir = vec3_sub(&eye, &origin);
 
-      const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
+   //mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
+   mvp.view = mat4_view(eye, dir);
+   //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
+   mat4 translate = mat4_translate((vec3) { 0.0f, 2.0f, 0.0f });
 
-      f32 delta = 0.75f;
-      static f32 rot = 0.0f;
-      rot += delta;
+   mvp.model = mat4_identity();
+   mvp.model = mat4_mul(translate, mvp.model);
 
-      mvp_transform mvp = hw->renderer.mvp;
-      assert(mvp.n > 0.0f);
-      assert(mvp.ar != 0.0f);
-#if 0
-      mvp.n = 0.01f;
-      mvp.f = 1000.0f;
-      mvp.ar = ar;
-#endif
+   const f32 c = 255.0f;
+   VkClearValue clear[2] = {};
+   clear[0].color = (VkClearColorValue){48 / c, 10 / c, 36 / c, 1.0f};
+   clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
-      f32 radius = 12.0f;
-      f32 theta = DEG2RAD(rot);
-      f32 height = 2.0f;
+   renderpass_info.clearValueCount = 2;
+   renderpass_info.pClearValues = clear;
 
-      vec3 eye = 
-      {
-          radius * cosf(theta),
-          height,
-          radius * sinf(theta)
-      };
+   VkImage color_image = context->swapchain_info.images[image_index];
+   VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-      vec3 origin = {0.0f, 2.0f, 0.0f};
-      vec3 dir = vec3_sub(&eye, &origin);
-
-      //mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
-      mvp.view = mat4_view(eye, dir);
-      //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
-      mat4 translate = mat4_translate((vec3){0.0f, 2.0f, 0.0f});
-
-      mvp.model = mat4_identity();
-      mvp.model = mat4_mul(translate, mvp.model);
-
-      const f32 c = 255.0f;
-      VkClearValue clear[2] = {};
-      clear[0].color = (VkClearColorValue){48 / c, 10 / c, 36 / c, 1.0f};
-      clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
-
-      renderpass_info.clearValueCount = 2;
-      renderpass_info.pClearValues = clear;
-
-      VkImage color_image = context->swapchain_info.images[image_index];
-      VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT ,0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
-
-      // TODO: Enable depth image barriers
-      //VkImage depth_image = context->swapchain_info.depths[image_index];
-      //VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-      //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                           //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
+   // TODO: Enable depth image barriers
+   //VkImage depth_image = context->swapchain_info.depths[image_index];
+   //VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+   //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                        //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
 
 
-      vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
+   vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
 #if RTX
-      vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
-                   sizeof(mvp), &mvp);
+   vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+                sizeof(mvp), &mvp);
 #else
 
-      vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                   sizeof(mvp), &mvp);
+   vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                sizeof(mvp), &mvp);
 #endif
 
-      VkViewport viewport = {};
+   VkViewport viewport = {};
 
-      // y-is-up
-      viewport.x = 0.0f;
-      viewport.y = (f32)context->swapchain_info.image_height;
-      viewport.width = (f32)context->swapchain_info.image_width;
-      viewport.height = -(f32)context->swapchain_info.image_height;
+   // y-is-up
+   viewport.x = 0.0f;
+   viewport.y = (f32)context->swapchain_info.image_height;
+   viewport.width = (f32)context->swapchain_info.image_width;
+   viewport.height = -(f32)context->swapchain_info.image_height;
 
-      viewport.minDepth = 0.0f;
-      viewport.maxDepth = 1.0f;
+   viewport.minDepth = 0.0f;
+   viewport.maxDepth = 1.0f;
 
-      //debug_message("viewport: %d %d\n", (int)viewport.width, (int)viewport.height);
+   //debug_message("viewport: %d %d\n", (int)viewport.width, (int)viewport.height);
 
-      VkRect2D scissor = {};
-      scissor.offset.x = 0;
-      scissor.offset.y = 0;
-      scissor.extent.width = (u32)context->swapchain_info.image_width;
-      scissor.extent.height = (u32)context->swapchain_info.image_height;
+   VkRect2D scissor = {};
+   scissor.offset.x = 0;
+   scissor.offset.y = 0;
+   scissor.extent.width = (u32)context->swapchain_info.image_width;
+   scissor.extent.height = (u32)context->swapchain_info.image_height;
 
-      vkCmdSetViewport(command_buffer, 0, 1, &viewport);
-      vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+   vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+   vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
-      VkDescriptorBufferInfo vb_info = {};
-      vb_info.buffer = context->vb.handle;
-      vb_info.offset = 0;
-      vb_info.range = context->vb.size;
+   VkDescriptorBufferInfo vb_info = {};
+   vb_info.buffer = context->vb.handle;
+   vb_info.offset = 0;
+   vb_info.range = context->vb.size;
 
 #if RTX
-      VkDescriptorBufferInfo mb_info = {};
-      mb_info.buffer = context->mb.handle;
-      mb_info.offset = 0;
-      mb_info.range = context->mb.size;
+   VkDescriptorBufferInfo mb_info = {};
+   mb_info.buffer = context->mb.handle;
+   mb_info.offset = 0;
+   mb_info.range = context->mb.size;
 
-      VkWriteDescriptorSet descriptors[2] = {};
-      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[0].dstBinding = 0;
-      descriptors[0].descriptorCount = 1;
-      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[0].pBufferInfo = &vb_info;
+   VkWriteDescriptorSet descriptors[2] = {};
+   descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptors[0].dstBinding = 0;
+   descriptors[0].descriptorCount = 1;
+   descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   descriptors[0].pBufferInfo = &vb_info;
 
-      descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[1].dstBinding = 1;
-      descriptors[1].descriptorCount = 1;
-      descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[1].pBufferInfo = &mb_info;
+   descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptors[1].dstBinding = 1;
+   descriptors[1].descriptorCount = 1;
+   descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   descriptors[1].pBufferInfo = &mb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-      // TODO: testing 
-      static u32 meshlet_count = 0;
-      meshlet_count += 50;
-      // max meshlet count
-      meshlet_count %= 0xffff;
-      vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+   // TODO: testing 
+   static u32 meshlet_count = 0;
+   meshlet_count += 10;
+   // max meshlet count
+   meshlet_count %= 0xffff;
+   vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
 #else
 
-      VkWriteDescriptorSet descriptors[1] = {};
-      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[0].dstBinding = 0;
-      descriptors[0].descriptorCount = 1;
-      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[0].pBufferInfo = &vb_info;
+   VkWriteDescriptorSet descriptors[1] = {};
+   descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptors[0].dstBinding = 0;
+   descriptors[0].descriptorCount = 1;
+   descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   descriptors[0].pBufferInfo = &vb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
-      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+   vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+   vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 #endif
 
 #if 0
-      // draw axis
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
-      vkCmdDraw(command_buffer, 18, 1, 0, 0);
+   // draw axis
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
+   vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
-      // draw frustum
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
-      vkCmdDraw(command_buffer, 12, 1, 0, 0);
+   // draw frustum
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+   vkCmdDraw(command_buffer, 12, 1, 0, 0);
 #endif
 
-      vkCmdEndRenderPass(command_buffer);
+   vkCmdEndRenderPass(command_buffer);
 
-      VkImageMemoryBarrier color_image_end_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-      vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 
-                           VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_end_barrier);
+   VkImageMemoryBarrier color_image_end_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_end_barrier);
 
-      // TODO: Enable depth image barriers
-      //VkImageMemoryBarrier depth_image_end_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED);
-      //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_end_barrier);
+   // TODO: Enable depth image barriers
+   //VkImageMemoryBarrier depth_image_end_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED);
+   //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_end_barrier);
 
-      vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1); 
+   vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1);
 
-      vk_assert(vkEndCommandBuffer(command_buffer));
-   }
+   // end command buffer
+   vk_assert(vkEndCommandBuffer(command_buffer));
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.waitSemaphoreCount = 1;
@@ -1262,7 +1263,8 @@ static void vk_present(hw* hw, vk_context* context)
    if(hw->timer.time() - timer > 1000)
    {
 #if RTX
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+      //hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, meshlet_count);
 #else
       hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
 #endif
@@ -1822,7 +1824,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(128);
+   size buffer_size = MB(1024);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -1844,10 +1846,10 @@ bool vk_initialize(hw* hw)
    // TODO: semcompress
    scratch = hw->vk_scratch;
 
-   obj_vertex* vb_data = new(&scratch, obj_vertex, MB(4)).beg;
+   obj_vertex* vb_data = new(&scratch, obj_vertex, MB(16)).beg;
    size vb_size = 0;
 
-   u32* ib_data = new(&scratch, u32, MB(16)).beg;
+   u32* ib_data = new(&scratch, u32, MB(32)).beg;
    size ib_size = 0;
 
    // Load meshes

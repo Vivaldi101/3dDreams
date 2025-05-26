@@ -4,21 +4,12 @@
 #include "vulkan_ng.h"
 #include "arena.h"
 
-//#define FULLSCREEN
+#define FULLSCREEN 0
 
-typedef struct app_some_type
-{
-   bool isvalid;
-   int arr[100];
-   char* name;
-} app_some_type;
-
-
-static void app_frame(arena scratch)
+static void app_frame(arena scratch, app_state* state)
 {
 }
 
-// do input handling
 static void app_input_handle(app_input* input)
 {
    u64 key;
@@ -35,7 +26,7 @@ void app_start(int argc, const char** argv, hw* hw)
 {
    pre(implies(argc > 0, argv[argc - 1]));
 
-#ifdef FULLSCREEN
+#if FULLSCREEN
 	int w = 1920, h = 1080;
 	int x = 0, y = 0;
 #else

@@ -13,7 +13,11 @@ align_struct hw_renderer
    void(*frame_wait)(void* renderer);
    void* (*window_surface_create)(void* instance, void* window_handle);
    hw_window window;
+
+   // should be inside app.c
    mvp_transform mvp;
+   // should be inside app.c
+
    u32 renderer_index;
 } hw_renderer;
 
@@ -169,20 +173,21 @@ static void hw_log(hw* hw, s8 message, ...)
    hw->log(hw, message);
 }
 
-void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch), void (*app_input_function)(struct app_input* input))
+void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_state* state), void (*app_input_function)(struct app_input* input))
 {
    // start the timer
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
+   app_state state = {};
    for (;;)
    {
-      app_input input;
+      app_input input = {};
       if (!hw->platform_loop()) 
          break;
 
       app_input_function(&input);
-      app_frame_function(hw->vk_scratch);
+      app_frame_function(hw->vk_scratch, &state);
 
       // TODO: Use perf counters for better granularity
       hw_frame_sync(hw);
