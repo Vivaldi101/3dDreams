@@ -6,6 +6,8 @@
 #include <assert.h>
 #include "common.h"
 
+static void* base_arena;
+
 #define arena_iterate(a, s, type, var, code_block) \
 do { \
     arena scratch_ = new(&(a), type, (s)); \
@@ -66,17 +68,36 @@ typedef struct arena
 
 enum { ARENA_SOFT_FAIL };
 
+// TODO: might wanna try page-fault handlers
+static arena arena_new(size cap)
+{
+   arena a = {0}; // stub arena
+   if(cap > 0)
+   {
+      cap = (cap + 4096 - 1) & ~(4096 - 1);
+
+      a.beg = VirtualAlloc(base_arena, cap, MEM_COMMIT, PAGE_READWRITE);
+      a.end = a.beg ? (byte*)a.beg + cap : 0;
+
+      base_arena = (byte*)base_arena + cap;
+   }
+
+   return a;
+}
+
 static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(count <= 0 || (count > ((char*)a->end - (char*)p) / alloc_size))
-      hw_message("Could not allocate arena memory");
+   if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
+      return arena_new(4096);
 
-   a->beg = (char*)p + (count * alloc_size);          // advance arena 
+   a->beg = (byte*)p + (count * alloc_size);          // advance arena 
 
-   post(((uptr)p & (align - 1)) == 0);   // aligned result
+   memset(p, 0, alloc_size*count);
+
+   assert(((uptr)p & (align - 1)) == 0);   // aligned result
 
    return (arena){p, a->beg};
 }

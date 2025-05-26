@@ -193,9 +193,9 @@ static void win32_abort(u32 code)
 #define hw_error(m) MessageBox(NULL, (m), "Engine", MB_OK | MB_ICONSTOP | MB_SYSTEMMODAL);
 
 typedef LPVOID(*VirtualAllocPtr)(LPVOID, SIZE_T, DWORD, DWORD);
-typedef VOID(*VirtualReleasePtr)(LPVOID, SIZE_T);
+typedef BOOL(*VirtualFreePtr)(LPVOID, SIZE_T, DWORD);
 static VirtualAllocPtr global_allocate = 0;
-static VirtualReleasePtr global_release = 0;
+static VirtualFreePtr global_free = 0;
 
 static void hw_global_reserve_available()
 {
@@ -244,7 +244,7 @@ static void hw_virtual_memory_release(void* address, usize size)
 {
 	pre(hw_is_virtual_memory_commited((byte*)address+size-1));
 
-	global_release(address, size);
+	global_free(address, 0, MEM_RELEASE);
 }
 
 static void hw_virtual_memory_decommit(void* address, usize size)
@@ -263,27 +263,10 @@ static void hw_virtual_memory_init()
    inv(hkernel32);
 
    global_allocate = (VirtualAllocPtr)(GetProcAddress(hkernel32, "VirtualAlloc"));
-   global_release = (VirtualReleasePtr)(GetProcAddress(hkernel32, "VirtualFree"));
+   global_free = (VirtualFreePtr)(GetProcAddress(hkernel32, "VirtualFree"));
 
    post(global_allocate);
-   post(global_release);
-}
-
-// TODO: might wanna try page-fault handlers
-static arena arena_new(size cap)
-{
-   arena a = {}; // stub arena
-   if(cap <= 0)
-      return a;
-
-   void* base = hw_virtual_memory_reserve(cap);
-   hw_virtual_memory_commit(base, cap);
-
-   // set the base pointer and size on success
-   a.beg = base;
-   a.end = a.beg ? (char*)a.beg + cap : 0;
-
-   return a;
+   post(global_free);
 }
 
 static void arena_free(arena* a)
@@ -298,6 +281,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    hw hw = {0};
 
    hw_virtual_memory_init();
+
+   base_arena = global_allocate(0, 1ull << 46, MEM_RESERVE, PAGE_READWRITE);
+
+   assert(base_arena);
+
+   void* pbase_arena = base_arena;
 
    size total_arena_size = MB(4096);
    arena base_storage = arena_new(total_arena_size);
@@ -329,8 +318,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    app_start(argc, argv, &hw);
    timeEndPeriod(1);
 
-   assert(arena_left(&base_storage) == total_arena_size);
-   arena_free(&base_storage);
+   bool gr = global_free(pbase_arena, 0, MEM_RELEASE);
+   assert(gr);
 
    return 0;
 }

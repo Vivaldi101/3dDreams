@@ -1678,8 +1678,6 @@ bool vk_initialize(hw* hw)
       return false;
 
    vk_context* context = new(&hw->vk_storage, vk_context).beg;
-   if(!context)
-      return false;
 
    // app callbacks
    hw->renderer.backends[vk_renderer_index] = context;
