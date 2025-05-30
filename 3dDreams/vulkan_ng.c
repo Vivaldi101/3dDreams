@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -243,10 +243,10 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      //const char* filename = "buddha.obj";
+      const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      const char* filename = "teapot3.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -1057,7 +1057,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 8.0f;
+   f32 radius = 2.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1260,8 +1260,8 @@ static void vk_present(hw* hw, vk_context* context)
    if(hw->timer.time() - timer > 1000)
    {
 #if RTX
-      //hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, meshlet_count);
+      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+      //hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, meshlet_count);
 #else
       hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
 #endif
