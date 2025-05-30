@@ -24,7 +24,7 @@ void main()
    if(ar < 1.0f)
    {
       r = t;      // flip the aspect
-      t = r / ar;   // re-establish invariant in new aspect
+      t = r / ar;   // re-establish invariant in push aspect
    }
 
    // near plane

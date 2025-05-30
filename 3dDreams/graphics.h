@@ -223,7 +223,7 @@ static inline mat4 mat4_perspective(f32 ar, f32 fov_y, f32 n, f32 f)
    if(ar < 1.0f)
    {
       r = t;      // flip the aspect
-      t = r / ar;   // re-establish invariant in new aspect
+      t = r / ar;   // re-establish invariant in push aspect
 
       assert(r == n*tan);
       assert(t > r);

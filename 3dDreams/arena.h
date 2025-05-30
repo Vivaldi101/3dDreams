@@ -10,7 +10,7 @@ static void* base_arena;
 
 #define arena_iterate(a, s, type, var, code_block) \
 do { \
-    arena scratch_ = new(&(a), type, (s)); \
+    arena scratch_ = push(&(a), type, (s)); \
     type* (var) = scratch_.beg; \
     size_t count_ = scratch_size(scratch_) / sizeof(type); \
     for (size_t i = 0; i < count_; ++i) code_block \
@@ -41,10 +41,8 @@ do { \
 #define arena_invariant(s, a, t) assert((s) <= arena_left((a), t))
 #define arena_shrink(a, s, t) (a)->end = (a)->beg + (s)*sizeof(t)
 
-// TODO: Different news for scratch and storage arenas
-
 #define newx(a,b,c,d,e,...) e
-#define new(...)            newx(__VA_ARGS__,new4,new3,new2)(__VA_ARGS__)
+#define push(...)            newx(__VA_ARGS__,new4,new3,new2)(__VA_ARGS__)
 #define new2(a, t)          alloc(a, sizeof(t), __alignof(t), 1, 0)
 #define new3(a, t, n)       alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    alloc(a, sizeof(t), __alignof(t), n, f)

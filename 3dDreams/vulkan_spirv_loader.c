@@ -29,7 +29,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
 
 static arena vk_project_directory(arena* storage)
 {
-   arena result = new(storage, char, MAX_PATH);
+   arena result = push(storage, char, MAX_PATH);
    if(result.beg == result.end)
       return (arena){0};
 
@@ -84,14 +84,14 @@ static const char** vk_shader_folder_read(arena* files, const char* shader_folde
 
    first_file = FindFirstFile(path, &file_data);
 
-   const char** shader_names = (const char**)new(files, const char*, shader_count+1).beg;
+   const char** shader_names = (const char**)push(files, const char*, shader_count+1).beg;
 
    u32 i = 0;
    do {
       if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
       {
          usize file_len = strlen(file_data.cFileName);
-         char* p = new(files, char, file_len+1).beg;
+         char* p = push(files, char, file_len+1).beg;
 
          if(p) 
          {
