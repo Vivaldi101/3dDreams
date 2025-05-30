@@ -94,7 +94,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pml = push(meshlet_storage, meshlet, 1);
+         meshlet* pml = push(meshlet_storage, meshlet);
          *pml = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
@@ -138,7 +138,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      meshlet* pml = push(meshlet_storage, meshlet, 1);
+      meshlet* pml = push(meshlet_storage, meshlet);
       *pml = ml;
       m->meshlet_count++;
    }
