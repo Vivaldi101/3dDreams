@@ -29,15 +29,13 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
 
 static arena vk_project_directory(arena* storage)
 {
-   arena result = push(storage, char, MAX_PATH);
-   if(result.beg == result.end)
-      return (arena){0};
+   arena result = {};
 
-   char* fb = result.beg;
+   char* buffer = push(storage, char, MAX_PATH);
 
-   GetCurrentDirectory(MAX_PATH, fb);
+   GetCurrentDirectory(MAX_PATH, buffer);
 
-   usize file_size = strlen(fb);
+   usize file_size = strlen(buffer);
 
    u32 count = 0;
 
@@ -45,18 +43,19 @@ static arena vk_project_directory(arena* storage)
 
    for(size i = file_size-1; i-- >= 0;)
    {
-      if(fb[i] == '\\')
+      if(buffer[i] == '\\')
          ++count;
       if(count == 2)
       {
-         fb[i+1] = 0;
+         buffer[i+1] = 0;
          break;
       }
    }
 
-   file_size = strlen(fb);
+   file_size = strlen(buffer);
 
-   scratch_shrink(result, file_size, char);
+   result.beg = buffer;
+   result.end = buffer + file_size;
 
    return result;
 }
@@ -84,14 +83,14 @@ static const char** vk_shader_folder_read(arena* files, const char* shader_folde
 
    first_file = FindFirstFile(path, &file_data);
 
-   const char** shader_names = (const char**)push(files, const char*, shader_count+1).beg;
+   const char** shader_names = push(files, const char*, shader_count+1);
 
    u32 i = 0;
    do {
       if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
       {
          usize file_len = strlen(file_data.cFileName);
-         char* p = push(files, char, file_len+1).beg;
+         char* p = push(files, char, file_len+1);
 
          if(p) 
          {

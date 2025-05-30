@@ -65,4 +65,7 @@ typedef struct
 
 #define struct_clear(s) memset(&(s), 0, sizeof(s))
 
+#define page_size (4096)
+#define align_page_size (4096 -1)
+
 #endif

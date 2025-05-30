@@ -6,8 +6,6 @@
 #include <assert.h>
 #include "common.h"
 
-static void* base_arena;
-
 #define arena_iterate(a, s, type, var, code_block) \
 do { \
     arena scratch_ = push(&(a), type, (s)); \
@@ -48,7 +46,7 @@ do { \
 #define new4(a, t, n, f)    alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define newxsize(a,b,c,d,e,...) e
-#define newsize(...)            newxsize(__VA_ARGS__,new4size,new3size,new2size)(__VA_ARGS__)
+#define push_size(...)            newxsize(__VA_ARGS__,new4size,new3size,new2size)(__VA_ARGS__)
 #define new2size(a, t)          alloc(a, t, __alignof(t), 1, 0)
 #define new3size(a, t, n)       alloc(a, t, __alignof(t), n, 0)
 #define new4size(a, t, n, f)    alloc(a, t, __alignof(t), n, f)
@@ -62,40 +60,65 @@ typedef struct arena
 {
    void* beg;
    void* end;  // one past the end
+   //list_head arenas;
 } arena;
 
-enum { ARENA_SOFT_FAIL };
-
-// TODO: might wanna try page-fault handlers
-static arena arena_new(size cap)
+// TODO: use GetSystemInfo
+static arena arena_new(void* base, size cap)
 {
-   arena a = {0}; // stub arena
-   if(cap > 0)
-   {
-      cap = (cap + 4096 - 1) & ~(4096 - 1);
+   assert(base && cap > 0);
 
-      a.beg = VirtualAlloc(base_arena, cap, MEM_COMMIT, PAGE_READWRITE);
-      a.end = a.beg ? (byte*)a.beg + cap : 0;
+   arena result = {0};
 
-      base_arena = (byte*)base_arena + cap;
-   }
+   result.beg = VirtualAlloc(base, cap, MEM_COMMIT, PAGE_READWRITE);
+   result.end = (byte*)result.beg + cap;
 
-   return a;
+   assert(result.beg < result.end);
+
+   return result;
 }
 
-static arena alloc(arena* a, size alloc_size, size align, size count, u32 flag)
+static void arena_expand(arena* a, size new_cap)
 {
+   assert((uintptr_t)a->end <= ((1ull << 48)-1) - page_size);
+   arena new_arena = arena_new((byte*)a->end, new_cap);
+   new_arena.beg = a->end;
+
+   assert(new_arena.beg == a->end);
+
+   a->beg = new_arena.beg; // expanded arena beginning
+   a->end = (byte*)a->beg + new_cap;
+
+   assert(a->beg < a->end);   // invariant
+   assert(a->end == (byte*)a->beg + new_cap);   // post
+}
+
+static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
+{
+   assert(align <= align_page_size);
+
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
-      return arena_new(count * alloc_size);
+   {
+      arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
+      p = a->beg;
+   }
 
-   a->beg = (byte*)p + (count * alloc_size);          // advance arena 
+   a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
 
-   memset(p, 0, alloc_size*count);
+   assert(((uptr)p & (align - 1)) == 0);                             // aligned result
 
-   assert(((uptr)p & (align - 1)) == 0);   // aligned result
+   return p;
+}
 
-   return (arena){p, a->beg};
+static bool arena_reset(arena* a)
+{
+   return VirtualAlloc(a->beg, (byte*)a->end - (byte*)a->beg, MEM_RESET, PAGE_READWRITE) != 0;
+}
+
+static bool arena_decommit(arena* a)
+{
+   return VirtualFree(a->beg, 0, MEM_DECOMMIT) != 0;
 }

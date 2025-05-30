@@ -286,14 +286,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
    hw_virtual_memory_init();
 
-   base_arena = global_allocate(0, 1ull << 46, MEM_RESERVE, PAGE_READWRITE);
-
-   assert(base_arena);
-
-   void* pbase_arena = base_arena;
+   size arena_size = 1ull << 46;
+   void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
+   assert(base);
 
    size total_arena_size = MB(32);
-   arena base_storage = arena_new(total_arena_size);
+   arena base_storage = arena_new(base, total_arena_size);
    assert(arena_left(&base_storage) == total_arena_size);
 
    hw.vk_storage.beg = base_storage.beg;
@@ -322,7 +320,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    app_start(argc, argv, &hw);
    timeEndPeriod(1);
 
-   bool gr = global_free(pbase_arena, 0, MEM_RELEASE);
+   bool gr = global_free(base, 0, MEM_RELEASE);
    assert(gr);
 
    return 0;

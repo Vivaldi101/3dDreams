@@ -67,7 +67,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
 
    size vertex_count = m->vertex_count;
 
-   u8* meshlet_vertices = push(&meshlet_scratch, u8, vertex_count).beg;
+   u8* meshlet_vertices = push(&meshlet_scratch, u8, vertex_count);
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
@@ -94,7 +94,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pml = push(meshlet_storage, meshlet, 1).beg;
+         meshlet* pml = push(meshlet_storage, meshlet, 1);
          *pml = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
@@ -138,7 +138,7 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      meshlet* pml = push(meshlet_storage, meshlet, 1).beg;
+      meshlet* pml = push(meshlet_storage, meshlet, 1);
       *pml = ml;
       m->meshlet_count++;
    }
@@ -243,10 +243,10 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      //const char* filename = "teapot3.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -261,7 +261,7 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       tinyobj_attrib_init(&attrib);
 
       obj_user_ctx user_data = {};
-      user_data.scratch = arena_new(MB(1000));
+      user_data.scratch = obj_scratch;
 
       if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       {
@@ -282,11 +282,8 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
 
       //scratch_clear(scratch);
 
-      arena keys = push(&scratch, hash_key, obj_table.max_count);
-      arena values = push(&scratch, hash_value, obj_table.max_count);
-
-      obj_table.keys = keys.beg;
-      obj_table.values = values.beg;
+      obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
+      obj_table.values = push(&scratch, hash_value, obj_table.max_count);
 
       memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
 
@@ -1060,7 +1057,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 2.0f;
+   f32 radius = 8.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1638,11 +1635,11 @@ VkInstance vk_instance_create(arena scratch)
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
       return 0;
 
-   VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count).beg;
+   VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count);
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
       return 0;
 
-   const char** ext_names = push(&scratch, const char*, ext_count).beg;
+   const char** ext_names = push(&scratch, const char*, ext_count);
 
    for(size_t i = 0; i < ext_count; ++i)
       ext_names[i] = extensions[i].extensionName;
@@ -1673,7 +1670,7 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   vk_context* context = push(&hw->vk_storage, vk_context).beg;
+   vk_context* context = push(&hw->vk_storage, vk_context);
 
    // app callbacks
    hw->renderer.backends[vk_renderer_index] = context;
@@ -1746,11 +1743,8 @@ bool vk_initialize(hw* hw)
    shader_hash_table.max_count = shader_count;
 
    // TODO: make function for hash tables
-   arena keys = push(&scratch, const char*, shader_hash_table.max_count);
-   arena values = push(&scratch, vk_shader_modules, shader_hash_table.max_count);
-
-   shader_hash_table.keys = keys.beg;
-   shader_hash_table.values = values.beg;
+   shader_hash_table.keys = push(&scratch, const char*, shader_hash_table.max_count);
+   shader_hash_table.values = push(&scratch, vk_shader_modules, shader_hash_table.max_count);
 
    memset(shader_hash_table.values, 0, shader_hash_table.max_count * sizeof(vk_shader_modules));
 
@@ -1840,10 +1834,10 @@ bool vk_initialize(hw* hw)
    // TODO: semcompress
    scratch = hw->vk_scratch;
 
-   obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16)).beg;
+   obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
    size vb_size = 0;
 
-   u32* ib_data = push(&scratch, u32, MB(32)).beg;
+   u32* ib_data = push(&scratch, u32, MB(32));
    size ib_size = 0;
 
    // Load meshes
