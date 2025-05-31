@@ -42,7 +42,7 @@ typedef struct
    size vertex_count;
    u32* index_buffer;         // vertex indices
    size index_count;
-   meshlet* meshlet_buffer;   // TODO: arenas here
+   array meshlet_buffer;
    u32 meshlet_count;
 } mesh;
 
@@ -59,18 +59,11 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static void meshlet_build(arena meshlet_scratch, mesh* m)
+static void meshlet_build(mesh* m, u8* meshlet_vertices)
 {
-   scratch_clear(meshlet_scratch);
-
    meshlet ml = {};
 
    size vertex_count = m->vertex_count;
-
-   u8* meshlet_vertices = push(&meshlet_scratch, u8, vertex_count);
-
-   // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertices, 0xff, vertex_count);
 
    usize max_index_count = array_count(ml.primitive_indices);
    usize max_vertex_count = array_count(ml.vertex_index_buffer);
@@ -94,7 +87,9 @@ static void meshlet_build(arena meshlet_scratch, mesh* m)
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         m->meshlet_buffer[m->meshlet_count] = ml;
+         //((meshlet*)m->meshlet_buffer.base)[m->meshlet_count] = ml;
+
+         *push(&m->meshlet_buffer.arena, meshlet) = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -137,7 +132,8 @@ static void meshlet_build(arena meshlet_scratch, mesh* m)
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      m->meshlet_buffer[m->meshlet_count] = ml;
+      //((meshlet*)m->meshlet_buffer.base)[m->meshlet_count] = ml;
+      *push(&m->meshlet_buffer.arena, meshlet) = ml;
       m->meshlet_count++;
    }
 }
@@ -336,23 +332,63 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
    }
 }
 
-// todo: should come before obj_load
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
+{
+   assert(data);
+   assert(scratch.data && scratch.size >= size);
+   memcpy(scratch.data, data, size);
+
+   vk_assert(vkResetCommandPool(device, cmd_pool, 0));
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
+
+   VkBufferCopy buffer_region = {0, 0, size};
+   vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
+
+   VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+   copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+   copy_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+   copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   copy_barrier.buffer = buffer.handle;
+   copy_barrier.size = size;
+   copy_barrier.offset = 0;
+
+#if RTX
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
+#else
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
+#endif
+
+   vk_assert(vkEndCommandBuffer(cmd_buffer));
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &cmd_buffer;
+
+   vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
+   // instead of explicit memory sync between queue submissions we wait all gpu jobs to complete
+   vk_assert(vkDeviceWaitIdle(device));
+}
 
 // TOOD: move into own file
-static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_buffer)
+static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 {
-   obj_vertex* vb_data = push(&obj_scratch, obj_vertex, MB(32));
-   u32* ib_data = push(&obj_scratch, u32, MB(64));
+   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
+   u32* ib_data = push(context->storage, u32, MB(64));
 
-   arena scratch = obj_scratch;
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
-   const char* filename = "buddha.obj";
+   //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
-   //const char* filename = "teapot3.obj";
+   const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
    //const char* filename = "living_room.obj";
@@ -368,7 +404,7 @@ static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_b
    tinyobj_attrib_init(&attrib);
 
    obj_user_ctx user_data = {};
-   user_data.scratch = obj_scratch;
+   user_data.scratch = *context->storage;
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
@@ -382,10 +418,10 @@ static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_b
 
    obj_table.max_count = index_count;
 
-   //scratch_clear(scratch);
+   arena table_scratch = *context->storage;
 
-   obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
-   obj_table.values = push(&scratch, hash_value, obj_table.max_count);
+   obj_table.keys = push(&table_scratch, hash_key, obj_table.max_count);
+   obj_table.values = push(&table_scratch, hash_value, obj_table.max_count);
 
    memset(obj_table.keys, -1, sizeof(hash_key) * obj_table.max_count);
 
@@ -448,13 +484,20 @@ static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_b
    obj_mesh.index_buffer = ib_data;
    obj_mesh.index_count = context->index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-   obj_mesh.meshlet_buffer = push(context->storage, meshlet, 0xffff); // max meshlet count on AMD
 
-   scratch = obj_scratch;
-   meshlet_build(scratch, &obj_mesh);
+   u8* meshlet_vertices = push(context->storage, u8, obj_mesh.vertex_count);
+
+   // 0xff means the vertex index is not in use yet
+   memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
+
+   // TODO: maker for arrays
+   obj_mesh.meshlet_buffer.arena = arena_new(context->storage->end, MB(1));
+   obj_mesh.meshlet_buffer.base = obj_mesh.meshlet_buffer.arena.beg;
+
+   meshlet_build(&obj_mesh, meshlet_vertices);
 
    context->meshlet_count = obj_mesh.meshlet_count;
-   context->meshlet_buffer = obj_mesh.meshlet_buffer;
+   context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
 #endif
 
    tinyobj_materials_free(materials, material_count);
@@ -472,52 +515,9 @@ static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_b
 #endif
 }
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
+static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 {
-   assert(scratch.data && scratch.size >= size);
-   memcpy(scratch.data, data, size);
-
-   vk_assert(vkResetCommandPool(device, cmd_pool, 0));
-
-   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
-   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-   vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
-
-   VkBufferCopy buffer_region = {0, 0, size};
-   vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
-
-   VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
-   copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-   copy_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-   copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-   copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-   copy_barrier.buffer = buffer.handle;
-   copy_barrier.size = size;
-   copy_barrier.offset = 0;
-
-#if RTX
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT,
-                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-#else
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-#endif
-
-   vk_assert(vkEndCommandBuffer(cmd_buffer));
-
-   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
-   submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &cmd_buffer;
-
-   vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
-   // instead of explicit memory sync between queue submissions we wait all gpu jobs to complete
-   vk_assert(vkDeviceWaitIdle(device));
-}
-
-static void vk_buffers_upload(vk_context* context, arena scratch, vk_buffer scratch_buffer)
-{
-   obj_load(context, scratch, scratch_buffer);
+   obj_load(context, scratch_buffer);
 }
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
@@ -1840,9 +1840,9 @@ bool vk_initialize(hw* hw)
    context->vb = vertex_buffer;
 
 #if RTX
-   vk_buffers_upload(context, *context->storage, scratch_buffer);
+   vk_buffers_upload(context, scratch_buffer);
 #else
-   vk_buffers_upload(context, *context->storage, scratch_buffer);
+   vk_buffers_upload(context, scratch_buffer);
 #endif
 
    return true;
