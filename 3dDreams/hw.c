@@ -187,8 +187,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
          break;
 
       app_input_function(&input);
-      // TODO: Fix this
-      //app_frame_function(hw->vk_scratch, &state);
+      app_frame_function(hw->vk_storage, &state);
 
       // TODO: Use perf counters for better granularity
       hw_frame_sync(hw);

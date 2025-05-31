@@ -296,18 +296,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
    hw.vk_storage = base_storage;
 
-   // TODO: this is now bad with expandable arenas - make only single global arena and pass it
-   //hw.vk_storage.beg = base_storage.beg;
-   //hw.vk_storage.end = (char*)hw.vk_storage.beg + total_arena_size/4;
-
-   //hw.vk_scratch.beg = hw.vk_storage.end;
-   //hw.vk_scratch.end = (char*)hw.vk_scratch.beg + total_arena_size/4;
-
-   //hw.misc_storage.beg = hw.vk_scratch.end;
-   //hw.misc_storage.end = (char*)hw.misc_storage.beg + total_arena_size/2;
-
-   //assert(hw.misc_storage.end == base_storage.end);
-
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
    hw.renderer.window_surface_create = window_surface_create;

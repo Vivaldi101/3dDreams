@@ -347,10 +347,10 @@ static void obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      //const char* filename = "buddha.obj";
+      const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      const char* filename = "teapot3.obj";
+      //const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -1181,7 +1181,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 12.0f;
+   f32 radius = 2.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
