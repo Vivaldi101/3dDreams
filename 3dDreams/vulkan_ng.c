@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -236,17 +236,121 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    *buf = file_read.beg;
 }
 
+static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
+{
+   assert(vk_valid_handle(logical_device));
+
+   arena project_dir = vk_project_directory(&scratch);
+
+   size shader_len = strlen(shader_name);
+   assert(shader_len != 0u);
+
+   VkShaderStageFlagBits shader_stage = 0;
+
+   for(size i = 0; i < shader_len; ++i)
+   {
+      usize mesh_len = strlen("mesh.spv");
+      if(strncmp(shader_name+i, "mesh.spv", mesh_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+         break;
+      }
+
+      usize vert_len = strlen("vert.spv");
+      if(strncmp(shader_name+i, "vert.spv", vert_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
+         break;
+      }
+
+      usize frag_len = strlen("frag.spv");
+      if(strncmp(shader_name+i, "frag.spv", frag_len) == 0)
+      {
+         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+         break;
+      }
+   }
+
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir.beg, shader_name);
+
+   switch(shader_stage)
+   {
+      case VK_SHADER_STAGE_MESH_BIT_EXT:
+         shader_modules->ms = shader_module;
+         break;
+      case VK_SHADER_STAGE_VERTEX_BIT:
+         shader_modules->vs = shader_module;
+         break;
+      case VK_SHADER_STAGE_FRAGMENT_BIT:
+         shader_modules->fs = shader_module;
+         break;
+      default: break;
+   }
+}
+
+static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names)
+{
+   assert(vk_valid_handle(logical_device));
+
+   // TODO: make function for hash tables
+   table->keys = push(&scratch, const char*, table->max_count);
+   table->values = push(&scratch, vk_shader_modules, table->max_count);
+
+   memset(table->values, 0, table->max_count * sizeof(vk_shader_modules));
+
+   for(size i = 0; i < table->max_count; ++i)
+      table->keys[i] = 0;
+
+   // TODO: routine to iterate over hash values
+
+   // Compile all the shaders
+   for(const char** p = shader_names; p && *p; ++p)
+   {
+      usize shader_len = strlen(*p);
+      const char* shader_name = *p;
+
+      for(usize i = 0; i < shader_len; ++i)
+      {
+         // TODO: cleanup this mess
+#if RTX
+         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
+         {
+            vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
+            vk_shader_load(logical_device, scratch, *p, &ms);
+            spv_hash_insert(table, "meshlet", ms);
+            break;
+         }
+#else
+         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
+         {
+            vk_shader_modules gm = spv_hash_lookup(table, "graphics");
+            vk_shader_load(logical_device, scratch, *p, &gm);
+            spv_hash_insert(table, "graphics", gm);
+            break;
+         }
+#endif
+         if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
+         {
+            vk_shader_modules am = spv_hash_lookup(table, "axis");
+            vk_shader_load(logical_device, scratch, *p, &am);
+            spv_hash_insert(table, "axis", am);
+            break;
+         }
+      }
+   }
+}
+
 // TOOD: move into own file
-static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
+static void obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
 {
       arena scratch = obj_scratch;
       index_hash_table obj_table = {};
 
       mesh obj_mesh = {};
-      const char* filename = "buddha.obj";
+      //const char* filename = "buddha.obj";
       //const char* filename = "hairball.obj";
       //const char* filename = "dragon.obj";
-      //const char* filename = "teapot3.obj";
+      const char* filename = "teapot3.obj";
       //const char* filename = "erato.obj";
       //const char* filename = "living_room.obj";
       //const char* filename = "san-miguel.obj";
@@ -264,10 +368,7 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       user_data.scratch = obj_scratch;
 
       if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
-      {
          hw_message("Could not load .obj file");
-         return false;
-      }
 
       // only triangles allowed
       assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
@@ -275,8 +376,8 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       const usize index_count = attrib.num_faces;
 
       // TODO: Do wp on ib_size and vb_size
-      if(index_count > (u32)~0u)
-         return false;
+      //if(index_count > (u32)~0u)
+         //return false;
 
       obj_table.max_count = index_count;
 
@@ -359,8 +460,6 @@ static bool obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       tinyobj_materials_free(materials, material_count);
       tinyobj_shapes_free(shapes, shape_count);
       tinyobj_attrib_free(&attrib);
-
-      return true;
 }
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
@@ -404,6 +503,31 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions we wait all gpu jobs to complete
    vk_assert(vkDeviceWaitIdle(device));
+}
+
+// TODO: rename
+static void vk_buffers_initialize(vk_context* context, arena scratch, vk_buffer scratch_buffer, vk_buffer index_buffer, vk_buffer vertex_buffer)
+{
+   obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
+   size vb_size = 0;
+
+   u32* ib_data = push(&scratch, u32, MB(32));
+   size ib_size = 0;
+
+   obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size);
+
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb, 
+      scratch_buffer, vb_data, vb_size);
+   memset(scratch_buffer.data, 0, scratch_buffer.size);
+
+#if RTX
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
+   memset(scratch_buffer.data, 0, scratch_buffer.size);
+#else
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
+      scratch_buffer, ib_data, ib_size);
+#endif
 }
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
@@ -1057,7 +1181,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 2.0f;
+   f32 radius = 12.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1268,60 +1392,6 @@ static void vk_present(hw* hw, vk_context* context)
       timer = hw->timer.time();
    }
    begin = end;
-}
-
-static bool vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
-{
-   assert(vk_valid_handle(logical_device));
-
-   arena project_dir = vk_project_directory(&scratch);
-
-   size shader_len = strlen(shader_name);
-   assert(shader_len != 0u);
-
-   VkShaderStageFlagBits shader_stage = 0;
-
-   for(size i = 0; i < shader_len; ++i)
-   {
-      usize mesh_len = strlen("mesh.spv");
-      if(strncmp(shader_name+i, "mesh.spv", mesh_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-         break;
-      }
-
-      usize vert_len = strlen("vert.spv");
-      if(strncmp(shader_name+i, "vert.spv", vert_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
-         break;
-      }
-
-      usize frag_len = strlen("frag.spv");
-      if(strncmp(shader_name+i, "frag.spv", frag_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-         break;
-      }
-   }
-
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir.beg, shader_name);
-
-   switch(shader_stage)
-   {
-      case VK_SHADER_STAGE_MESH_BIT_EXT:
-         shader_modules->ms = shader_module;
-         break;
-      case VK_SHADER_STAGE_VERTEX_BIT:
-         shader_modules->vs = shader_module;
-         break;
-      case VK_SHADER_STAGE_FRAGMENT_BIT:
-         shader_modules->fs = shader_module;
-         break;
-      default: break;
-   }
-
-   return true;
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device)
@@ -1680,8 +1750,7 @@ bool vk_initialize(hw* hw)
 
    context->storage = &hw->vk_storage;
 
-   arena scratch = hw->vk_scratch;
-   VkInstance instance = vk_instance_create(scratch);
+   VkInstance instance = vk_instance_create(*context->storage);
 
    if(!instance)
       return 0;
@@ -1734,63 +1803,15 @@ bool vk_initialize(hw* hw)
       return false;
 
    u32 shader_count = 0;
-   const char** shader_names = vk_shader_folder_read(&scratch, "bin\\assets\\shaders");
+   const char** shader_names = vk_shader_folder_read(context->storage, "bin\\assets\\shaders");
    for(const char** p = shader_names; p && *p; ++p)
       shader_count++;
 
-   // TODO: store this inside the context
+   // TODO: store this inside the context?
    spv_hash_table shader_hash_table = {};
    shader_hash_table.max_count = shader_count;
 
-   // TODO: make function for hash tables
-   shader_hash_table.keys = push(&scratch, const char*, shader_hash_table.max_count);
-   shader_hash_table.values = push(&scratch, vk_shader_modules, shader_hash_table.max_count);
-
-   memset(shader_hash_table.values, 0, shader_hash_table.max_count * sizeof(vk_shader_modules));
-
-   for(size i = 0; i < shader_hash_table.max_count; ++i)
-      shader_hash_table.keys[i] = 0;
-
-   // TODO: routine to iterate over hash values
-
-   // Compile all the shaders
-   for(const char** p = shader_names; p && *p; ++p)
-   {
-      usize shader_len = strlen(*p);
-      const char* shader_name = *p;
-
-      for(usize i = 0; i < shader_len; ++i)
-      {
-         // TODO: cleanup this mess
-#if RTX
-         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
-         {
-            vk_shader_modules ms = spv_hash_lookup(&shader_hash_table, "meshlet");
-            if(!vk_shader_load(context->logical_device, scratch, *p, &ms))
-               return false;
-            spv_hash_insert(&shader_hash_table, "meshlet", ms);
-            break;
-         }
-#else
-         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
-         {
-            vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
-            if(!vk_shader_load(context->logical_device, scratch, *p, &gm))
-               return false;
-            spv_hash_insert(&shader_hash_table, "graphics", gm);
-            break;
-         }
-#endif
-         if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
-         {
-            vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
-            if(!vk_shader_load(context->logical_device, scratch, *p, &am))
-               return false;
-            spv_hash_insert(&shader_hash_table, "axis", am);
-            break;
-         }
-      }
-   }
+   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names);
 
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device);
@@ -1831,31 +1852,9 @@ bool vk_initialize(hw* hw)
 #if RTX
    context->mb = meshlet_buffer;
 #endif
-   // TODO: semcompress
-   scratch = hw->vk_scratch;
 
-   obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
-   size vb_size = 0;
-
-   u32* ib_data = push(&scratch, u32, MB(32));
-   size ib_size = 0;
-
-   // Load meshes
-   if(!obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size))
-      return false;
-
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb, 
-      scratch_buffer, vb_data, vb_size);
-   memset(scratch_buffer.data, 0, scratch_buffer.size);
-
-#if RTX
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
-      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
-   memset(scratch_buffer.data, 0, scratch_buffer.size);
-#else
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
-      scratch_buffer, ib_data, ib_size);
-#endif
+   // TODO: pass meshlet buffer too
+   vk_buffers_initialize(context, *context->storage, scratch_buffer, index_buffer, vertex_buffer);
 
    return true;
 }

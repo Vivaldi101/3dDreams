@@ -31,8 +31,8 @@ align_struct hw
 {
    hw_renderer renderer;
    arena vk_storage;
-   arena vk_scratch;
-   arena misc_storage;
+   //arena vk_scratch;
+   //arena misc_storage;
    hw_timer timer;
    void (*log)(hw* hw, s8 message, ...);
    bool(*platform_loop)();
@@ -187,7 +187,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
          break;
 
       app_input_function(&input);
-      app_frame_function(hw->vk_scratch, &state);
+      // TODO: Fix this
+      //app_frame_function(hw->vk_scratch, &state);
 
       // TODO: Use perf counters for better granularity
       hw_frame_sync(hw);

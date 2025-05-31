@@ -290,20 +290,23 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
 
-   size total_arena_size = MB(256);
+   size total_arena_size = MB(8);
    arena base_storage = arena_new(base, total_arena_size);
    assert(arena_left(&base_storage) == total_arena_size);
 
-   hw.vk_storage.beg = base_storage.beg;
-   hw.vk_storage.end = (char*)hw.vk_storage.beg + total_arena_size/4;
+   hw.vk_storage = base_storage;
 
-   hw.vk_scratch.beg = hw.vk_storage.end;
-   hw.vk_scratch.end = (char*)hw.vk_scratch.beg + total_arena_size/4;
+   // TODO: this is now bad with expandable arenas - make only single global arena and pass it
+   //hw.vk_storage.beg = base_storage.beg;
+   //hw.vk_storage.end = (char*)hw.vk_storage.beg + total_arena_size/4;
 
-   hw.misc_storage.beg = hw.vk_scratch.end;
-   hw.misc_storage.end = (char*)hw.misc_storage.beg + total_arena_size/2;
+   //hw.vk_scratch.beg = hw.vk_storage.end;
+   //hw.vk_scratch.end = (char*)hw.vk_scratch.beg + total_arena_size/4;
 
-   assert(hw.misc_storage.end == base_storage.end);
+   //hw.misc_storage.beg = hw.vk_scratch.end;
+   //hw.misc_storage.end = (char*)hw.misc_storage.beg + total_arena_size/2;
+
+   //assert(hw.misc_storage.end == base_storage.end);
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
