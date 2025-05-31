@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -502,15 +502,16 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-// TODO: rename
 static void vk_buffers_initialize(vk_context* context, arena scratch, vk_buffer scratch_buffer)
 {
+   // TODO: these vb and ib datas should be allocated inside obj_load along with scratch_buffer upload
    obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
    size vb_size = 0;
 
    u32* ib_data = push(&scratch, u32, MB(32));
    size ib_size = 0;
 
+   // TODO: make this return scratch vk_buffer and use it within this function
    obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size);
 
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb, 
@@ -1750,7 +1751,7 @@ bool vk_initialize(hw* hw)
    VkInstance instance = vk_instance_create(*context->storage);
 
    if(!instance)
-      return 0;
+      return false;
 
    volkLoadInstance(instance);
 
