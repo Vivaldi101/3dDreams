@@ -110,6 +110,8 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    assert(((uptr)p & (align - 1)) == 0);                             // aligned result
 
+   memset(p, 0, (count*alloc_size));
+
    return p;
 }
 

@@ -59,9 +59,9 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static void meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
+static void meshlet_build(arena meshlet_scratch, mesh* m)
 {
-   //scratch_clear(meshlet_scratch);
+   scratch_clear(meshlet_scratch);
 
    meshlet ml = {};
 
@@ -94,8 +94,7 @@ static void meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* pml = push(meshlet_storage, meshlet);
-         *pml = ml;
+         m->meshlet_buffer[m->meshlet_count] = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -138,8 +137,7 @@ static void meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      meshlet* pml = push(meshlet_storage, meshlet);
-      *pml = ml;
+      m->meshlet_buffer[m->meshlet_count] = ml;
       m->meshlet_count++;
    }
 }
@@ -338,125 +336,140 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
    }
 }
 
+// todo: should come before obj_load
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
+
 // TOOD: move into own file
-static void obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data, size* vb_size, u32* ib_data, size* ib_size)
+static void obj_load(vk_context* context, arena obj_scratch, vk_buffer scratch_buffer)
 {
-      arena scratch = obj_scratch;
-      index_hash_table obj_table = {};
+   obj_vertex* vb_data = push(&obj_scratch, obj_vertex, MB(32));
+   u32* ib_data = push(&obj_scratch, u32, MB(64));
 
-      mesh obj_mesh = {};
-      const char* filename = "buddha.obj";
-      //const char* filename = "hairball.obj";
-      //const char* filename = "dragon.obj";
-      //const char* filename = "teapot3.obj";
-      //const char* filename = "erato.obj";
-      //const char* filename = "living_room.obj";
-      //const char* filename = "san-miguel.obj";
+   arena scratch = obj_scratch;
+   index_hash_table obj_table = {};
 
-      tinyobj_shape_t* shapes = 0;
-      tinyobj_material_t* materials = 0;
-      tinyobj_attrib_t attrib = {};
+   mesh obj_mesh = {};
+   const char* filename = "buddha.obj";
+   //const char* filename = "hairball.obj";
+   //const char* filename = "dragon.obj";
+   //const char* filename = "teapot3.obj";
+   //const char* filename = "cube.obj";
+   //const char* filename = "erato.obj";
+   //const char* filename = "living_room.obj";
+   //const char* filename = "san-miguel.obj";
 
-      size_t shape_count = 0;
-      size_t material_count = 0;
+   tinyobj_shape_t* shapes = 0;
+   tinyobj_material_t* materials = 0;
+   tinyobj_attrib_t attrib = {};
 
-      tinyobj_attrib_init(&attrib);
+   size_t shape_count = 0;
+   size_t material_count = 0;
 
-      obj_user_ctx user_data = {};
-      user_data.scratch = obj_scratch;
+   tinyobj_attrib_init(&attrib);
 
-      if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
-         hw_message("Could not load .obj file");
+   obj_user_ctx user_data = {};
+   user_data.scratch = obj_scratch;
 
-      // only triangles allowed
-      assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+      hw_message("Could not load .obj file");
 
-      const usize index_count = attrib.num_faces;
+   // only triangles allowed
+   assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
 
-      // TODO: Do wp on ib_size and vb_size
-      //if(index_count > (u32)~0u)
-         //return false;
+   const usize index_count = attrib.num_faces;
 
-      obj_table.max_count = index_count;
+   assert((size)index_count*sizeof(u32) <= (u32)~0u);
 
-      //scratch_clear(scratch);
+   obj_table.max_count = index_count;
 
-      obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
-      obj_table.values = push(&scratch, hash_value, obj_table.max_count);
+   //scratch_clear(scratch);
 
-      memset(obj_table.keys, -1, sizeof(hash_key)*obj_table.max_count);
+   obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
+   obj_table.values = push(&scratch, hash_value, obj_table.max_count);
 
-      u32 vertex_index = 0;
-      u32 primitive_index = 0;
+   memset(obj_table.keys, -1, sizeof(hash_key) * obj_table.max_count);
 
-      for(usize f = 0; f < index_count; f += 3)
+   u32 vertex_index = 0;
+   u32 primitive_index = 0;
+
+   for(usize f = 0; f < index_count; f += 3)
+   {
+      const tinyobj_vertex_index_t* vidx = attrib.faces + f;
+
+      for(usize i = 0; i < 3; ++i)
       {
-         const tinyobj_vertex_index_t* vidx = attrib.faces + f;
+         i32 vi = vidx[i].v_idx;
+         i32 vti = vidx[i].vt_idx;
+         i32 vni = vidx[i].vn_idx;
 
-         for(usize i = 0; i < 3; ++i)
+         hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+         hash_value lookup = hash_lookup(&obj_table, index);
+
+         if(lookup == ~0u)
          {
-            i32 vi = vidx[i].v_idx;
-            i32 vti = vidx[i].vt_idx;
-            i32 vni = vidx[i].vn_idx;
-
-            hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-            hash_value lookup = hash_lookup(&obj_table, index);
-
-            if(lookup == ~0u)
+            obj_vertex v = {};
+            if(vi >= 0)
             {
-               obj_vertex v = {};
-               if(vi >= 0)
-               {
-                  v.vx = attrib.vertices[vi * 3 + 0];
-                  v.vy = attrib.vertices[vi * 3 + 1];
-                  v.vz = attrib.vertices[vi * 3 + 2];
-               }
-
-               if(vni >= 0)
-               {
-                  f32 nx = attrib.normals[vni * 3 + 0];
-                  f32 ny = attrib.normals[vni * 3 + 1];
-                  f32 nz = attrib.normals[vni * 3 + 2];
-                  v.nx = (u8)(nx * 127.f + 127.f);
-                  v.ny = (u8)(ny * 127.f + 127.f);
-                  v.nz = (u8)(nz * 127.f + 127.f);
-               }
-
-               if(vti >= 0)
-               {
-                  v.tu = attrib.texcoords[vti * 2 + 0];
-                  v.tv = attrib.texcoords[vti * 2 + 1];
-               }
-
-               hash_insert(&obj_table, index, vertex_index);
-               ib_data[primitive_index++] = vertex_index;
-               vb_data[vertex_index++] = v;
+               v.vx = attrib.vertices[vi * 3 + 0];
+               v.vy = attrib.vertices[vi * 3 + 1];
+               v.vz = attrib.vertices[vi * 3 + 2];
             }
-            else
-               ib_data[primitive_index++] = lookup;
-         }
-      }
 
-      context->index_count = (u32)index_count;
-      *ib_size = index_count*sizeof(u32);
-      *vb_size = vertex_index*sizeof(obj_vertex);
+            if(vni >= 0)
+            {
+               f32 nx = attrib.normals[vni * 3 + 0];
+               f32 ny = attrib.normals[vni * 3 + 1];
+               f32 nz = attrib.normals[vni * 3 + 2];
+               v.nx = (u8)(nx * 127.f + 127.f);
+               v.ny = (u8)(ny * 127.f + 127.f);
+               v.nz = (u8)(nz * 127.f + 127.f);
+            }
+
+            if(vti >= 0)
+            {
+               v.tu = attrib.texcoords[vti * 2 + 0];
+               v.tv = attrib.texcoords[vti * 2 + 1];
+            }
+
+            hash_insert(&obj_table, index, vertex_index);
+            ib_data[primitive_index++] = vertex_index;
+            vb_data[vertex_index++] = v;
+         }
+         else
+            ib_data[primitive_index++] = lookup;
+      }
+   }
+
+   context->index_count = (u32)index_count;
+   usize ib_size = index_count * sizeof(u32);
+   usize vb_size = vertex_index * sizeof(obj_vertex);
 
 #if RTX 
-      obj_mesh.index_buffer = ib_data;
-      obj_mesh.index_count = context->index_count;
-      obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-      obj_mesh.meshlet_buffer = context->storage->beg;
+   obj_mesh.index_buffer = ib_data;
+   obj_mesh.index_count = context->index_count;
+   obj_mesh.vertex_count = obj_table.count;  // unique vertex count
+   obj_mesh.meshlet_buffer = push(context->storage, meshlet, 0xffff); // max meshlet count on AMD
 
-      scratch = obj_scratch;
-      meshlet_build(context->storage, scratch, &obj_mesh);
+   scratch = obj_scratch;
+   meshlet_build(scratch, &obj_mesh);
 
-      context->meshlet_count = obj_mesh.meshlet_count;
-      context->meshlet_buffer = obj_mesh.meshlet_buffer;
+   context->meshlet_count = obj_mesh.meshlet_count;
+   context->meshlet_buffer = obj_mesh.meshlet_buffer;
 #endif
 
-      tinyobj_materials_free(materials, material_count);
-      tinyobj_shapes_free(shapes, shape_count);
-      tinyobj_attrib_free(&attrib);
+   tinyobj_materials_free(materials, material_count);
+   tinyobj_shapes_free(shapes, shape_count);
+   tinyobj_attrib_free(&attrib);
+
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+      scratch_buffer, vb_data, vb_size);
+#if RTX
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
+#else
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
+      scratch_buffer, ib_data, ib_size);
+#endif
 }
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
@@ -502,30 +515,9 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-static void vk_buffers_initialize(vk_context* context, arena scratch, vk_buffer scratch_buffer)
+static void vk_buffers_upload(vk_context* context, arena scratch, vk_buffer scratch_buffer)
 {
-   // TODO: these vb and ib datas should be allocated inside obj_load along with scratch_buffer upload
-   obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
-   size vb_size = 0;
-
-   u32* ib_data = push(&scratch, u32, MB(32));
-   size ib_size = 0;
-
-   // TODO: make this return scratch vk_buffer and use it within this function
-   obj_load(context, scratch, vb_data, &vb_size, ib_data, &ib_size);
-
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb, 
-      scratch_buffer, vb_data, vb_size);
-   memset(scratch_buffer.data, 0, scratch_buffer.size);
-
-#if RTX
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
-      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
-   memset(scratch_buffer.data, 0, scratch_buffer.size);
-#else
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
-      scratch_buffer, ib_data, ib_size);
-#endif
+   obj_load(context, scratch, scratch_buffer);
 }
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
@@ -1179,9 +1171,9 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 2.0f;
+   f32 radius = 12.0f;
    f32 theta = DEG2RAD(rot);
-   f32 height = 2.0f;
+   f32 height = 6.0f;
 
    vec3 eye =
    {
@@ -1283,12 +1275,7 @@ static void vk_present(hw* hw, vk_context* context)
    descriptors[1].pBufferInfo = &mb_info;
 
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
-   // TODO: testing 
-   static u32 meshlet_count = 0;
-   meshlet_count += 10;
-   // max meshlet count
-   meshlet_count %= 0xffff;
-   vkCmdDrawMeshTasksEXT(command_buffer, 0xffff-10, 1, 1);
+   vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
 #else
 
    VkWriteDescriptorSet descriptors[1] = {};
@@ -1845,16 +1832,17 @@ bool vk_initialize(hw* hw)
    if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE || scratch_buffer.handle == VK_NULL_HANDLE)
       return false;
 
-   context->vb = vertex_buffer;
-   context->ib = index_buffer;
 #if RTX
    context->mb = meshlet_buffer;
+#else
+   context->ib = index_buffer;
 #endif
+   context->vb = vertex_buffer;
 
 #if RTX
-   vk_buffers_initialize(context, *context->storage, scratch_buffer);
+   vk_buffers_upload(context, *context->storage, scratch_buffer);
 #else
-   vk_buffers_initialize(context, *context->storage, scratch_buffer);
+   vk_buffers_upload(context, *context->storage, scratch_buffer);
 #endif
 
    return true;
