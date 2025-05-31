@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -59,7 +59,7 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
+static void meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m)
 {
    //scratch_clear(meshlet_scratch);
 
@@ -142,8 +142,6 @@ static bool meshlet_build(arena* meshlet_storage, arena meshlet_scratch, mesh* m
       *pml = ml;
       m->meshlet_count++;
    }
-
-   return true;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
@@ -450,8 +448,7 @@ static void obj_load(vk_context* context, arena obj_scratch, obj_vertex* vb_data
       obj_mesh.meshlet_buffer = context->storage->beg;
 
       scratch = obj_scratch;
-      if(!meshlet_build(context->storage, scratch, &obj_mesh))
-         return false;
+      meshlet_build(context->storage, scratch, &obj_mesh);
 
       context->meshlet_count = obj_mesh.meshlet_count;
       context->meshlet_buffer = obj_mesh.meshlet_buffer;
@@ -1853,8 +1850,11 @@ bool vk_initialize(hw* hw)
    context->mb = meshlet_buffer;
 #endif
 
-   // TODO: pass meshlet buffer too
+#if RTX
+   vk_buffers_initialize(context, *context->storage, scratch_buffer, meshlet_buffer, vertex_buffer);
+#else
    vk_buffers_initialize(context, *context->storage, scratch_buffer, index_buffer, vertex_buffer);
+#endif
 
    return true;
 }
