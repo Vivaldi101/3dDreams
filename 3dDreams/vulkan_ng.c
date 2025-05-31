@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -503,7 +503,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 }
 
 // TODO: rename
-static void vk_buffers_initialize(vk_context* context, arena scratch, vk_buffer scratch_buffer, vk_buffer index_buffer, vk_buffer vertex_buffer)
+static void vk_buffers_initialize(vk_context* context, arena scratch, vk_buffer scratch_buffer)
 {
    obj_vertex* vb_data = push(&scratch, obj_vertex, MB(16));
    size vb_size = 0;
@@ -1841,7 +1841,7 @@ bool vk_initialize(hw* hw)
    if(meshlet_buffer.handle == VK_NULL_HANDLE)
       return false;
 #endif
-   if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE)
+   if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE || scratch_buffer.handle == VK_NULL_HANDLE)
       return false;
 
    context->vb = vertex_buffer;
@@ -1851,9 +1851,9 @@ bool vk_initialize(hw* hw)
 #endif
 
 #if RTX
-   vk_buffers_initialize(context, *context->storage, scratch_buffer, meshlet_buffer, vertex_buffer);
+   vk_buffers_initialize(context, *context->storage, scratch_buffer);
 #else
-   vk_buffers_initialize(context, *context->storage, scratch_buffer, index_buffer, vertex_buffer);
+   vk_buffers_initialize(context, *context->storage, scratch_buffer);
 #endif
 
    return true;
