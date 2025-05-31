@@ -387,8 +387,8 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    mesh obj_mesh = {};
    //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
-   const char* filename = "teapot3.obj";
+   const char* filename = "dragon.obj";
+   //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
    //const char* filename = "living_room.obj";
@@ -491,7 +491,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
 
    // TODO: maker for arrays
-   obj_mesh.meshlet_buffer.arena = arena_new(context->storage->end, MB(1));
+   obj_mesh.meshlet_buffer.arena = arena_new(context->storage->end, MB(128));
    obj_mesh.meshlet_buffer.base = obj_mesh.meshlet_buffer.arena.beg;
 
    meshlet_build(&obj_mesh, meshlet_vertices);
@@ -508,7 +508,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
       scratch_buffer, vb_data, vb_size);
 #if RTX
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
-      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(*context->meshlet_buffer));
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(meshlet));
 #else
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
       scratch_buffer, ib_data, ib_size);
@@ -1171,9 +1171,9 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 12.0f;
+   f32 radius = 2.0f;
    f32 theta = DEG2RAD(rot);
-   f32 height = 6.0f;
+   f32 height = 2.0f;
 
    vec3 eye =
    {
