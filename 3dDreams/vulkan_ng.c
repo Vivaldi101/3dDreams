@@ -403,7 +403,7 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
    u32 primitive_index = 0;
 
    u32* ib_data = push(context->storage, u32, index_count);
-   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(10));
+   arena vb_data = arena_new(context->storage, MB(10));
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -446,7 +446,9 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 
             hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index++] = vertex_index;
-            vb_data[vertex_index++] = v;
+            //vb_data[vertex_index++] = v;
+            *push(&vb_data, obj_vertex) = v;
+            vertex_index++;
          }
          else
             ib_data[primitive_index++] = lookup;
@@ -478,7 +480,7 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 #endif
 
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data, vb_size);
+      scratch_buffer, vb_data.base, vb_size);
 #if RTX
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
       scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(meshlet));
@@ -502,9 +504,9 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
+   const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
