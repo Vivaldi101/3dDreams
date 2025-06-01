@@ -42,7 +42,7 @@ typedef struct
    size vertex_count;
    u32* index_buffer;         // vertex indices
    size index_count;
-   arena* meshlet_buffer;
+   arena meshlet_buffer;
    u32 meshlet_count;
 } mesh;
 
@@ -87,7 +87,7 @@ static void meshlet_build(mesh* m, u8* meshlet_vertices)
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* mp = push(m->meshlet_buffer, meshlet);
+         meshlet* mp = push(&m->meshlet_buffer, meshlet);
 
          *mp = ml;
 
@@ -136,7 +136,7 @@ static void meshlet_build(mesh* m, u8* meshlet_vertices)
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      *push(m->meshlet_buffer, meshlet) = ml;
+      *push(&m->meshlet_buffer, meshlet) = ml;
       m->meshlet_count++;
    }
 }
@@ -388,8 +388,8 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
-   //const char* filename = "buddha.obj";
-   const char* filename = "hairball.obj";
+   const char* filename = "buddha.obj";
+   //const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
@@ -492,7 +492,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    arena meshlets = arena_new(context->storage, MB(1));
    u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
    meshlets.base = 0;
-   obj_mesh.meshlet_buffer = &meshlets;
+   obj_mesh.meshlet_buffer = meshlets;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
@@ -500,7 +500,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    meshlet_build(&obj_mesh, meshlet_vertices);
 
    context->meshlet_count = obj_mesh.meshlet_count;
-   context->meshlet_buffer = obj_mesh.meshlet_buffer->base;
+   context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
 #endif
 
    tinyobj_materials_free(materials, material_count);
