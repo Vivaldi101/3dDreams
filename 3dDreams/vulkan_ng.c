@@ -19,7 +19,7 @@
 
 typedef struct 
 {
-   arena scratch;
+   arena* scratch;
 } obj_user_ctx;
 
 typedef struct 
@@ -42,7 +42,7 @@ typedef struct
    size vertex_count;
    u32* index_buffer;         // vertex indices
    size index_count;
-   array meshlet_buffer;
+   arena* meshlet_buffer;
    u32 meshlet_count;
 } mesh;
 
@@ -87,9 +87,9 @@ static void meshlet_build(mesh* m, u8* meshlet_vertices)
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         //((meshlet*)m->meshlet_buffer.base)[m->meshlet_count] = ml;
+         meshlet* mp = push(m->meshlet_buffer, meshlet);
 
-         *push(&m->meshlet_buffer.arena, meshlet) = ml;
+         *mp = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -103,6 +103,10 @@ static void meshlet_build(mesh* m, u8* meshlet_vertices)
          // begin another meshlet
          struct_clear(ml);
       }
+
+      assert(i0 < vertex_count);
+      assert(i1 < vertex_count);
+      assert(i2 < vertex_count);
 
       meshlet_add_new_vertex_index(i0, meshlet_vertices, &ml);
       meshlet_add_new_vertex_index(i1, meshlet_vertices, &ml);
@@ -132,8 +136,7 @@ static void meshlet_build(mesh* m, u8* meshlet_vertices)
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      //((meshlet*)m->meshlet_buffer.base)[m->meshlet_count] = ml;
-      *push(&m->meshlet_buffer.arena, meshlet) = ml;
+      *push(m->meshlet_buffer, meshlet) = ml;
       m->meshlet_count++;
    }
 }
@@ -217,12 +220,12 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
 
-   arena project_dir = vk_project_directory(&user_data->scratch);
+   arena project_dir = vk_project_directory(user_data->scratch);
 
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
    wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, filename);
 
-   arena file_read = win32_file_read(&user_data->scratch, shader_path);
+   arena file_read = win32_file_read(user_data->scratch, shader_path);
 
    *len = scratch_left(file_read);
    *buf = file_read.beg;
@@ -385,9 +388,9 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
-   //const char* filename = "buddha.obj";
+   const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   const char* filename = "dragon.obj";
+   //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
@@ -404,7 +407,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    tinyobj_attrib_init(&attrib);
 
    obj_user_ctx user_data = {};
-   user_data.scratch = *context->storage;
+   user_data.scratch = context->storage;
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
@@ -420,8 +423,8 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 
    arena table_scratch = *context->storage;
 
-   obj_table.keys = push(&table_scratch, hash_key, obj_table.max_count);
-   obj_table.values = push(&table_scratch, hash_value, obj_table.max_count);
+   obj_table.keys = push(context->storage, hash_key, obj_table.max_count);
+   obj_table.values = push(context->storage, hash_value, obj_table.max_count);
 
    memset(obj_table.keys, -1, sizeof(hash_key) * obj_table.max_count);
 
@@ -484,20 +487,21 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    obj_mesh.index_buffer = ib_data;
    obj_mesh.index_count = context->index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
+   // TODO: maker for arrays
+   // TODO: fix this bug - this seems to not work with expanding arenas for mesh shading
+   arena meshlets = arena_new(context->storage, KB(4));
 
-   u8* meshlet_vertices = push(context->storage, u8, obj_mesh.vertex_count);
+   u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
+   meshlets.base = 0;
+   obj_mesh.meshlet_buffer = &meshlets;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
 
-   // TODO: maker for arrays
-   obj_mesh.meshlet_buffer.arena = arena_new(context->storage->end, MB(128));
-   obj_mesh.meshlet_buffer.base = obj_mesh.meshlet_buffer.arena.beg;
-
    meshlet_build(&obj_mesh, meshlet_vertices);
 
    context->meshlet_count = obj_mesh.meshlet_count;
-   context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
+   context->meshlet_buffer = obj_mesh.meshlet_buffer->base;
 #endif
 
    tinyobj_materials_free(materials, material_count);

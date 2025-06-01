@@ -60,24 +60,27 @@ typedef struct arena
 {
    void* beg;
    void* end;  // one past the end
+   void* base;
 } arena;
 
-typedef struct array
+static bool hw_is_virtual_memory_commited(void* address)
 {
-   arena arena;
-   void* base;
-   size count; // TODO: not used atm
-} array;
+   MEMORY_BASIC_INFORMATION mbi;
+   if(VirtualQuery(address, &mbi, sizeof(mbi)) == 0)
+      return false;
+
+   return mbi.State == MEM_COMMIT;
+}
 
 // TODO: use GetSystemInfo
-// TODO: pass arena as base and get its end
-static arena arena_new(void* base, size cap)
+static arena arena_new(arena* base, size cap)
 {
-   assert(base && cap > 0);
+   assert(base->end && cap > 0);
+   assert(!hw_is_virtual_memory_commited(base->end));
 
    arena result = {0};
 
-   result.beg = VirtualAlloc(base, cap, MEM_COMMIT, PAGE_READWRITE);
+   result.beg = VirtualAlloc(base->end, cap, MEM_COMMIT, PAGE_READWRITE);
    result.end = (byte*)result.beg + cap;
 
    assert(result.beg < result.end);
@@ -88,22 +91,21 @@ static arena arena_new(void* base, size cap)
 static void arena_expand(arena* a, size new_cap)
 {
    assert((uintptr_t)a->end <= ((1ull << 48)-1) - page_size);
-   arena new_arena = arena_new((byte*)a->end, new_cap);
-   new_arena.beg = a->end;
+   arena new_arena = arena_new(a, new_cap);
 
+   assert(new_arena.beg > a->beg);
    assert(new_arena.beg == a->end);
+   assert(new_arena.end > a->end);
 
-   a->beg = new_arena.beg; // expanded arena beginning
-   a->end = (byte*)a->beg + new_cap;
+   a->end = (byte*)new_arena.beg + new_cap;
 
    assert(a->beg < a->end);   // invariant
-   assert(a->end == (byte*)a->beg + new_cap);   // post
+   assert(a->end == (byte*)new_arena.beg + new_cap);   // post
 }
 
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    assert(align <= align_page_size);
-   assert(a->beg && a->end);
 
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
@@ -118,7 +120,8 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    assert(((uptr)p & (align - 1)) == 0);                             // aligned result
 
-   memset(p, 0, (count*alloc_size));
+   void* base = a->base;
+   a->base = !base ? p : base;
 
    return p;
 }
