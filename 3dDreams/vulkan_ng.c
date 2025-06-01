@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -402,8 +402,8 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
    u32 vertex_index = 0;
    u32 primitive_index = 0;
 
-   u32* ib_data = push(context->storage, u32, index_count*sizeof(u32));
-   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
+   u32* ib_data = push(context->storage, u32, index_count);
+   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(10));
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -502,10 +502,10 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   //const char* filename = "buddha.obj";
+   const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
-   const char* filename = "teapot3.obj";
+   //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
    //const char* filename = "living_room.obj";
