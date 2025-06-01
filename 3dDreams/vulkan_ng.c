@@ -382,9 +382,6 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 // TOOD: move into own file
 static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
-   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
-   u32* ib_data = push(context->storage, u32, MB(32));
-
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
@@ -397,8 +394,6 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 
    obj_table.max_count = index_count;
 
-   arena table_scratch = *context->storage;
-
    obj_table.keys = push(context->storage, hash_key, obj_table.max_count);
    obj_table.values = push(context->storage, hash_value, obj_table.max_count);
 
@@ -406,6 +401,9 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 
    u32 vertex_index = 0;
    u32 primitive_index = 0;
+
+   u32* ib_data = push(context->storage, u32, index_count*sizeof(u32));
+   obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
 
    for(usize f = 0; f < index_count; f += 3)
    {
