@@ -383,13 +383,13 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 {
    obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
-   u32* ib_data = push(context->storage, u32, MB(64));
+   u32* ib_data = push(context->storage, u32, MB(32));
 
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
-   const char* filename = "buddha.obj";
-   //const char* filename = "hairball.obj";
+   //const char* filename = "buddha.obj";
+   const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
@@ -487,10 +487,9 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    obj_mesh.index_buffer = ib_data;
    obj_mesh.index_count = context->index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-   // TODO: maker for arrays
-   // TODO: fix this bug - this seems to not work with expanding arenas for mesh shading
-   arena meshlets = arena_new(context->storage, KB(4));
 
+   // TODO: maker for arrays
+   arena meshlets = arena_new(context->storage, MB(1));
    u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
    meshlets.base = 0;
    obj_mesh.meshlet_buffer = &meshlets;
@@ -1175,7 +1174,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 2.0f;
+   f32 radius = 12.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1195,6 +1194,7 @@ static void vk_present(hw* hw, vk_context* context)
    mat4 translate = mat4_translate((vec3) { 0.0f, 2.0f, 0.0f });
 
    mvp.model = mat4_identity();
+   //mvp.model = mat4_scale(0.125f, mvp.model);
    mvp.model = mat4_mul(translate, mvp.model);
 
    const f32 c = 255.0f;
@@ -1822,7 +1822,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(16);
+   size buffer_size = MB(256);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);

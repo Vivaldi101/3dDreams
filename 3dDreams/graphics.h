@@ -115,7 +115,7 @@ static inline mat4 mat4_identity()
    return result;
 }
 
-static inline mat4 mat4_scale(mat4 m, f32 s)
+static inline mat4 mat4_scale(f32 s, mat4 m)
 {
    mat4 result = m;
 
