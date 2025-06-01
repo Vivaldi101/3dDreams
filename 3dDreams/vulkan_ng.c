@@ -403,7 +403,7 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
    u32 primitive_index = 0;
 
    u32* ib_data = push(context->storage, u32, index_count);
-   arena vb_data = arena_new(context->storage, MB(10));
+   arena vb_data = arena_new(context->storage, KB(512));
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -446,7 +446,6 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 
             hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index++] = vertex_index;
-            //vb_data[vertex_index++] = v;
             *push(&vb_data, obj_vertex) = v;
             vertex_index++;
          }
@@ -1823,7 +1822,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(512);
+   size buffer_size = MB(32);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
