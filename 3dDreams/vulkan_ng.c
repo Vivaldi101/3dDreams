@@ -19,7 +19,7 @@
 
 typedef struct 
 {
-   arena* scratch;
+   arena scratch;
 } obj_user_ctx;
 
 typedef struct 
@@ -220,12 +220,12 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
 
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
 
-   arena project_dir = vk_project_directory(user_data->scratch);
+   arena project_dir = vk_project_directory(&user_data->scratch);
 
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
    wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, filename);
 
-   arena file_read = win32_file_read(user_data->scratch, shader_path);
+   arena file_read = win32_file_read(&user_data->scratch, shader_path);
 
    *len = scratch_left(file_read);
    *buf = file_read.beg;
@@ -380,7 +380,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 }
 
 // TOOD: move into own file
-static void obj_load(vk_context* context, vk_buffer scratch_buffer)
+static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
    obj_vertex* vb_data = push(context->storage, obj_vertex, MB(32));
    u32* ib_data = push(context->storage, u32, MB(32));
@@ -388,34 +388,10 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    index_hash_table obj_table = {};
 
    mesh obj_mesh = {};
-   const char* filename = "buddha.obj";
-   //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
-   //const char* filename = "teapot3.obj";
-   //const char* filename = "cube.obj";
-   //const char* filename = "erato.obj";
-   //const char* filename = "living_room.obj";
-   //const char* filename = "san-miguel.obj";
-
-   tinyobj_shape_t* shapes = 0;
-   tinyobj_material_t* materials = 0;
-   tinyobj_attrib_t attrib = {};
-
-   size_t shape_count = 0;
-   size_t material_count = 0;
-
-   tinyobj_attrib_init(&attrib);
-
-   obj_user_ctx user_data = {};
-   user_data.scratch = context->storage;
-
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
-      hw_message("Could not load .obj file");
-
    // only triangles allowed
-   assert(attrib.num_face_num_verts * 3 == attrib.num_faces);
+   assert(attrib->num_face_num_verts * 3 == attrib->num_faces);
 
-   const usize index_count = attrib.num_faces;
+   const usize index_count = attrib->num_faces;
 
    assert((size)index_count*sizeof(u32) <= (u32)~0u);
 
@@ -433,7 +409,7 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 
    for(usize f = 0; f < index_count; f += 3)
    {
-      const tinyobj_vertex_index_t* vidx = attrib.faces + f;
+      const tinyobj_vertex_index_t* vidx = attrib->faces + f;
 
       for(usize i = 0; i < 3; ++i)
       {
@@ -449,16 +425,16 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
             obj_vertex v = {};
             if(vi >= 0)
             {
-               v.vx = attrib.vertices[vi * 3 + 0];
-               v.vy = attrib.vertices[vi * 3 + 1];
-               v.vz = attrib.vertices[vi * 3 + 2];
+               v.vx = attrib->vertices[vi * 3 + 0];
+               v.vy = attrib->vertices[vi * 3 + 1];
+               v.vz = attrib->vertices[vi * 3 + 2];
             }
 
             if(vni >= 0)
             {
-               f32 nx = attrib.normals[vni * 3 + 0];
-               f32 ny = attrib.normals[vni * 3 + 1];
-               f32 nz = attrib.normals[vni * 3 + 2];
+               f32 nx = attrib->normals[vni * 3 + 0];
+               f32 ny = attrib->normals[vni * 3 + 1];
+               f32 nz = attrib->normals[vni * 3 + 2];
                v.nx = (u8)(nx * 127.f + 127.f);
                v.ny = (u8)(ny * 127.f + 127.f);
                v.nz = (u8)(nz * 127.f + 127.f);
@@ -466,8 +442,8 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 
             if(vti >= 0)
             {
-               v.tu = attrib.texcoords[vti * 2 + 0];
-               v.tv = attrib.texcoords[vti * 2 + 1];
+               v.tu = attrib->texcoords[vti * 2 + 0];
+               v.tv = attrib->texcoords[vti * 2 + 1];
             }
 
             hash_insert(&obj_table, index, vertex_index);
@@ -503,10 +479,6 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
    context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
 #endif
 
-   tinyobj_materials_free(materials, material_count);
-   tinyobj_shapes_free(shapes, shape_count);
-   tinyobj_attrib_free(&attrib);
-
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data, vb_size);
 #if RTX
@@ -520,7 +492,36 @@ static void obj_load(vk_context* context, vk_buffer scratch_buffer)
 
 static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 {
-   obj_load(context, scratch_buffer);
+   tinyobj_shape_t* shapes = 0;
+   tinyobj_material_t* materials = 0;
+   tinyobj_attrib_t attrib = {};
+
+   size_t shape_count = 0;
+   size_t material_count = 0;
+
+   tinyobj_attrib_init(&attrib);
+
+   obj_user_ctx user_data = {};
+   user_data.scratch = *context->storage;
+
+   //const char* filename = "buddha.obj";
+   //const char* filename = "hairball.obj";
+   //const char* filename = "dragon.obj";
+   const char* filename = "teapot3.obj";
+   //const char* filename = "cube.obj";
+   //const char* filename = "erato.obj";
+   //const char* filename = "living_room.obj";
+   //const char* filename = "san-miguel.obj";
+
+
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+      hw_message("Could not load .obj file");
+
+   obj_load(context, &attrib, scratch_buffer);
+
+   tinyobj_materials_free(materials, material_count);
+   tinyobj_shapes_free(shapes, shape_count);
+   tinyobj_attrib_free(&attrib);
 }
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
@@ -1174,7 +1175,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 12.0f;
+   f32 radius = 2.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1822,7 +1823,7 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(256);
+   size buffer_size = MB(512);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
