@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 0
+#define RTX 1
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -464,7 +464,7 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
 
    // TODO: maker for arrays
-   arena meshlets = arena_new(context->storage, MB(1));
+   arena meshlets = arena_new(&vb_data, MB(1));
    u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
    meshlets.base = 0;
    obj_mesh.meshlet_buffer = meshlets;
