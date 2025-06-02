@@ -504,8 +504,8 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    user_data.scratch = *context->storage;
 
    //const char* filename = "buddha.obj";
-   //const char* filename = "hairball.obj";
-   const char* filename = "dragon.obj";
+   const char* filename = "hairball.obj";
+   //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
@@ -1174,7 +1174,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 2.0f;
+   f32 radius = 12.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
@@ -1822,7 +1822,8 @@ bool vk_initialize(hw* hw)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
    // TODO: fine tune these and get device memory limits
-   size buffer_size = MB(32);
+   // video memory
+   size buffer_size = MB(128);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
