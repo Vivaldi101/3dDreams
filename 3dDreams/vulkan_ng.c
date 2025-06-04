@@ -380,7 +380,8 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 }
 
 // TOOD: move into own file
-static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
+// TOOD: this should get its own scratch buffer
+static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
    index_hash_table obj_table = {};
 
@@ -394,16 +395,16 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
 
    obj_table.max_count = index_count;
 
-   obj_table.keys = push(context->storage, hash_key, obj_table.max_count);
-   obj_table.values = push(context->storage, hash_value, obj_table.max_count);
+   obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
+   obj_table.values = push(&scratch, hash_value, obj_table.max_count);
 
    memset(obj_table.keys, -1, sizeof(hash_key) * obj_table.max_count);
 
    u32 vertex_index = 0;
    u32 primitive_index = 0;
 
-   u32* ib_data = push(context->storage, u32, index_count);
-   arena vb_data = arena_new(context->storage, MB(1));
+   u32* ib_data = push(&scratch, u32, index_count);
+   arena vb_data = arena_new(&scratch, MB(1));
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -445,12 +446,13 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
             }
 
             hash_insert(&obj_table, index, vertex_index);
-            ib_data[primitive_index++] = vertex_index;
+            ib_data[primitive_index] = vertex_index++;
             *push(&vb_data, obj_vertex) = v;
-            vertex_index++;
          }
          else
-            ib_data[primitive_index++] = lookup;
+            ib_data[primitive_index] = lookup;
+
+         ++primitive_index;
       }
    }
 
@@ -503,8 +505,8 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   //const char* filename = "buddha.obj";
-   const char* filename = "hairball.obj";
+   const char* filename = "buddha.obj";
+   //const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
@@ -516,7 +518,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
-   obj_load(context, &attrib, scratch_buffer);
+   obj_load(context, *context->storage, &attrib, scratch_buffer);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
@@ -1174,7 +1176,7 @@ static void vk_present(hw* hw, vk_context* context)
    mvp.ar = ar;
 #endif
 
-   f32 radius = 12.0f;
+   f32 radius = 2.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 2.0f;
 
