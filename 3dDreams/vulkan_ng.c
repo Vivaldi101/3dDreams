@@ -59,7 +59,7 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static void meshlet_build(mesh* m, u8* meshlet_vertices)
+static void meshlet_build(mesh* m, arena scratch, u8* meshlet_vertices)
 {
    meshlet ml = {};
 
@@ -459,12 +459,15 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    usize ib_size = index_count * sizeof(u32);
    usize vb_size = vertex_index * sizeof(obj_vertex);
 
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+      scratch_buffer, vb_data.base, vb_size);
+
 #if RTX 
    obj_mesh.index_buffer = ib_data;
    obj_mesh.index_count = index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
 
-   arena meshlets = arena_new(&vb_data, MB(1));
+   arena meshlets = arena_new(&scratch, MB(1));
    u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
    meshlets.base = 0;
    obj_mesh.meshlet_buffer = meshlets;
@@ -472,14 +475,11 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
 
-   meshlet_build(&obj_mesh, meshlet_vertices);
+   meshlet_build(&obj_mesh, scratch, meshlet_vertices);
 
    context->meshlet_count = obj_mesh.meshlet_count;
    context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
 #endif
-
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data.base, vb_size);
 #if RTX
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
       scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(meshlet));
@@ -503,9 +503,9 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   //const char* filename = "buddha.obj";
+   const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   const char* filename = "dragon.obj";
+   //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
