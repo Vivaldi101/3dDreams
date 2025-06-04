@@ -403,7 +403,7 @@ static void obj_load(vk_context* context, tinyobj_attrib_t* attrib, vk_buffer sc
    u32 primitive_index = 0;
 
    u32* ib_data = push(context->storage, u32, index_count);
-   arena vb_data = arena_new(context->storage, KB(512));
+   arena vb_data = arena_new(context->storage, MB(1));
 
    for(usize f = 0; f < index_count; f += 3)
    {
