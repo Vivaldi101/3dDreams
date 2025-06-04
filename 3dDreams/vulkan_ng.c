@@ -59,9 +59,15 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static void meshlet_build(mesh* m, arena scratch, u8* meshlet_vertices)
+static void meshlet_build(mesh* m, arena scratch)
 {
    meshlet ml = {};
+
+   u8* meshlet_vertices = push(&scratch, u8, m->vertex_count);
+   m->meshlet_buffer = arena_new(&scratch, MB(1));
+
+   // 0xff means the vertex index is not in use yet
+   memset(meshlet_vertices, 0xff, m->vertex_count);
 
    size vertex_count = m->vertex_count;
 
@@ -467,15 +473,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    obj_mesh.index_count = index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
 
-   arena meshlets = arena_new(&scratch, MB(1));
-   u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
-   meshlets.base = 0;
-   obj_mesh.meshlet_buffer = meshlets;
-
-   // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertices, 0xff, obj_mesh.vertex_count);
-
-   meshlet_build(&obj_mesh, scratch, meshlet_vertices);
+   meshlet_build(&obj_mesh, scratch);
 
    context->meshlet_count = obj_mesh.meshlet_count;
    context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
@@ -503,9 +501,9 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
+   const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
