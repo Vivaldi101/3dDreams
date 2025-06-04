@@ -380,7 +380,6 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 }
 
 // TOOD: move into own file
-// TOOD: this should get its own scratch buffer
 static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
    index_hash_table obj_table = {};
@@ -404,7 +403,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    u32 primitive_index = 0;
 
    u32* ib_data = push(&scratch, u32, index_count);
-   arena vb_data = arena_new(&scratch, MB(1));
+   arena vb_data = arena_new(&scratch, attrib->num_face_num_verts*sizeof(obj_vertex));
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -462,10 +461,9 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
 #if RTX 
    obj_mesh.index_buffer = ib_data;
-   obj_mesh.index_count = context->index_count;
+   obj_mesh.index_count = index_count;
    obj_mesh.vertex_count = obj_table.count;  // unique vertex count
 
-   // TODO: maker for arrays
    arena meshlets = arena_new(&vb_data, MB(1));
    u8* meshlet_vertices = push(&meshlets, u8, obj_mesh.vertex_count);
    meshlets.base = 0;
@@ -505,9 +503,9 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
+   const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";

@@ -27,8 +27,6 @@ static arena win32_file_read(arena* file_arena, const char* path)
    if(!(ReadFile(file, buffer, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
       return (arena) {};
 
-   //scratch_shrink(result, bytes_read, char);
-
    CloseHandle(file);
 
    result.beg = buffer;
