@@ -472,8 +472,6 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    context->meshlet_count = obj_mesh.meshlet_count;
    context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
-#endif
-#if RTX
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
       scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(meshlet));
 #else
@@ -504,7 +502,6 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    //const char* filename = "erato.obj";
    //const char* filename = "living_room.obj";
    //const char* filename = "san-miguel.obj";
-
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
