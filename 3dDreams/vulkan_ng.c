@@ -59,30 +59,28 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshle
    }
 }
 
-static void meshlet_build(mesh* m, arena scratch, arena* storage)
+static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* index_buffer, u32 index_count)
 {
+   mesh result = {};
+
    meshlet ml = {};
 
-   u8* meshlet_vertices = push(&scratch, u8, m->vertex_count);
-   m->meshlet_buffer = arena_new(storage, MB(1));
+   u8* meshlet_vertices = push(&scratch, u8, vertex_count);
+   result.meshlet_buffer = arena_new(storage, MB(1));
 
    // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertices, 0xff, m->vertex_count);
-
-   size vertex_count = m->vertex_count;
+   memset(meshlet_vertices, 0xff, vertex_count);
 
    usize max_index_count = array_count(ml.primitive_indices);
    usize max_vertex_count = array_count(ml.vertex_index_buffer);
    usize max_triangle_count = max_index_count/3;
 
-   size index_count = m->index_count;
-
    for(size i = 0; i < index_count; i += 3)
    {
       // original per primitive (triangle indices)
-      u32 i0 = m->index_buffer[i + 0];
-      u32 i1 = m->index_buffer[i + 1];
-      u32 i2 = m->index_buffer[i + 2];
+      u32 i0 = index_buffer[i + 0];
+      u32 i1 = index_buffer[i + 1];
+      u32 i2 = index_buffer[i + 2];
 
       // are the mesh vertex indices not used yet
       bool mi0 = meshlet_vertices[i0] == 0xff;
@@ -93,7 +91,7 @@ static void meshlet_build(mesh* m, arena scratch, arena* storage)
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         meshlet* mp = push(&m->meshlet_buffer, meshlet);
+         meshlet* mp = push(&result.meshlet_buffer, meshlet);
 
          *mp = ml;
 
@@ -104,7 +102,7 @@ static void meshlet_build(mesh* m, arena scratch, arena* storage)
             meshlet_vertices[ml.vertex_index_buffer[j]] = 0xff;
          }
 
-         m->meshlet_count++;
+         result.meshlet_count++;
 
          // begin another meshlet
          struct_clear(ml);
@@ -142,9 +140,11 @@ static void meshlet_build(mesh* m, arena scratch, arena* storage)
    // add any left over meshlets
    if(ml.vertex_count > 0)
    {
-      *push(&m->meshlet_buffer, meshlet) = ml;
-      m->meshlet_count++;
+      *push(&result.meshlet_buffer, meshlet) = ml;
+      result.meshlet_count++;
    }
+
+   return result;
 }
 
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
@@ -390,7 +390,6 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 {
    index_hash_table obj_table = {};
 
-   mesh obj_mesh = {};
    // only triangles allowed
    assert(attrib->num_face_num_verts * 3 == attrib->num_faces);
 
@@ -469,12 +468,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
       scratch_buffer, vb_data.base, vb_size);
 
 #if RTX 
-   obj_mesh.index_buffer = ib_data;
-   obj_mesh.index_count = index_count;
-   obj_mesh.vertex_count = obj_table.count;  // unique vertex count
-
-   // TODO: pass index, vertex buffer and counts
-   meshlet_build(&obj_mesh, scratch, context->storage);
+   mesh obj_mesh = meshlet_build(scratch, context->storage, (u32)obj_table.count, ib_data, (u32)index_count);
 
    context->meshlet_count = obj_mesh.meshlet_count;
    context->meshlet_buffer = obj_mesh.meshlet_buffer.base;
@@ -502,9 +496,9 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   //const char* filename = "buddha.obj";
+   const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   const char* filename = "dragon.obj";
+   //const char* filename = "dragon.obj";
    //const char* filename = "teapot3.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
