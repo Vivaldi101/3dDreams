@@ -132,6 +132,10 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
          return 0;
       }
+
+      case WM_KEYDOWN:
+         win32_hw->state.input.key = wparam;
+         break;
    }
 
    return DefWindowProc(hwnd, umsg, wparam, lparam);

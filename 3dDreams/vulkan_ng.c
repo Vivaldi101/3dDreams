@@ -12,7 +12,7 @@
 
 #pragma comment(lib,	"vulkan-1.lib")
 
-#define RTX 1
+#define RTX 0
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
@@ -494,10 +494,10 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
    //const char* filename = "dragon.obj";
-   //const char* filename = "teapot3.obj";
+   const char* filename = "sponza.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
    //const char* filename = "living_room.obj";
@@ -1093,7 +1093,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    const f32 ar = (f32)width / height;
 
    mvp.n = 0.01f;
-   mvp.f = 1000.0f;
+   mvp.f = 10000.0f;
    mvp.ar = ar;
 
    mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
@@ -1158,25 +1158,21 @@ static void vk_present(hw* hw, vk_context* context)
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
-#if 0
-   mvp.n = 0.01f;
-   mvp.f = 1000.0f;
-   mvp.ar = ar;
-#endif
 
-   f32 radius = 2.0f;
+   f32 radius = 1.0f;
    f32 theta = DEG2RAD(rot);
-   f32 height = 2.0f;
+   f32 height = 30.0f;
 
    vec3 eye =
    {
-       radius * cosf(theta),
+       mvp.radius*5,
        height,
-       radius * sinf(theta)
+       mvp.radius,
    };
 
-   vec3 origin = {0.0f, 2.0f, 0.0f};
-   vec3 dir = vec3_sub(&eye, &origin);
+   vec3 origin = {0.0f, radius, 0.0f};
+   vec3 dir = (vec3){-5.0f, 0.0f, -1.0f};
+   vec3_normalize(dir);
 
    //mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
    mvp.view = mat4_view(eye, dir);
@@ -1184,7 +1180,7 @@ static void vk_present(hw* hw, vk_context* context)
    mat4 translate = mat4_translate((vec3) { 0.0f, 2.0f, 0.0f });
 
    mvp.model = mat4_identity();
-   //mvp.model = mat4_scale(0.125f, mvp.model);
+   mvp.model = mat4_scale(0.125f, mvp.model);
    mvp.model = mat4_mul(translate, mvp.model);
 
    const f32 c = 255.0f;

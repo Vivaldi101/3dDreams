@@ -14,6 +14,7 @@ align_struct app_state
    mat4 proj;
    mat4 view;
    vec3 camera_pos;
+   app_input input;  // add pointer if the structures get too large
 } app_state;
 
 void app_start(int argc, const char** argv, hw* hw);

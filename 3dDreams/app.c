@@ -10,22 +10,23 @@ static void app_frame(arena scratch, app_state* state)
 {
 }
 
-static void app_input_handle(app_input* input)
+static void app_input_handle(app_state* state)
 {
    u64 key;
    i32 pos[2], i;
-   if(input->input_type == HW_INPUT_TYPE_MOUSE)
-      if(input->pos[0] > 0 && input->pos[1] > 0)
-         for(i = 0; i < 2; ++i)
-            pos[i] = input->pos[i];
-   if(input->input_type == HW_INPUT_TYPE_KEY)
-      key = input->key;
+   if(state->input.key == 'W')
+      state->camera_pos.z -= 0.2f;
+   else if(state->input.key == 'S')
+      state->camera_pos.z += 0.2f;
+
+   state->input.key = 0;
 }
 
 void app_start(int argc, const char** argv, hw* hw)
 {
    pre(implies(argc > 0, argv[argc - 1]));
 
+   // TODO: key press to toggle
 #if FULLSCREEN
 	int w = 1920, h = 1080;
 	int x = 0, y = 0;

@@ -419,6 +419,7 @@ typedef struct mvp_transform
     f32 n;
     f32 f;
     f32 ar;
+    f32 radius;    // todo: remove
 } mvp_transform;
 #pragma pack(pop)
 
