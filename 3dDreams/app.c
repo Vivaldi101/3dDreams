@@ -14,10 +14,20 @@ static void app_input_handle(app_state* state)
 {
    u64 key;
    i32 pos[2], i;
+   // TODO: proper rotation here
+   f32 speed = 0.5f;
    if(state->input.key == 'W')
-      state->camera_pos.z -= 0.2f;
+      state->camera_pos.z -= speed;
    else if(state->input.key == 'S')
-      state->camera_pos.z += 0.2f;
+      state->camera_pos.z += speed;
+   if(state->input.key == 'A')
+      state->camera_pos.x -= speed;
+   else if(state->input.key == 'D')
+      state->camera_pos.x += speed;
+   else if(state->input.key == 'Z')
+      state->camera_pos.y -= speed;
+   else if(state->input.key == 'C')
+      state->camera_pos.y += speed;
 
    state->input.key = 0;
 }

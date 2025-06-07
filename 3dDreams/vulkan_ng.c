@@ -496,11 +496,11 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 
    //const char* filename = "buddha.obj";
    //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
-   const char* filename = "sponza.obj";
+   const char* filename = "dragon.obj";
+   //const char* filename = "suzanne.obj";
    //const char* filename = "cube.obj";
    //const char* filename = "erato.obj";
-   //const char* filename = "living_room.obj";
+   //const char* filename = "exterior.obj";
    //const char* filename = "san-miguel.obj";
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
@@ -1161,27 +1161,20 @@ static void vk_present(hw* hw, vk_context* context)
 
    f32 radius = 1.0f;
    f32 theta = DEG2RAD(rot);
-   f32 height = 30.0f;
+   f32 height = 1000.0f;
 
-   vec3 eye =
-   {
-       mvp.radius*5,
-       height,
-       mvp.radius,
-   };
+   vec3 eye = mvp.camera_pos;
 
-   vec3 origin = {0.0f, radius, 0.0f};
-   vec3 dir = (vec3){-5.0f, 0.0f, -1.0f};
+   vec3 dir = (vec3){0.0f, 0.0f, -1.0f};
    vec3_normalize(dir);
 
-   //mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
    mvp.view = mat4_view(eye, dir);
-   //mat4 translate = mat4_translate((vec3){-50.0f, 0.0f, -20.0f});
-   mat4 translate = mat4_translate((vec3) { 0.0f, 2.0f, 0.0f });
+   mat4 translate = mat4_translate((vec3){0.0f, 0.0f, -1.5f});
 
    mvp.model = mat4_identity();
-   mvp.model = mat4_scale(0.125f, mvp.model);
-   mvp.model = mat4_mul(translate, mvp.model);
+   mat4 rot_transform = mat4_rotation_y(rot);
+   mvp.model = mat4_mul(mvp.model, translate);
+   mvp.model = mat4_mul(mvp.model, rot_transform);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
@@ -1264,6 +1257,7 @@ static void vk_present(hw* hw, vk_context* context)
    descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
    descriptors[1].pBufferInfo = &mb_info;
 
+   // TODO: toggle mesh shading and vanilla vertex IA by button
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
    vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
 #else
@@ -1277,6 +1271,7 @@ static void vk_present(hw* hw, vk_context* context)
 
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
+   // TODO: toggle mesh shading and vanilla vertex IA by button
    vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
    vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
 #endif
