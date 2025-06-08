@@ -1173,6 +1173,7 @@ static void vk_present(hw* hw, vk_context* context)
 
    mvp.model = mat4_identity();
    mat4 rot_transform = mat4_rotation_y(rot);
+   mvp.model = mat4_scale(mvp.model, 0.25f);
    mvp.model = mat4_mul(mvp.model, translate);
    mvp.model = mat4_mul(mvp.model, rot_transform);
 
