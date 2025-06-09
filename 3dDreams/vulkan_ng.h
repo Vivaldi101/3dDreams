@@ -8,6 +8,8 @@
 #endif
 
 #include "common.h"
+#include "arena.h"
+
 #include <vulkan/vulkan.h>
 
 bool vk_uninitialize(struct hw* hw);
@@ -35,5 +37,97 @@ bool vk_initialize(struct hw* hw);
 #else
 #define vk_assert(v) (v)
 #endif
+
+enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
+
+align_struct swapchain_surface_info
+{
+   u32 image_width;
+   u32 image_height;
+   u32 image_count;
+
+   VkSurfaceKHR surface;
+   VkSwapchainKHR swapchain;
+
+   VkFormat format;
+   VkImage images[MAX_VULKAN_OBJECT_COUNT];
+   VkImage depths[MAX_VULKAN_OBJECT_COUNT];
+   VkImageView image_views[MAX_VULKAN_OBJECT_COUNT];
+   VkImageView depth_views[MAX_VULKAN_OBJECT_COUNT];
+} swapchain_surface_info;
+
+align_struct
+{
+   VkBuffer handle;
+   VkDeviceMemory memory;
+   void* data; // host or local memory
+   usize size;
+} vk_buffer;
+
+align_struct
+{
+   vk_buffer buffer;
+   u32 count;
+} vk_meshlet;
+
+align_struct
+{
+   u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
+   u8 primitive_indices[126];    // 42 triangles (primitives) into the above buffer
+   u8 triangle_count;
+   u8 vertex_count;
+} meshlet;
+
+align_struct
+{
+   size vertex_count;
+   u32* index_buffer;         // vertex indices
+   size index_count;
+   arena meshlet_buffer;
+   u32 meshlet_count;
+} mesh;
+
+align_struct
+{
+   VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
+
+   VkInstance instance;
+   VkPhysicalDevice physical_device;
+   VkDevice logical_device;
+   VkSurfaceKHR surface;
+   VkAllocationCallbacks* allocator;
+   VkSemaphore image_ready_semaphore;
+   VkSemaphore image_done_semaphore;
+   VkQueue graphics_queue;
+   VkCommandPool command_pool;
+   VkQueryPool query_pool;
+   u32 query_pool_size;
+   VkCommandBuffer command_buffer;
+   VkRenderPass renderpass;
+
+   // TODO: Pipelines into an array
+   VkPipeline graphics_pipeline;
+   VkPipeline axis_pipeline;
+   VkPipeline frustum_pipeline;
+   VkPipelineLayout pipeline_layout;
+
+   vk_buffer vb;        // vertex buffer
+   vk_buffer ib;        // index buffer
+   vk_buffer mb;        // mesh buffer
+
+   u32 max_meshlet_count;
+   u32 meshlet_count;
+   meshlet* meshlet_buffer;
+   u32 index_count;
+
+   swapchain_surface_info swapchain_info;
+
+   arena* storage;
+   u32 queue_family_index;
+
+   f32 time_period;
+} vk_context;
+
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
 
 #endif

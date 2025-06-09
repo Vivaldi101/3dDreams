@@ -184,7 +184,6 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
          break;
 
       app_input_function(&hw->state);
-      hw->renderer.mvp.camera_pos = hw->state.camera_pos;
       app_frame_function(hw->vk_storage, &hw->state);
 
       // TODO: Use perf counters for better granularity
