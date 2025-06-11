@@ -1,4 +1,4 @@
-#define RTX 1
+#define RTX 0
 
 #include "arena.h"
 #include "common.h"
@@ -195,14 +195,6 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    user_data.scratch = *context->storage;
 
    const char* filename = "buddha.obj";
-   //const char* filename = "hairball.obj";
-   //const char* filename = "dragon.obj";
-   //const char* filename = "suzanne.obj";
-   //const char* filename = "sponza.obj";
-   //const char* filename = "erato.obj";
-   //const char* filename = "exterior.obj";
-   //const char* filename = "san-miguel.obj";
-
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
@@ -1514,30 +1506,18 @@ bool vk_initialize(hw* hw)
    // video memory
    size buffer_size = MB(128);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 #if RTX
    vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   if(meshlet_buffer.handle == VK_NULL_HANDLE)
-      return false;
-#endif
-   if(index_buffer.handle == VK_NULL_HANDLE || vertex_buffer.handle == VK_NULL_HANDLE || scratch_buffer.handle == VK_NULL_HANDLE)
-      return false;
-
-#if RTX
    context->mb = meshlet_buffer;
 #else
    context->ib = index_buffer;
 #endif
    context->vb = vertex_buffer;
 
-#if RTX
    vk_buffers_upload(context, scratch_buffer);
-#else
-   vk_buffers_upload(context, scratch_buffer);
-#endif
 
    return true;
 }

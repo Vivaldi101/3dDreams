@@ -189,9 +189,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    }
 
    context->index_count = (u32)index_count;
-   usize ib_size = index_count * sizeof(u32);
-   usize vb_size = vertex_index * sizeof(obj_vertex);
 
+   usize vb_size = vertex_index * sizeof(obj_vertex);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data.base, vb_size);
 
@@ -203,6 +202,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb, 
       scratch_buffer, context->meshlet_buffer, context->meshlet_count*sizeof(meshlet));
 #else
+   usize ib_size = index_count * sizeof(u32);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib, 
       scratch_buffer, ib_data, ib_size);
 #endif
