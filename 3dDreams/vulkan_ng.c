@@ -1,4 +1,4 @@
-#define RTX 1
+#define RTX 0
 
 #include "arena.h"
 #include "common.h"
@@ -11,7 +11,7 @@
 #include "hash.c"
 #include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
-#include "obj_loader.c"
+#include "meshlet.c"
 
 #pragma comment(lib,	"vulkan-1.lib")
 
