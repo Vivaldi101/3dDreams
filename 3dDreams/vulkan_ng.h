@@ -71,9 +71,10 @@ align_struct
 } vk_meshlet;
 
 align_struct
+
 {
    u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
-   u8 primitive_indices[126];    // 42 triangles (primitives) into the above buffer
+   u8 primitive_indices[127*3];    // 126 triangles (primitives) into the above buffer
    u8 triangle_count;
    u8 vertex_count;
 } meshlet;

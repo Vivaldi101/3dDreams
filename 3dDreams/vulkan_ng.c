@@ -1,4 +1,4 @@
-#define RTX 0
+#define RTX 1
 
 #include "arena.h"
 #include "common.h"
@@ -856,9 +856,9 @@ static void vk_present(hw* hw, vk_context* context)
    f32 height = 1000.0f;
 
    // world space origin
-   vec3 eye = {};
+   vec3 eye = {0.f, 0.0f, radius};
 
-   vec3 dir = (vec3){0.0f, 0.0f, -1.0f};
+   vec3 dir = vec3_sub(&eye, &(vec3){});
    vec3_normalize(dir);
 
    mvp.view = mat4_view(eye, dir);
@@ -866,7 +866,7 @@ static void vk_present(hw* hw, vk_context* context)
 
    mvp.model = mat4_identity();
    mat4 rot_transform = mat4_rotation_y(rot);
-   mvp.model = mat4_scale(mvp.model, 0.25f);
+   //mvp.model = mat4_scale(mvp.model, 0.25f);
    mvp.model = mat4_mul(mvp.model, translate);
    mvp.model = mat4_mul(mvp.model, rot_transform);
 

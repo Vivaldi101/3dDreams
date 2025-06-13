@@ -15,11 +15,11 @@ layout(push_constant) uniform Transform
 } transform;
 
 // number of threads inside the work group
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(triangles, max_vertices = 64, max_primitives = 42) out;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 64, max_primitives = 127) out;
 
 const uint max_vertices = 64;
-const uint max_primitives = 42;
+const uint max_primitives = 127;
 
 struct Vertex
 {
@@ -31,7 +31,7 @@ struct Vertex
 struct Meshlet
 {
    uint32_t vertex_index_buffer[64];  // unique indices into the mesh vertex buffer
-   uint8_t primitive_indices[126];    // 42 triangles (primitives)
+   uint8_t primitive_indices[127*3];
    uint8_t triangle_count;
    uint8_t vertex_count;
 };
@@ -80,6 +80,7 @@ void main()
 
     for(uint i = 0; i < meshlets[mi].triangle_count; ++i)
     {
+      // one triangle - 3 primitive indices
       uint i0 = meshlets[mi].primitive_indices[3*i + 0];
       uint i1 = meshlets[mi].primitive_indices[3*i + 1];
       uint i2 = meshlets[mi].primitive_indices[3*i + 2];
