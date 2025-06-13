@@ -194,7 +194,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "dragon.obj";
+   const char* filename = "hairball.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
@@ -851,7 +851,7 @@ static void vk_present(hw* hw, vk_context* context)
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
 
-   f32 radius = 1.0f;
+   f32 radius = 3.0f;
    f32 theta = DEG2RAD(rot);
    f32 height = 1000.0f;
 
@@ -866,7 +866,7 @@ static void vk_present(hw* hw, vk_context* context)
 
    mvp.model = mat4_identity();
    mat4 rot_transform = mat4_rotation_y(rot);
-   //mvp.model = mat4_scale(mvp.model, 0.25f);
+   mvp.model = mat4_scale(mvp.model, 0.25f);
    mvp.model = mat4_mul(mvp.model, translate);
    mvp.model = mat4_mul(mvp.model, rot_transform);
 
@@ -955,9 +955,11 @@ static void vk_present(hw* hw, vk_context* context)
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
    // do 10 draw calls for measurement
+   assert(context->meshlet_count <= 0xffff);
+
    u32 draw_calls = 1;
    for(u32 i = 0; i < draw_calls; ++i)
-      vkCmdDrawMeshTasksEXT(command_buffer, 0xffff, 1, 1);
+      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
 #else
 
    VkWriteDescriptorSet descriptors[1] = {};
