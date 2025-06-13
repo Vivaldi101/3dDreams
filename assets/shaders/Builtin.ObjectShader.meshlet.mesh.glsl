@@ -60,10 +60,16 @@ vec3 renormalize_normal(vec3 n)
 void main()
 {
     uint mi = gl_WorkGroupID.x;
+    uint ti = gl_LocalInvocationID.x;
 
-    SetMeshOutputsEXT(meshlets[mi].vertex_count, meshlets[mi].triangle_count);
+    uint vertex_count = meshlets[mi].vertex_count;
+    uint triangle_count = meshlets[mi].triangle_count;
 
-    for(uint i = 0; i < meshlets[mi].vertex_count; ++i)
+    // write output counts once
+    if(ti == 0)
+      SetMeshOutputsEXT(vertex_count, triangle_count);
+
+    for(uint i = ti; i < vertex_count; i += 64)
     {
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
@@ -78,7 +84,7 @@ void main()
       out_color[i] = vec4(vec3(normal), 1.0);
     }
 
-    for(uint i = 0; i < meshlets[mi].triangle_count; ++i)
+    for(uint i = ti; i < triangle_count; i += 64)
     {
       // one triangle - 3 primitive indices
       uint i0 = meshlets[mi].primitive_indices[3*i + 0];
