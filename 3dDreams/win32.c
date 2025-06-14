@@ -136,6 +136,39 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
       case WM_KEYDOWN:
          win32_hw->state.input.key = wparam;
          break;
+
+      case WM_MOUSEMOVE:
+      {
+         POINT pt;
+         GetCursorPos(&pt);
+         ScreenToClient(hwnd, &pt);
+
+         win32_hw->state.input.mouse_pos[0] = pt.x;
+         win32_hw->state.input.mouse_pos[1] = pt.y;
+      }
+      break;
+      case WM_LBUTTONDOWN:
+         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_LEFT;
+         break;
+
+      case WM_LBUTTONUP:
+         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_LEFT;
+         break;
+
+      case WM_RBUTTONDOWN:
+         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_RIGHT;
+         break;
+
+      case WM_RBUTTONUP:
+         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_RIGHT;
+         break;
+
+      case WM_MBUTTONDOWN:
+         break;
+
+      case WM_MBUTTONUP:
+         break;
+      break;
    }
 
    return DefWindowProc(hwnd, umsg, wparam, lparam);

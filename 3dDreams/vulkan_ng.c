@@ -1,5 +1,3 @@
-#define RTX 1
-
 #include "arena.h"
 #include "common.h"
 #include "graphics.h"
@@ -194,7 +192,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "hairball.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
@@ -374,7 +372,7 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
 
    vkGetPhysicalDeviceProperties2(physical_device, &device_props2);
 
-   u32 max_mesh_tasks = mesh_shader_props.maxTaskWorkGroupCount[0];
+   u32 max_mesh_tasks = mesh_shader_props.maxMeshWorkGroupInvocations;
 
    return max_mesh_tasks;
 }
@@ -811,7 +809,7 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
    return result;
 }
 
-static void vk_present(hw* hw, vk_context* context)
+static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
@@ -843,32 +841,27 @@ static void vk_present(hw* hw, vk_context* context)
 
    const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
 
-   f32 delta = 0.75f;
-   static f32 rot = 0.0f;
-   rot += delta;
-
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
 
-   f32 radius = 3.0f;
-   f32 theta = DEG2RAD(rot);
    f32 height = 1000.0f;
 
    // world space origin
-   vec3 eye = {0.f, 0.0f, radius};
+   // TODO: pass orbit data here
+   vec3 eye = state->camera.pos;
+   if(eye.x == .0f && eye.y == .0f && eye.z == 0.f)
+      eye.z = 1.0f;
 
-   vec3 dir = vec3_sub(&eye, &(vec3){});
+   vec3 origin = {};
+
+   vec3 dir = vec3_sub(&eye, &origin);
    vec3_normalize(dir);
 
    mvp.view = mat4_view(eye, dir);
-   mat4 translate = mat4_translate((vec3){0.0f, 0.0f, -1.5f});
 
    mvp.model = mat4_identity();
-   mat4 rot_transform = mat4_rotation_y(rot);
-   mvp.model = mat4_scale(mvp.model, 0.25f);
-   mvp.model = mat4_mul(mvp.model, translate);
-   mvp.model = mat4_mul(mvp.model, rot_transform);
+   //mvp.model = mat4_mul(mvp.model, roty);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
@@ -1468,7 +1461,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
 #if RTX
-   context->max_meshlet_count = vk_mesh_shader_max_tasks(context->physical_device);
+   assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
 #endif
 
    if(!vk_swapchain_update(context))
@@ -1506,7 +1499,7 @@ bool vk_initialize(hw* hw)
 
    // TODO: fine tune these and get device memory limits
    // video memory
-   size buffer_size = MB(128);
+   size buffer_size = MB(1024);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);

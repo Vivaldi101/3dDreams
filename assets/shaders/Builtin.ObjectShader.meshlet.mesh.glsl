@@ -36,14 +36,14 @@ struct Meshlet
    uint8_t vertex_count;
 };
 
-layout(set = 0, binding = 0) readonly buffer Verts
-{
-   Vertex verts[];
-};
-
 layout(set = 0, binding = 1) readonly buffer Meshlets
 {
    Meshlet meshlets[];
+};
+
+layout(set = 0, binding = 0) readonly buffer Verts
+{
+   Vertex verts[];
 };
 
 layout(location = 0) out vec4 out_color[];

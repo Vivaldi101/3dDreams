@@ -8,7 +8,7 @@
 align_struct hw_renderer
 {
    void* backends[renderer_count];
-   void(*frame_present)(hw* hw, void* renderer);
+   void(*frame_present)(hw* hw, void* context, app_state* state);
    void(*frame_resize)(hw* hw, u32 width, u32 height);
    void(*frame_wait)(void* renderer);
    void* (*window_surface_create)(void* instance, void* window_handle);
@@ -164,7 +164,7 @@ static void hw_frame_render(hw* hw)
       return;
 
    pre(renderer_index < (u32)renderer_count);
-   hw->renderer.frame_present(hw, renderers[renderer_index]);
+   hw->renderer.frame_present(hw, renderers[renderer_index], &hw->state);
 }
 
 static void hw_log(hw* hw, s8 message, ...)

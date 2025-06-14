@@ -7,6 +7,8 @@
 // other plats for vulkan
 #endif
 
+#define RTX 0
+
 #include "common.h"
 #include "arena.h"
 
@@ -71,7 +73,6 @@ align_struct
 } vk_meshlet;
 
 align_struct
-
 {
    u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
    u8 primitive_indices[127*3];  // up to 127 triangles (primitives) into the above buffer
