@@ -25,15 +25,19 @@ static void app_input_handle(app_state* state)
       state->input.mouse_wheel_state = 0;
    }
 
+   // rads = rads/pixels * pixels
    if(state->input.mouse_dragged)
    {
-      f32 speed = 0.005f;
+      // half turn across view plane width
+      f32 speed_x = PI/state->camera.viewplane_width;
+      f32 speed_y = PI/state->camera.viewplane_height;
 
+      // delta in pixels
       f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
       f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-      state->camera.azimuth += delta_x * speed;
-      state->camera.altitude += delta_y * speed;
+      state->camera.azimuth += speed_x * delta_x;
+      state->camera.altitude += speed_y * delta_y;
       state->input.mouse_dragged = false;
    }
 

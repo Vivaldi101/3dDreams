@@ -33,6 +33,8 @@ align_struct app_camera
    f32 azimuth;
    f32 altitude;
    f32 radius;
+   u32 viewplane_width;
+   u32 viewplane_height;
 } app_camera;
 
 align_struct app_state

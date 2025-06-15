@@ -185,6 +185,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       if (!hw->platform_loop()) 
          break;
 
+      hw->state.camera.viewplane_width = hw->renderer.window.width;
+      hw->state.camera.viewplane_height = hw->renderer.window.height;
       app_input_function(&hw->state);
       app_frame_function(hw->vk_storage, &hw->state);
 
