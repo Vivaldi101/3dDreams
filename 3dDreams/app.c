@@ -31,7 +31,6 @@ static void app_input_handle(app_state* state)
       f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
       f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-      // Update azimuth and altitude
       state->camera.azimuth += delta_x * speed;
       state->camera.altitude += delta_y * speed;
       state->input.mouse_dragged = false;
