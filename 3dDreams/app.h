@@ -32,6 +32,7 @@ align_struct app_camera
    vec3 pos;
    f32 azimuth;
    f32 altitude;
+   f32 radius;
 } app_camera;
 
 align_struct app_state

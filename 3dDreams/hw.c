@@ -178,6 +178,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
+   // start orbiting with radius of one
+   hw->state.camera.radius = 1.0f;
    for (;;)
    {
       if (!hw->platform_loop()) 

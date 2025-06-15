@@ -10,17 +10,18 @@ static void app_frame(arena scratch, app_state* state)
 {
 }
 
+// TODO: Handle flipping 
 static void app_input_handle(app_state* state)
 {
-   static f32 radius = 1.0f;
+   f32 radius = state->camera.radius;
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
-      radius -= 0.1f;
+      radius -= .1f;
       state->input.mouse_wheel_state = 0;
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
-      radius += 0.1f;
+      radius += .1f;
       state->input.mouse_wheel_state = 0;
    }
 
@@ -48,6 +49,7 @@ static void app_input_handle(app_state* state)
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
    state->input.mouse_prev_pos[1] = state->input.mouse_pos[1];
+   state->camera.radius = radius;
 }
 
 void app_start(int argc, const char** argv, hw* hw)
