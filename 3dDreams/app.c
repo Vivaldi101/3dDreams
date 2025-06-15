@@ -16,7 +16,7 @@ static void app_input_handle(app_state* state)
 
    if(state->input.mouse_dragged)
    {
-      f32 speed = 0.01f;
+      f32 speed = 0.005f;
 
       f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
       f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
