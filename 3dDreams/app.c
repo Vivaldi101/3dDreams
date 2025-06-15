@@ -12,42 +12,33 @@ static void app_frame(arena scratch, app_state* state)
 
 static void app_input_handle(app_state* state)
 {
-   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
+   f32 radius = 1.0f;
+
+   if(state->input.mouse_dragged)
    {
-      f32 speed = 1.0f;
-      f32 radius = 1.0f;
+      f32 speed = 0.01f;
 
-      // TODO: normalize into pi and pi/2
-      f32 azimuth = (f32)state->input.mouse_pos[0];
-      f32 altitude = (f32)state->input.mouse_pos[1];
+      f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
+      f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-      // TODO: get the client area
-      f32 w = 800.0f;   // TODO: for testing
-      f32 h = 600.0f;   // TODO: for testing
-
-      azimuth = clamp(azimuth, 0.f, w-1);
-      altitude = clamp(altitude, 0.f, h-1);
-
-      assert(0.0f <= azimuth && azimuth < w);
-      assert(0.0f <= altitude && altitude < h);
-
-      f32 aw = 2.f / (w - 1);
-      f32 ah = 2.f / (h - 1);
-      f32 b = -1.f;
-
-      azimuth = aw * azimuth + b;
-      altitude = ah * altitude + b;
-
-      assert(-1.f <= azimuth && azimuth <= 1.f);
-      assert(-1.f <= altitude && altitude <= 1.f);
-
-      f32 x = radius * cosf(altitude) * cosf(azimuth);    // right
-      f32 z = -radius * cosf(altitude) * sinf(azimuth);   // forward = -z
-      f32 y = -radius * sinf(altitude);                   // up
-
-      vec3 eye = {x, y, z};
-      state->camera.pos = eye;
+      // Update azimuth and altitude
+      state->camera.azimuth += delta_x * speed;
+      state->camera.altitude += delta_y * speed;
+      state->input.mouse_dragged = false;
    }
+
+   f32 azimuth = state->camera.azimuth;
+   f32 altitude = state->camera.altitude;
+
+   f32 x = radius * cosf(altitude) * cosf(azimuth);    // right
+   f32 z = -radius * cosf(altitude) * sinf(azimuth);   // forward = -z
+   f32 y = -radius * sinf(altitude);                   // up
+
+   vec3 eye = {x, y, z};
+   state->camera.pos = eye;
+
+   state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
+   state->input.mouse_prev_pos[1] = state->input.mouse_pos[1];
 }
 
 void app_start(int argc, const char** argv, hw* hw)

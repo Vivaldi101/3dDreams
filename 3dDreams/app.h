@@ -14,8 +14,10 @@ align_struct app_input
 {
    hw_input_type input_type;
    union { u32 mouse_pos[2]; u64 key; };
+   u32 mouse_prev_pos[2];
    // TODO: add mouse buttons
    u32 mouse_buttons;   // bit flags
+   bool mouse_dragged;
 } app_input;
 
 align_struct app_camera
