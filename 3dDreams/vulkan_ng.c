@@ -192,7 +192,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "sponza.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
@@ -845,14 +845,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
 
-   f32 height = 1000.0f;
-
    // world space origin
    // TODO: pass orbit data here
    vec3 eye = state->camera.pos;
-   if(eye.x == .0f && eye.y == .0f && eye.z == 0.f)
-      eye.z = 1.0f;
-
    vec3 origin = {};
 
    vec3 dir = vec3_sub(&eye, &origin);
@@ -861,7 +856,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    mvp.view = mat4_view(eye, dir);
 
    mvp.model = mat4_identity();
-   //mvp.model = mat4_mul(mvp.model, roty);
+   //mvp.model = mat4_scale(mvp.model, 0.025f);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};

@@ -12,7 +12,17 @@ static void app_frame(arena scratch, app_state* state)
 
 static void app_input_handle(app_state* state)
 {
-   f32 radius = 1.0f;
+   static f32 radius = 1.0f;
+   if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
+   {
+      radius -= 0.1f;
+      state->input.mouse_wheel_state = 0;
+   }
+   else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
+   {
+      radius += 0.1f;
+      state->input.mouse_wheel_state = 0;
+   }
 
    if(state->input.mouse_dragged)
    {

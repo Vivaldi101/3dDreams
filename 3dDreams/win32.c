@@ -137,6 +137,16 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          win32_hw->state.input.key = wparam;
          break;
 
+      case WM_MOUSEWHEEL:
+      {
+         i32 delta = GET_WHEEL_DELTA_WPARAM(wparam);
+         if(delta > 0)
+            win32_hw->state.input.mouse_wheel_state = MOUSE_WHEEL_STATE_UP;
+         else if(delta < 0)
+            win32_hw->state.input.mouse_wheel_state = MOUSE_WHEEL_STATE_DOWN;
+      }
+      break;
+
       case WM_MOUSEMOVE:
       {
          POINT pt;

@@ -10,6 +10,12 @@ enum
    MOUSE_BUTTON_STATE_MIDDLE = 1 << 2,
 };
 
+enum
+{
+   MOUSE_WHEEL_STATE_DOWN = 1 << 0,
+   MOUSE_WHEEL_STATE_UP = 1 << 1,
+};
+
 align_struct app_input
 {
    hw_input_type input_type;
@@ -17,6 +23,7 @@ align_struct app_input
    u32 mouse_prev_pos[2];
    // TODO: add mouse buttons
    u32 mouse_buttons;   // bit flags
+   u32 mouse_wheel_state;     // bit flags
    bool mouse_dragged;
 } app_input;
 
