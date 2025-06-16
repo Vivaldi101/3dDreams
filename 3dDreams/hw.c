@@ -180,6 +180,10 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    // start orbiting with radius of one
    hw->state.camera.radius = 1.0f;
+   vec3 eye = {1.f*hw->state.camera.radius, 0, 0};
+   vec3 origin = {0.f, 0.f, 0.f};
+   hw->state.camera.pos = eye;
+   hw->state.camera.dir = vec3_sub(&eye, &origin);
    for (;;)
    {
       if (!hw->platform_loop()) 
