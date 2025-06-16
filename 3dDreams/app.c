@@ -14,6 +14,7 @@ static void app_frame(arena scratch, app_state* state)
 static void app_input_handle(app_state* state)
 {
    f32 radius = state->camera.radius;
+   // TODO: de/accelration keys for zooming
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       radius -= .1f;
@@ -58,8 +59,8 @@ static void app_input_handle(app_state* state)
    f32 altitude = state->camera.altitude;
 
    f32 x = radius * cosf(altitude) * cosf(azimuth);    // right
-   f32 z = -radius * cosf(altitude) * sinf(azimuth);   // forward = -z
-   f32 y = -radius * sinf(altitude);                   // up
+   f32 z = radius * cosf(altitude) * sinf(azimuth);   // forward = -z
+   f32 y = radius * sinf(altitude);                   // up
    vec3 eye = {x, y, z};
    vec3 old_eye = state->camera.pos;
    state->camera.pos = eye;
