@@ -71,7 +71,6 @@ static void app_input_handle(app_state* state)
    else if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT))
    {
       vec3 dir = {-x, -y, -z};
-      vec3 origin = {1.f, 0.f, 0.f};
       state->camera.dir = dir;
    }
 
