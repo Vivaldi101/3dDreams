@@ -158,12 +158,6 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
       }
       break;
 
-      case WM_MOUSELEAVE:
-      case WM_NCMOUSELEAVE:
-      {
-         win32_hw->state.input.mouse_buttons = 0;
-      } break;
-
       case WM_LBUTTONDOWN:
          win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_LEFT;
          break;
