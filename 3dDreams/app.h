@@ -30,6 +30,7 @@ align_struct app_input
 align_struct app_camera
 {
    vec3 pos;
+   vec3 dir;
    f32 azimuth;
    f32 altitude;
    f32 radius;

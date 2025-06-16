@@ -26,7 +26,8 @@ static void app_input_handle(app_state* state)
    }
 
    // rads = rads/pixels * pixels
-   if(state->input.mouse_dragged)
+   // TODO: compress
+   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT))
    {
       // half turn across view plane width
       f32 speed_x = PI/state->camera.viewplane_width;
@@ -38,7 +39,19 @@ static void app_input_handle(app_state* state)
 
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
-      state->input.mouse_dragged = false;
+   }
+   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT))
+   {
+      // half turn across view plane width
+      f32 speed_x = PI/state->camera.viewplane_width;
+      f32 speed_y = PI/state->camera.viewplane_height;
+
+      // delta in pixels
+      f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
+      f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
+
+      state->camera.azimuth -= speed_x * delta_x;
+      state->camera.altitude -= speed_y * delta_y;
    }
 
    f32 azimuth = state->camera.azimuth;
@@ -48,12 +61,24 @@ static void app_input_handle(app_state* state)
    f32 z = -radius * cosf(altitude) * sinf(azimuth);   // forward = -z
    f32 y = -radius * sinf(altitude);                   // up
 
-   vec3 eye = {x, y, z};
-   state->camera.pos = eye;
+   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT))
+   {
+      vec3 eye = {x, y, z};
+      vec3 origin = {0.f, 0.f, 0.f};
+      state->camera.pos = eye;
+      state->camera.dir = vec3_sub(&eye, &origin);
+   }
+   else if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT))
+   {
+      vec3 dir = {-x, -y, -z};
+      vec3 origin = {1.f, 0.f, 0.f};
+      state->camera.dir = dir;
+   }
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
    state->input.mouse_prev_pos[1] = state->input.mouse_pos[1];
    state->camera.radius = radius;
+   state->input.mouse_dragged = false;
 }
 
 void app_start(int argc, const char** argv, hw* hw)
