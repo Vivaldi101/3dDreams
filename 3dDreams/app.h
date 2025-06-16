@@ -24,7 +24,6 @@ align_struct app_input
    // TODO: add mouse buttons
    u32 mouse_buttons;   // bit flags
    u32 mouse_wheel_state;     // bit flags
-   bool mouse_dragged;
 } app_input;
 
 align_struct app_camera

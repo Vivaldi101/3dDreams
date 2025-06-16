@@ -27,7 +27,7 @@ static void app_input_handle(app_state* state)
 
    // rads = rads/pixels * pixels
    // TODO: compress
-   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT))
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
       // half turn across view plane width
       f32 speed_x = PI/state->camera.viewplane_width;
@@ -40,7 +40,7 @@ static void app_input_handle(app_state* state)
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
    }
-   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT))
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
       // half turn across view plane width
       f32 speed_x = PI/state->camera.viewplane_width;
@@ -60,24 +60,26 @@ static void app_input_handle(app_state* state)
    f32 x = radius * cosf(altitude) * cosf(azimuth);    // right
    f32 z = -radius * cosf(altitude) * sinf(azimuth);   // forward = -z
    f32 y = -radius * sinf(altitude);                   // up
+   vec3 eye = {x, y, z};
+   vec3 old_eye = state->camera.pos;
+   state->camera.pos = eye;
 
-   if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT))
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
-      vec3 eye = {x, y, z};
       vec3 origin = {0.f, 0.f, 0.f};
       state->camera.pos = eye;
       state->camera.dir = vec3_sub(&eye, &origin);
    }
-   else if(state->input.mouse_dragged && (state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT))
+   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
       vec3 dir = {-x, -y, -z};
+      state->camera.pos = old_eye;
       state->camera.dir = dir;
    }
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
    state->input.mouse_prev_pos[1] = state->input.mouse_pos[1];
    state->camera.radius = radius;
-   state->input.mouse_dragged = false;
 }
 
 void app_start(int argc, const char** argv, hw* hw)
