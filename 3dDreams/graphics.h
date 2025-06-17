@@ -68,6 +68,12 @@ typedef vec4 quat;
 
 #define vec3_dot(a, b) ((a).x*(b).x + (a).y*(b).y + (a).z*(b).z)
 
+static vec3 vec3_scale(const vec3* a, f32 s) 
+{
+   vec3 v = {a->x*s, a->y*s, a->z*s};
+   return v;
+}
+
 static vec3 vec3_neg(const vec3* a) 
 {
    vec3 v = {-a->x, -a->y, -a->z};

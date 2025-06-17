@@ -36,15 +36,10 @@ static void app_input_handle(app_state* state)
    }
 
    // rads = rads/pixels * pixels
-   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
+   if(state->input.mouse_buttons & (MOUSE_BUTTON_STATE_LEFT | MOUSE_BUTTON_STATE_RIGHT))
    {
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
-   }
-   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
-   {
-      state->camera.azimuth -= speed_x * delta_x;
-      state->camera.altitude -= speed_y * delta_y;
    }
 
    f32 azimuth = state->camera.azimuth;
@@ -72,10 +67,7 @@ static void app_input_handle(app_state* state)
    {
       vec3 dir = state->camera.dir;
       vec3_normalize(dir);
-
-      dir.x *= 0.01f;
-      dir.y *= 0.01f;
-      dir.z *= 0.01f;
+      dir = vec3_scale(&dir, 0.01f);
 
       state->camera.pos = vec3_add(&state->camera.pos, &dir);
 
