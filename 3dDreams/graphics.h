@@ -68,6 +68,12 @@ typedef vec4 quat;
 
 #define vec3_dot(a, b) ((a).x*(b).x + (a).y*(b).y + (a).z*(b).z)
 
+static vec3 vec3_neg(const vec3* a) 
+{
+   vec3 v = {-a->x, -a->y, -a->z};
+   return v;
+}
+
 static vec3 vec3_sub(const vec3* a, const vec3* b) 
 {
    vec3 v = {b->x - a->x, b->y - a->y, b->z - a->z};

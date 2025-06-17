@@ -14,43 +14,35 @@ static void app_frame(arena scratch, app_state* state)
 static void app_input_handle(app_state* state)
 {
    f32 radius = state->camera.radius;
+
+   // half turn across view plane width
+   f32 speed_x = PI / state->camera.viewplane_width;
+   f32 speed_y = PI / state->camera.viewplane_height;
+
+   // delta in pixels
+   f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
+   f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
+
    // TODO: de/accelration keys for zooming
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
-      radius -= .1f;
+      radius -= 0.25f;
       state->input.mouse_wheel_state = 0;
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
-      radius += .1f;
+      radius += 0.25f;
       state->input.mouse_wheel_state = 0;
    }
 
    // rads = rads/pixels * pixels
-   // TODO: compress
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
-      // half turn across view plane width
-      f32 speed_x = PI/state->camera.viewplane_width;
-      f32 speed_y = PI/state->camera.viewplane_height;
-
-      // delta in pixels
-      f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
-      f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
-
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
    }
-   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
+   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      // half turn across view plane width
-      f32 speed_x = PI/state->camera.viewplane_width;
-      f32 speed_y = PI/state->camera.viewplane_height;
-
-      // delta in pixels
-      f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
-      f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
-
       state->camera.azimuth -= speed_x * delta_x;
       state->camera.altitude -= speed_y * delta_y;
    }
@@ -68,12 +60,11 @@ static void app_input_handle(app_state* state)
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
       vec3 origin = {0.f, 0.f, 0.f};
-      state->camera.pos = eye;
       state->camera.dir = vec3_sub(&eye, &origin);
    }
    else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      vec3 dir = {-x, -y, -z};
+      vec3 dir = vec3_neg(&eye);
       state->camera.pos = old_eye;
       state->camera.dir = dir;
    }
