@@ -175,9 +175,11 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          break;
 
       case WM_MBUTTONDOWN:
+         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_MIDDLE;
          break;
 
       case WM_MBUTTONUP:
+         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_MIDDLE;
          break;
       break;
    }

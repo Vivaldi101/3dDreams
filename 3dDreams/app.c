@@ -50,23 +50,36 @@ static void app_input_handle(app_state* state)
    f32 azimuth = state->camera.azimuth;
    f32 altitude = state->camera.altitude;
 
-   f32 x = radius * cosf(altitude) * cosf(azimuth);    // right
-   f32 z = radius * cosf(altitude) * sinf(azimuth);   // forward = -z
-   f32 y = radius * sinf(altitude);                   // up
+   f32 x = radius * cosf(altitude) * cosf(azimuth);
+   f32 z = radius * cosf(altitude) * sinf(azimuth);
+   f32 y = radius * sinf(altitude);
    vec3 eye = {x, y, z};
+   vec3 origin = {0.f, 0.f, 0.f};
    vec3 old_eye = state->camera.pos;
-   state->camera.pos = eye;
 
+   // TODO: Shift modifier to translate origin?
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
-      vec3 origin = {0.f, 0.f, 0.f};
+      state->camera.pos = eye;
       state->camera.dir = vec3_sub(&eye, &origin);
    }
    else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      vec3 dir = vec3_neg(&eye);
       state->camera.pos = old_eye;
-      state->camera.dir = dir;
+      state->camera.dir = vec3_neg(&eye);
+   }
+   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
+   {
+      vec3 dir = state->camera.dir;
+      vec3_normalize(dir);
+
+      dir.x *= 0.01f;
+      dir.y *= 0.01f;
+      dir.z *= 0.01f;
+
+      state->camera.pos = vec3_add(&state->camera.pos, &dir);
+
+      radius -= vec3_len(dir);
    }
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
