@@ -15,7 +15,7 @@ static void app_input_handle(app_state* state)
 {
    f32 radius = state->camera.radius;
 
-   // half turn across view plane width
+   // half turn across view plane extents (in azimuth)
    f32 speed_x = PI / state->camera.viewplane_width;
    f32 speed_y = PI / state->camera.viewplane_height;
 
@@ -38,8 +38,13 @@ static void app_input_handle(app_state* state)
    // rads = rads/pixels * pixels
    if(state->input.mouse_buttons & (MOUSE_BUTTON_STATE_LEFT | MOUSE_BUTTON_STATE_RIGHT))
    {
+      const f32 max_altitude = PI / 2.0f - 0.001f;
+
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
+
+      if(state->camera.altitude > max_altitude)  state->camera.altitude = max_altitude;
+      if(state->camera.altitude < -max_altitude) state->camera.altitude = -max_altitude;
    }
 
    f32 azimuth = state->camera.azimuth;
@@ -63,6 +68,7 @@ static void app_input_handle(app_state* state)
       state->camera.pos = old_eye;
       state->camera.dir = vec3_neg(&eye);
    }
+   // TODO: Do this with wasd
    else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
       vec3 dir = state->camera.dir;
@@ -70,8 +76,6 @@ static void app_input_handle(app_state* state)
       dir = vec3_scale(&dir, 0.01f);
 
       state->camera.pos = vec3_add(&state->camera.pos, &dir);
-
-      radius -= vec3_len(dir);
    }
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
