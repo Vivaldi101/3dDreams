@@ -189,6 +189,15 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       if (!hw->platform_loop()) 
          break;
 
+      // TODO: Handle all keys
+      if(GetAsyncKeyState('W') & 0x8000)
+      {
+         hw->state.input.key = 'W';
+         hw->state.input.key_state = KEY_STATE_DOWN;
+      }
+      else
+         hw->state.input.key_state = 0;
+
       hw->state.camera.viewplane_width = hw->renderer.window.width;
       hw->state.camera.viewplane_height = hw->renderer.window.height;
       app_input_function(&hw->state);

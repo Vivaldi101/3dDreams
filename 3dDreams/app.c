@@ -38,7 +38,7 @@ static void app_input_handle(app_state* state)
    // rads = rads/pixels * pixels
    if(state->input.mouse_buttons & (MOUSE_BUTTON_STATE_LEFT | MOUSE_BUTTON_STATE_RIGHT))
    {
-      const f32 max_altitude = PI / 2.0f - 0.001f;
+      const f32 max_altitude = PI / 2.0f - 0.01f;
 
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
@@ -55,27 +55,40 @@ static void app_input_handle(app_state* state)
    f32 y = radius * sinf(altitude);
    vec3 eye = {x, y, z};
    vec3 origin = {0.f, 0.f, 0.f};
-   vec3 old_eye = state->camera.pos;
 
-   // TODO: Shift modifier to translate origin?
+   if(state->input.key == 'W' && (state->input.key_state & KEY_STATE_DOWN))
+   {
+      f32 move_speed = 0.01f;
+      vec3 dir = state->camera.dir;
+      vec3_normalize(dir);
+      dir = vec3_scale(&dir, move_speed);
+
+      state->camera.pos = vec3_add(&state->camera.pos, &dir);
+   }
+   else if(state->input.key == 'S' && (state->input.key_state & KEY_STATE_DOWN))
+   {
+      f32 move_speed = -0.01f;
+      vec3 dir = state->camera.dir;
+      vec3_normalize(dir);
+      dir = vec3_scale(&dir, move_speed);
+
+      state->camera.pos = vec3_add(&state->camera.pos, &dir);
+   }
+
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
       state->camera.pos = eye;
       state->camera.dir = vec3_sub(&eye, &origin);
+
+      vec3_normalize(state->camera.dir);
    }
    else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      state->camera.pos = old_eye;
-      state->camera.dir = vec3_neg(&eye);
-   }
-   // TODO: Do this with wasd
-   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
-   {
-      vec3 dir = state->camera.dir;
-      vec3_normalize(dir);
-      dir = vec3_scale(&dir, 0.01f);
+      state->camera.dir.x += -x;
+      state->camera.dir.y += -y;
+      state->camera.dir.z += -z;
 
-      state->camera.pos = vec3_add(&state->camera.pos, &dir);
+      vec3_normalize(state->camera.dir);
    }
 
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
