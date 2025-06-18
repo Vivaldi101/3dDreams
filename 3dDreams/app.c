@@ -23,7 +23,6 @@ static void app_input_handle(app_state* state)
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-   // TODO: de/accelration keys for zooming
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       radius -= 0.25f;
@@ -60,6 +59,7 @@ static void app_input_handle(app_state* state)
    {
       f32 move_speed = 0.01f;
       vec3 dir = state->camera.dir;
+
       vec3_normalize(dir);
       dir = vec3_scale(&dir, move_speed);
 
