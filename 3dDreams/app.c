@@ -56,7 +56,7 @@ static void app_input_handle(app_state* state)
    vec3 eye = {x, y, z};
    vec3 origin = {0.f, 0.f, 0.f};
 
-   if(state->input.key == 'W' && (state->input.key_state & KEY_STATE_DOWN))
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
       f32 move_speed = 0.01f;
       vec3 dir = state->camera.dir;
@@ -65,16 +65,6 @@ static void app_input_handle(app_state* state)
 
       state->camera.pos = vec3_add(&state->camera.pos, &dir);
    }
-   else if(state->input.key == 'S' && (state->input.key_state & KEY_STATE_DOWN))
-   {
-      f32 move_speed = -0.01f;
-      vec3 dir = state->camera.dir;
-      vec3_normalize(dir);
-      dir = vec3_scale(&dir, move_speed);
-
-      state->camera.pos = vec3_add(&state->camera.pos, &dir);
-   }
-
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_LEFT)
    {
       state->camera.pos = eye;
@@ -82,7 +72,7 @@ static void app_input_handle(app_state* state)
 
       vec3_normalize(state->camera.dir);
    }
-   else if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
       state->camera.dir.x += -x;
       state->camera.dir.y += -y;
