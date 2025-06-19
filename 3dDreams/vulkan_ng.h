@@ -7,7 +7,7 @@
 // other plats for vulkan
 #endif
 
-#define RTX 0
+#define RTX 1
 
 #include "common.h"
 #include "arena.h"

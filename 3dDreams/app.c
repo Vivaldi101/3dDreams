@@ -10,9 +10,9 @@ static void app_frame(arena scratch, app_state* state)
 {
 }
 
-// TODO: Handle flipping 
-static void app_input_handle(app_state* state)
+static void app_camera_update(app_state* state)
 {
+   // Spherical camera
    f32 radius = state->camera.radius;
 
    // half turn across view plane extents (in azimuth)
@@ -42,8 +42,8 @@ static void app_input_handle(app_state* state)
       state->camera.azimuth += speed_x * delta_x;
       state->camera.altitude += speed_y * delta_y;
 
-      if(state->camera.altitude > max_altitude)  state->camera.altitude = max_altitude;
-      if(state->camera.altitude < -max_altitude) state->camera.altitude = -max_altitude;
+      state->camera.altitude > max_altitude ? state->camera.altitude = max_altitude : state->camera.altitude;
+      state->camera.altitude < -max_altitude ? state->camera.altitude = -max_altitude : state->camera.altitude;
    }
 
    f32 azimuth = state->camera.azimuth;
@@ -57,6 +57,7 @@ static void app_input_handle(app_state* state)
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
+      // TODO: base on scene size
       f32 move_speed = 0.01f;
       vec3 dir = state->camera.dir;
 
@@ -84,6 +85,12 @@ static void app_input_handle(app_state* state)
    state->input.mouse_prev_pos[0] = state->input.mouse_pos[0];
    state->input.mouse_prev_pos[1] = state->input.mouse_pos[1];
    state->camera.radius = radius;
+
+}
+
+static void app_input_handle(app_state* state)
+{
+   app_camera_update(state);
 }
 
 void app_start(int argc, const char** argv, hw* hw)
