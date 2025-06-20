@@ -358,10 +358,14 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
+#if _DEBUG
          debug_message("Supported device extensions:\n\n");
+#endif
          for(u32 j = 0; j < extension_count; ++j)
          {
+#if _DEBUG
             debug_message("%s\n", extensions[j].extensionName);
+#endif
             if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
             {
                context->rtx_supported = true;
