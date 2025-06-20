@@ -192,7 +192,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "teapot3.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message("Could not load .obj file");
 
@@ -325,11 +325,12 @@ static swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice 
    return result;
 }
 
-static VkPhysicalDevice vk_pdevice_select(vk_context* context, VkInstance instance)
+static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scratch, VkInstance instance)
 {
    assert(vk_valid_handle(instance));
 
    VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {};
+   VkPhysicalDevice fallback_gpu = 0;
    u32 dev_count = array_count(devs);
    vk_assert(vkEnumeratePhysicalDevices(instance, &dev_count, devs));
 
@@ -338,24 +339,44 @@ static VkPhysicalDevice vk_pdevice_select(vk_context* context, VkInstance instan
       VkPhysicalDeviceProperties props;
       vkGetPhysicalDeviceProperties(devs[i], &props);
 
+      // match version
       if(props.apiVersion < VK_VERSION_1_1)
          continue;
 
+      // timestamps
       if(!props.limits.timestampComputeAndGraphics)
          continue;
 
+      // dedicated gpu
       if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
       {
          context->time_period = props.limits.timestampPeriod;
-         return devs[i];
+         u32 extension_count = 0;
+         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+
+         // TODO: log all the device extensions
+         VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
+         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
+
+         for(u32 j = 0; j < extension_count; ++j)
+         {
+            if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
+            {
+               context->rtx_supported = true;
+               return devs[i];
+            }
+         }
+
+         // use fallback as the first discrete gpu
+         fallback_gpu = devs[i];
+         break;
       }
    }
 
-   assert(false);
-   return 0;
+   return fallback_gpu;
 }
 
-static u32 vk_ldevice_select_family_index()
+static u32 vk_logical_device_select_family_index()
 {
    // TODO: select the queue family
    return 0;
@@ -363,6 +384,8 @@ static u32 vk_ldevice_select_family_index()
 
 static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
 {
+   assert(vk_valid_handle(physical_device));
+
    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = {};
    mesh_shader_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT;
 
@@ -377,7 +400,7 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
    return max_mesh_tasks;
 }
 
-static VkDevice vk_ldevice_create(VkPhysicalDevice physical_device, u32 queue_family_index)
+static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, u32 queue_family_index)
 {
    assert(vk_valid_handle(physical_device));
    f32 queue_prio = 1.0f;
@@ -1432,13 +1455,12 @@ bool vk_initialize(hw* hw)
 
       if(!vk_valid(vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger)))
          return false;
-
    }
 #endif
 
-   context->queue_family_index = vk_ldevice_select_family_index();
-   context->physical_device = vk_pdevice_select(context, instance);
-   context->logical_device = vk_ldevice_create(context->physical_device, context->queue_family_index);
+   context->queue_family_index = vk_logical_device_select_family_index();
+   context->physical_device = vk_physical_device_select(context, *context->storage, instance);
+   context->logical_device = vk_logical_device_create(context->physical_device, context->queue_family_index);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);

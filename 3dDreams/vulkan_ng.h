@@ -125,9 +125,12 @@ align_struct
    swapchain_surface_info swapchain_info;
 
    arena* storage;
-   u32 queue_family_index;
 
+   u32 queue_family_index;
    f32 time_period;
+
+   bool rtx_supported;
+   bool rtx_enabled;
 } vk_context;
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);

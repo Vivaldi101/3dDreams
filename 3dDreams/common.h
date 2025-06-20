@@ -34,6 +34,8 @@ typedef struct
 #define inv(p)
 #endif
 
+#define fault  hw_message("Fault")
+
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))
 
