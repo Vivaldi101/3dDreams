@@ -7,8 +7,6 @@
 // other plats for vulkan
 #endif
 
-#define RTX 1
-
 #include "common.h"
 #include "arena.h"
 
@@ -133,6 +131,6 @@ align_struct
    bool rtx_enabled;
 } vk_context;
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size, bool rtx_supported);
 
 #endif

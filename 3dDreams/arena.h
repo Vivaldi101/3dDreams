@@ -60,8 +60,14 @@ typedef struct arena
 {
    void* beg;
    void* end;  // one past the end
-   void* base;
+   void* base; // this might be better inside the array structure
 } arena;
+
+typedef struct array
+{
+   arena arena;
+   size count;
+} array;
 
 static bool hw_is_virtual_memory_commited(void* address)
 {

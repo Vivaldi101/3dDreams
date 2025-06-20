@@ -82,7 +82,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names)
+static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names, bool rtx_supported)
 {
    assert(vk_valid_handle(logical_device));
 
@@ -106,23 +106,26 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
       for(usize i = 0; i < shader_len; ++i)
       {
          // TODO: cleanup this mess
-#if RTX
-         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
+         if(rtx_supported)
          {
-            vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
-            vk_shader_load(logical_device, scratch, *p, &ms);
-            spv_hash_insert(table, "meshlet", ms);
-            break;
+            if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
+            {
+               vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
+               vk_shader_load(logical_device, scratch, *p, &ms);
+               spv_hash_insert(table, "meshlet", ms);
+               break;
+            }
          }
-#else
-         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
+         else
          {
-            vk_shader_modules gm = spv_hash_lookup(table, "graphics");
-            vk_shader_load(logical_device, scratch, *p, &gm);
-            spv_hash_insert(table, "graphics", gm);
-            break;
+            if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
+            {
+               vk_shader_modules gm = spv_hash_lookup(table, "graphics");
+               vk_shader_load(logical_device, scratch, *p, &gm);
+               spv_hash_insert(table, "graphics", gm);
+               break;
+            }
          }
-#endif
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
             vk_shader_modules am = spv_hash_lookup(table, "axis");
@@ -134,7 +137,7 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
    }
 }
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size, bool rtx_supported)
 {
    assert(data);
    assert(scratch.data && scratch.size >= size);
@@ -159,13 +162,12 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.size = size;
    copy_barrier.offset = 0;
 
-#if RTX
+if(rtx_supported)
    vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-#else
+else
    vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-#endif
 
    vk_assert(vkEndCommandBuffer(cmd_buffer));
 
@@ -406,7 +408,7 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
    return max_mesh_tasks;
 }
 
-static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, u32 queue_family_index)
+static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena scratch, u32 queue_family_index, bool rtx_supported)
 {
    assert(vk_valid_handle(physical_device));
    f32 queue_prio = 1.0f;
@@ -417,17 +419,31 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, u32 q
    queue_info.pQueuePriorities = &queue_prio;
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
-   const char* dev_ext_names[] = 
+
+   // TODO: use an array with arena here
+   const char** p = push(&scratch, const char*);
+
+   const char** dev_ext_names = p;
+
+   *p = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+
+   p = push(&scratch, const char*);
+   *p = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+
+   p = push(&scratch, const char*);
+   *p = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
+
+   p = push(&scratch, const char*);
+   *p = VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME;
+
+   if(rtx_supported)
    {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-      VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-      VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-#if RTX
-      VK_EXT_MESH_SHADER_EXTENSION_NAME,
-      VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
-#endif
-   };
+      p = push(&scratch, const char*);
+      *p = VK_EXT_MESH_SHADER_EXTENSION_NAME;
+
+      p = push(&scratch, const char*);
+      *p = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
+   }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
@@ -439,19 +455,22 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, u32 q
    VkPhysicalDeviceFragmentShadingRateFeaturesKHR frag_shading_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
    frag_shading_features.primitiveFragmentShadingRate = VK_TRUE;
 
-#if RTX
+   // TODO: Dont expose if no rtx was supported
    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
-   mesh_shader_features.meshShader = true;
-   mesh_shader_features.taskShader = true;
-   mesh_shader_features.multiviewMeshShader = true;
-   mesh_shader_features.pNext = &frag_shading_features;
-#endif
+
+   if(rtx_supported)
+   {
+      mesh_shader_features.meshShader = true;
+      mesh_shader_features.taskShader = true;
+      mesh_shader_features.multiviewMeshShader = true;
+      mesh_shader_features.pNext = &frag_shading_features;
+   }
 
    VkPhysicalDeviceMultiviewFeatures multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
    multiview.multiview = true;
-#if RTX
-   multiview.pNext = &mesh_shader_features;
-#endif
+
+   if(rtx_supported)
+      multiview.pNext = &mesh_shader_features;
 
    vk12.pNext = &multiview;
    features2.pNext = &vk12;
@@ -465,7 +484,8 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, u32 q
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
-   ldev_info.enabledExtensionCount = array_count(dev_ext_names);
+   //ldev_info.enabledExtensionCount = array_count(dev_ext_names);
+   ldev_info.enabledExtensionCount = rtx_supported ? 6 : 4;   // TODO: use array_count(dev_ext_names) here
    ldev_info.ppEnabledExtensionNames = dev_ext_names;
    ldev_info.pNext = &features2;
 
@@ -906,16 +926,14 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
-#if RTX
-   vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
-                sizeof(mvp), &mvp);
-#else
-
-   vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                sizeof(mvp), &mvp);
-#endif
+   if(context->rtx_supported)
+      vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+                   sizeof(mvp), &mvp);
+   else
+      vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                   sizeof(mvp), &mvp);
 
    VkViewport viewport = {};
 
@@ -946,7 +964,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vb_info.offset = 0;
    vb_info.range = context->vb.size;
 
-#if RTX
+if(context->rtx_supported)
+{
    VkDescriptorBufferInfo mb_info = {};
    mb_info.buffer = context->mb.handle;
    mb_info.offset = 0;
@@ -974,7 +993,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    u32 draw_calls = 1;
    for(u32 i = 0; i < draw_calls; ++i)
       vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
-#else
+}
+else
+{
 
    VkWriteDescriptorSet descriptors[1] = {};
    descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -990,7 +1011,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    u32 draw_calls = 1;
    for(u32 i = 0; i < draw_calls; ++i)
       vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
-#endif
+}
 
 #if 0
    // draw axis
@@ -1069,69 +1090,80 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    if(hw->timer.time() - timer > 1000)
    {
-#if RTX
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; #Draw calls: %u"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count, draw_calls);
+      if(context->rtx_supported)
+         hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
       //hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, meshlet_count);
-#else
-      hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Draw calls: %u"), end - begin, gpu_end - gpu_begin, draw_calls);
-#endif
+      else
+         hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
       timer = hw->timer.time();
    }
    begin = end;
 }
 
-static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device)
+static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
 {
    assert(vk_valid_handle(logical_device));
    VkDescriptorSetLayout set_layout = 0;
 
-#if RTX
-   VkDescriptorSetLayoutBinding bindings[2] = {};
-   bindings[0].binding = 0;
-   bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   bindings[0].descriptorCount = 1;
-   bindings[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+   // TODO: cleanup
+   if(rtx_supported)
+   {
+      VkDescriptorSetLayoutBinding bindings[2] = {};
+      bindings[0].binding = 0;
+      bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      bindings[0].descriptorCount = 1;
+      bindings[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
 
-   bindings[1].binding = 1;
-   bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   bindings[1].descriptorCount = 1;
-   bindings[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
-#else
-   VkDescriptorSetLayoutBinding bindings[1] = {};
-   bindings[0].binding = 0;
-   bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   bindings[0].descriptorCount = 1;
-   bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-#endif
+      bindings[1].binding = 1;
+      bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      bindings[1].descriptorCount = 1;
+      bindings[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
 
-   VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
+      VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
-   info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-   info.bindingCount = array_count(bindings);
-   info.pBindings = bindings;
+      info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+      info.bindingCount = array_count(bindings);
+      info.pBindings = bindings;
 
-   vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout);
+      vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout);
+   }
+   else
+   {
+      VkDescriptorSetLayoutBinding bindings[1] = {};
+      bindings[0].binding = 0;
+      bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      bindings[0].descriptorCount = 1;
+      bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+      VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
+
+      info.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+      info.bindingCount = array_count(bindings);
+      info.pBindings = bindings;
+
+      vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout);
+   }
 
    return set_layout;
 }
 
-static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device)
+static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, bool rtx_supported)
 {
    assert(vk_valid_handle(logical_device));
    VkPipelineLayout layout = 0;
 
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
 
-   VkDescriptorSetLayout set_layout = vk_pipeline_set_layout_create(logical_device);
+   VkDescriptorSetLayout set_layout = vk_pipeline_set_layout_create(logical_device, rtx_supported);
    if(!vk_valid_handle(set_layout))
       return VK_NULL_HANDLE;
 
    VkPushConstantRange push_constants = {};
-#if RTX
-   push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
-#else
-   push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-#endif
+   if(rtx_supported)
+      push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
+   else
+      push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
    push_constants.offset = 0;
    push_constants.size = sizeof(mvp_transform);
 
@@ -1466,7 +1498,7 @@ bool vk_initialize(hw* hw)
 
    context->queue_family_index = vk_logical_device_select_family_index();
    context->physical_device = vk_physical_device_select(context, *context->storage, instance);
-   context->logical_device = vk_logical_device_create(context->physical_device, context->queue_family_index);
+   context->logical_device = vk_logical_device_create(context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
@@ -1480,9 +1512,8 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-#if RTX
-   assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
-#endif
+   if(context->rtx_supported)
+      assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
 
    if(!vk_swapchain_update(context))
       return false;
@@ -1496,18 +1527,21 @@ bool vk_initialize(hw* hw)
    spv_hash_table shader_hash_table = {};
    shader_hash_table.max_count = shader_count;
 
-   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names);
+   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names, context->rtx_supported);
 
    VkPipelineCache cache = 0; // TODO: enable
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device);
+   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->rtx_supported);
 
-#if RTX
-   vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
-   context->graphics_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, layout, &mm);
-#else
-   vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
-   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
-#endif
+   if(context->rtx_supported)
+   {
+      vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
+      context->graphics_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, layout, &mm);
+   }
+   else
+   {
+      vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
+      context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
+   }
 
    vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
    context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
@@ -1524,12 +1558,13 @@ bool vk_initialize(hw* hw)
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-#if RTX
-   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   context->mb = meshlet_buffer;
-#else
-   context->ib = index_buffer;
-#endif
+   if(context->rtx_supported)
+   {
+      vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      context->mb = meshlet_buffer;
+   }
+   else
+      context->ib = index_buffer;
    context->vb = vertex_buffer;
 
    vk_buffers_upload(context, scratch_buffer);
