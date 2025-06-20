@@ -25,16 +25,16 @@ typedef struct
 } s8;
 
 #ifdef _DEBUG
-#define pre(p)  {if(!(p))hw_message(p)}
-#define post(p) {if(!(p))hw_message(p)}
-#define inv(p)  {if(!(p))hw_message(p)}
+#define pre(p)  {if(!(p))hw_message_box(p)}
+#define post(p) {if(!(p))hw_message_box(p)}
+#define inv(p)  {if(!(p))hw_message_box(p)}
 #else
 #define pre(p)
 #define post(p)
 #define inv(p)
 #endif
 
-#define fault  hw_message("Fault")
+#define fault  hw_message_box("Fault")
 
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))

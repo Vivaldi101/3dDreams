@@ -194,7 +194,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 
    const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
-      hw_message("Could not load .obj file");
+      hw_message_box("Could not load .obj file");
 
    obj_load(context, *context->storage, &attrib, scratch_buffer);
 
@@ -358,8 +358,10 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
+         debug_message("Supported device extensions:\n\n");
          for(u32 j = 0; j < extension_count; ++j)
          {
+            debug_message("%s\n", extensions[j].extensionName);
             if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
             {
                context->rtx_supported = true;

@@ -111,12 +111,12 @@ void app_start(int argc, const char** argv, hw* hw)
    if(!vk_initialize(hw))
    {
       hw_window_close(hw);
-      hw_message("Could not initialize Vulkan");
+      hw_message_box("Could not initialize Vulkan");
    }
 
    hw_event_loop_start(hw, app_frame, app_input_handle);
    hw_window_close(hw);
 
 	if(!vk_uninitialize(hw))
-      hw_message("Could not uninitialize Vulkan");
+      hw_message_box("Could not uninitialize Vulkan");
 }

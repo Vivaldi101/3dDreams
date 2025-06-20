@@ -4,14 +4,14 @@
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#define hw_message(p) { MessageBoxA(0, #p, "Assertion", MB_OK); __debugbreak(); }
+#define hw_message_box(p) { MessageBoxA(0, #p, "Assertion", MB_OK); __debugbreak(); }
 #pragma comment(lib,	"winmm.lib") // timers etc.
 #elif
 // other plats like linux, osx and ios
 #endif
 
 // Every platform should define hw_message
-#define hw_assert(p) if(!(p)) hw_message(p)
+#define hw_assert(p) if(!(p)) hw_message_box(p)
 
 // TODO: Move this to general renderer.h
 // TODO: all caps

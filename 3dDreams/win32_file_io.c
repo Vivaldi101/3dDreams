@@ -9,7 +9,7 @@ static arena win32_file_read(arena* file_arena, const char* path)
    HANDLE file = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
    if(file == INVALID_HANDLE_VALUE)
    {
-      hw_message("No file with such name");
+      hw_message_box("No file with such name");
       return (arena) {};
    }
 
