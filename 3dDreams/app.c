@@ -92,9 +92,10 @@ static void app_input_handle(app_state* state)
 {
    app_camera_update(state);
 
-   if(state->input.key == 'R' && state->input.key_state == KEY_STATE_DOWN)
+   if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
-      int foo = 42;
+      state->input.key_state = 0;
+      state->rtx_enabled = !state->rtx_enabled;
    }
 }
 

@@ -21,7 +21,7 @@ enum
    KEY_STATE_DOWN = 1 << 0,
    KEY_STATE_UP = 1 << 1,
    KEY_STATE_RELEASED = 1 << 2,
-   KEY_STATE_REPEATING = 1 << 3,
+   KEY_STATE_REPEATING = 1 << 4
 };
 
 align_struct app_input
@@ -29,9 +29,9 @@ align_struct app_input
    hw_input_type input_type;
    u32 mouse_pos[2];
    u32 mouse_prev_pos[2];
-   u64 key;
    u32 mouse_buttons;
    u32 mouse_wheel_state;
+   u64 key;
    u32 key_state;
 } app_input;
 
@@ -52,6 +52,7 @@ align_struct app_state
    mat4 view;
    app_input input;
    app_camera camera;
+   bool rtx_enabled;
 } app_state;
 
 void app_start(int argc, const char** argv, hw* hw);

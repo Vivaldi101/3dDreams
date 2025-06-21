@@ -1078,13 +1078,12 @@ else
    {
       // frame logs
       // TODO: this should really be in app.c
-      if(hw->timer.time() - timer > 50)
+      if(hw->timer.time() - timer > 100)
       {
-         if(context->rtx_supported && hw->state.input.key == 'R' &&
-            (hw->state.input.key_state == KEY_STATE_DOWN || hw->state.input.key_state == KEY_STATE_REPEATING))
-            hw->log(hw, s8("RTX pipeline; cpu: %u ms; gpu: %.2f ms; #Meshlets: %u"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+         if(hw->state.rtx_enabled)
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
          else
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; RTX OFF"), end - begin, gpu_end - gpu_begin);
 
          timer = hw->timer.time();
       }
