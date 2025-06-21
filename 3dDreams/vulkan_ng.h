@@ -81,7 +81,6 @@ align_struct
 align_struct
 {
    scratch_array meshlet_buffer;
-   u32 meshlet_count;
 } mesh;
 
 align_struct

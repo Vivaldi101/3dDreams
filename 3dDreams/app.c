@@ -91,6 +91,11 @@ static void app_camera_update(app_state* state)
 static void app_input_handle(app_state* state)
 {
    app_camera_update(state);
+
+   if(state->input.key == 'R' && state->input.key_state == KEY_STATE_DOWN)
+   {
+      int foo = 42;
+   }
 }
 
 void app_start(int argc, const char** argv, hw* hw)
