@@ -194,7 +194,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   const char* filename = "dragon.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -421,7 +421,6 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    array extensions = {};
    extensions.arena = scratch;
-   extensions.data = scratch.beg;
 
    *push_array(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
    *push_array(&extensions, const char*) = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;

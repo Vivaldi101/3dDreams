@@ -33,7 +33,6 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
    meshlet ml = {};
 
    u8* meshlet_vertices = push(&scratch, u8, vertex_count);
-   // TODO: make_array(scratch...) - important to align scratch beg 
    result.meshlet_buffer.arena = scratch;
 
    // 0xff means the vertex index is not in use yet
@@ -135,11 +134,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    u32 primitive_index = 0;
 
    u32* ib_data = push(&scratch, u32, index_count);
-   //array vb_data = arena_new(&scratch, attrib->num_face_num_verts*sizeof(obj_vertex));
-   // TODO: make_array(arena scratch...)
    array vb_data = {};
    vb_data.arena = scratch;
-   vb_data.data = scratch.beg;
 
    for(usize f = 0; f < index_count; f += 3)
    {
