@@ -68,7 +68,7 @@ static const char** vk_shader_folder_read(arena* files, const char* shader_folde
    WIN32_FIND_DATA file_data;
 
    char path[MAX_PATH];
-   wsprintf(path, "%s\\%s\\*", project_dir.beg, shader_folder_path);
+   wsprintf(path, "%s\\%s\\*", (const char*)project_dir.beg, shader_folder_path);
    HANDLE first_file = FindFirstFile(path, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)

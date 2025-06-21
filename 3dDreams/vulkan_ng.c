@@ -22,7 +22,7 @@ static void obj_file_read(void *ctx, const char *filename, int is_mtl, const cha
    arena project_dir = vk_project_directory(&user_data->scratch);
 
    wsprintf(shader_path, project_dir.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", project_dir.beg, filename);
+   wsprintf(shader_path, "%s\\assets\\objs\\%s", (const char*)project_dir.beg, filename);
 
    arena file_read = win32_file_read(&user_data->scratch, shader_path);
 
