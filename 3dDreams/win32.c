@@ -177,6 +177,27 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
       case WM_MBUTTONUP:
          win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_MIDDLE;
          break;
+
+      // TODO: hash table for keys
+      case WM_KEYDOWN:
+      {
+         u32 vkcode = (u32)wparam;
+         bool is_repeat = (lparam & (1 << 30)) != 0;
+
+         win32_hw->state.input.key = vkcode;
+         win32_hw->state.input.key_state = is_repeat ? KEY_STATE_REPEATING : KEY_STATE_DOWN;
+
+         return 0;
+      }
+      case WM_KEYUP:
+      {
+         u32 vkcode = (u32)wparam;
+
+         win32_hw->state.input.key = vkcode;
+         win32_hw->state.input.key_state = KEY_STATE_UP;
+
+         return 0;
+      }
       break;
    }
 

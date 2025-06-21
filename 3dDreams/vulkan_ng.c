@@ -1075,15 +1075,21 @@ else
       begin = time;
    u32 end = hw->timer.time();
 
-   if(hw->timer.time() - timer > 1000)
+   if(hw->state.input.key == 'L' && (hw->state.input.key_state == KEY_STATE_DOWN || hw->state.input.key_state == KEY_STATE_REPEATING))
    {
-      if(context->rtx_supported)
-         hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
-      //hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %d"), end - begin, gpu_end - gpu_begin, meshlet_count);
-      else
-         hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
-      timer = hw->timer.time();
+      if(hw->timer.time() - timer > 100)
+      {
+         if(context->rtx_supported)
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+         else
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms"), end - begin, gpu_end - gpu_begin);
+
+         timer = hw->timer.time();
+      }
    }
+   else
+      hw->log(hw, s8("Vulkan App"));
+
    begin = end;
 }
 

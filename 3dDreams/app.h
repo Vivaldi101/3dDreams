@@ -18,15 +18,18 @@ enum
 
 enum
 {
-   KEY_STATE_DOWN = 1 << 1,
+   KEY_STATE_DOWN = 1 << 0,
+   KEY_STATE_UP = 1 << 1,
+   KEY_STATE_RELEASED = 1 << 2,
+   KEY_STATE_REPEATING = 1 << 3,
 };
 
 align_struct app_input
 {
    hw_input_type input_type;
-   union { u32 mouse_pos[2]; u64 key; };
+   u32 mouse_pos[2];
    u32 mouse_prev_pos[2];
-   // TODO: add mouse buttons
+   u64 key;
    u32 mouse_buttons;
    u32 mouse_wheel_state;
    u32 key_state;
