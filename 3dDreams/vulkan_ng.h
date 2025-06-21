@@ -80,10 +80,7 @@ align_struct
 
 align_struct
 {
-   size vertex_count;
-   u32* index_buffer;         // vertex indices
-   size index_count;
-   arena meshlet_buffer;
+   array meshlet_buffer;
    u32 meshlet_count;
 } mesh;
 

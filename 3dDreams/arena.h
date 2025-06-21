@@ -65,7 +65,6 @@ typedef struct arena
 {
    void* beg;
    void* end;  // one past the end
-   void* base; // this might be better inside the array structure
 } arena;
 
 typedef struct array
@@ -132,17 +131,17 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
 
-   // TODO: remove this
-   void* base = a->base;
-   a->base = !base ? p : base;
-
    return p;
 }
 
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
+   void* result = alloc(&a->arena, alloc_size, align, count, flag);
+
    a->count++;
-   return alloc(&a->arena, alloc_size, align, count, flag);
+   !a->data ? a->data = result : a->data;
+
+   return result;
 }
 
 static bool arena_reset(arena* a)
