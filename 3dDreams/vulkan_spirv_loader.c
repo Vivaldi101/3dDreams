@@ -60,7 +60,6 @@ static arena vk_project_directory(arena* storage)
    return result;
 }
 
-// TODO: path must end with wildcard - test it
 static const char** vk_shader_folder_read(arena* files, const char* shader_folder_path)
 {
    arena project_dir = vk_project_directory(files);

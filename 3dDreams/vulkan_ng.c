@@ -419,7 +419,7 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   array extensions = {};
+   scratch_array extensions = {};
    extensions.arena = scratch;
 
    *push_array(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;

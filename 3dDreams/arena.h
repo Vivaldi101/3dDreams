@@ -67,12 +67,12 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
-typedef struct array
+typedef struct scratch_array
 {
    arena arena;
    size count;
    void* data;
-} array;
+} scratch_array;
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -134,7 +134,7 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    return p;
 }
 
-static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
+static void* array_alloc(scratch_array* a, size alloc_size, size align, size count, u32 flag)
 {
    void* result = alloc(&a->arena, alloc_size, align, count, flag);
 

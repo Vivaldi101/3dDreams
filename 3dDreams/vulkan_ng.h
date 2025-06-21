@@ -80,7 +80,7 @@ align_struct
 
 align_struct
 {
-   array meshlet_buffer;
+   scratch_array meshlet_buffer;
    u32 meshlet_count;
 } mesh;
 
@@ -102,7 +102,7 @@ align_struct
    VkCommandBuffer command_buffer;
    VkRenderPass renderpass;
 
-   // TODO: Pipelines into an array
+   // TODO: Pipelines into an scratch_array
    VkPipeline graphics_pipeline;
    VkPipeline axis_pipeline;
    VkPipeline frustum_pipeline;

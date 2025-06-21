@@ -134,7 +134,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    u32 primitive_index = 0;
 
    u32* ib_data = push(&scratch, u32, index_count);
-   array vb_data = {};
+   scratch_array vb_data = {};
    vb_data.arena = scratch;
 
    for(usize f = 0; f < index_count; f += 3)
