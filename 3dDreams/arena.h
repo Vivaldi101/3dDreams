@@ -72,7 +72,7 @@ typedef struct array
 {
    arena arena;
    size count;
-   void* base; // TODO: add this and remove it from arena
+   void* data;
 } array;
 
 static bool hw_is_virtual_memory_commited(void* address)
