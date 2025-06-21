@@ -356,7 +356,6 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          u32 extension_count = 0;
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
 
-         // TODO: log all the device extensions
          VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
@@ -420,29 +419,19 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   // TODO: use an array with arena here
-   const char** p = push(&scratch, const char*);
+   array extensions = {};
+   extensions.arena = scratch;
+   extensions.base = scratch.beg;
 
-   const char** dev_ext_names = p;
-
-   *p = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-
-   p = push(&scratch, const char*);
-   *p = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
-
-   p = push(&scratch, const char*);
-   *p = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
-
-   p = push(&scratch, const char*);
-   *p = VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME;
+   *push_array(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+   *push_array(&extensions, const char*) = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+   *push_array(&extensions, const char*) = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
+   *push_array(&extensions, const char*) = VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME;
 
    if(rtx_supported)
    {
-      p = push(&scratch, const char*);
-      *p = VK_EXT_MESH_SHADER_EXTENSION_NAME;
-
-      p = push(&scratch, const char*);
-      *p = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
+      *push_array(&extensions, const char*) = VK_EXT_MESH_SHADER_EXTENSION_NAME;
+      *push_array(&extensions, const char*) = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
    }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
@@ -484,9 +473,8 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
-   //ldev_info.enabledExtensionCount = array_count(dev_ext_names);
-   ldev_info.enabledExtensionCount = rtx_supported ? 6 : 4;   // TODO: use array_count(dev_ext_names) here
-   ldev_info.ppEnabledExtensionNames = dev_ext_names;
+   ldev_info.enabledExtensionCount = (u32)extensions.count;
+   ldev_info.ppEnabledExtensionNames = extensions.base;
    ldev_info.pNext = &features2;
 
    VkDevice logical_device;
