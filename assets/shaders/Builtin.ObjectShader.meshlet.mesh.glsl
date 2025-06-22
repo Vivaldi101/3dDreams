@@ -4,6 +4,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
 
+#define DEBUG 1
+
 layout(push_constant) uniform Transform
 {
     mat4 projection;
@@ -57,6 +59,17 @@ vec3 renormalize_normal(vec3 n)
    return n/a + b;
 }
 
+uint hash_index(uint k)
+{
+   uint hash = 2166136261u;
+
+   uint bits = k;
+   hash ^= bits;
+   hash *= 16777619u;
+
+   return hash;
+}
+
 void main()
 {
     uint mi = gl_WorkGroupID.x;
@@ -64,6 +77,11 @@ void main()
 
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;
+
+#if DEBUG
+    uint h = hash_index(mi);
+    vec3 meshlet_color = vec3(float(h & 255), float((h >> 8) & 255), float((h >> 16) & 255)) / 255.f;
+#endif
 
     // write output counts once
     if(ti == 0)
@@ -81,7 +99,11 @@ void main()
       //vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
       vec3 normal = renormalize_normal(vec3(v.nx, v.ny, v.nz));
 
+#if DEBUG
+      out_color[i] = vec4(meshlet_color, 1.0);
+#else
       out_color[i] = vec4(vec3(normal), 1.0);
+#endif
     }
 
     for(uint i = ti; i < triangle_count; i += 64)

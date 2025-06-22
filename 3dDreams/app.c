@@ -8,6 +8,7 @@
 
 static void app_frame(arena scratch, app_state* state)
 {
+   // ...
 }
 
 static void app_camera_update(app_state* state)
