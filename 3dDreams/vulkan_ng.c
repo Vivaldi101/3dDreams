@@ -155,7 +155,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.size = size;
    copy_barrier.offset = 0;
 
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 
    vk_assert(vkEndCommandBuffer(cmd_buffer));
@@ -165,7 +165,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    submit_info.pCommandBuffers = &cmd_buffer;
 
    vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
-   // instead of explicit memory sync between queue submissions we wait all gpu jobs to complete
+   // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
    vk_assert(vkDeviceWaitIdle(device));
 }
 
