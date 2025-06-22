@@ -423,6 +423,7 @@ static mat4 mat4_rotation_z(f32 rotz)
 }
 
 #pragma pack(push, 1)
+// TODO: #include in shaders
 typedef struct mvp_transform
 {
     mat4 projection;

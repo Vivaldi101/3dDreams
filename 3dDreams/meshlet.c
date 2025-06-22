@@ -1,19 +1,14 @@
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
 
+#include "../assets/shaders/mesh.h"
+
 typedef struct 
 {
    arena scratch;
 } obj_user_ctx;
 
-typedef struct 
-{
-   f32 vx, vy, vz;   // pos
-   u8 nx, ny, nz;   // normal
-   f32 tu, tv;       // texture
-} obj_vertex;
-
-static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, meshlet* ml)
+static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct meshlet* ml)
 {
    if(meshlet_vertices[index] == 0xff)
    {
@@ -30,7 +25,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
 {
    mesh result = {};
 
-   meshlet ml = {};
+   struct meshlet ml = {};
 
    u8* meshlet_vertices = push(&scratch, u8, vertex_count);
    result.meshlet_buffer.arena = scratch;
@@ -58,7 +53,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         *push_array(&result.meshlet_buffer, meshlet) = ml;
+         *push_array(&result.meshlet_buffer, struct meshlet) = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -102,7 +97,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
 
    // add any left over meshlets
    if(ml.vertex_count > 0)
-      *push_array(&result.meshlet_buffer, meshlet) = ml;
+      *push_array(&result.meshlet_buffer, struct meshlet) = ml;
 
    return result;
 }
@@ -147,7 +142,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
          if(lookup == ~0u)
          {
-            obj_vertex v = {};
+            struct vertex v = {};
             if(vi >= 0)
             {
                v.vx = attrib->vertices[vi * 3 + 0];
@@ -173,7 +168,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
             hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index] = vertex_index++;
-            *push_array(&vb_data, obj_vertex) = v;
+            *push_array(&vb_data, struct vertex) = v;
          }
          else
             ib_data[primitive_index] = lookup;
@@ -184,7 +179,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    context->index_count = (u32)index_count;
 
-   usize vb_size = vertex_index * sizeof(obj_vertex);
+   usize vb_size = vertex_index * sizeof(struct vertex);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data.data, vb_size);
 
@@ -193,7 +188,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    context->meshlet_buffer = obj_mesh.meshlet_buffer.data;
 
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(meshlet));
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(struct meshlet));
 
    usize ib_size = index_count * sizeof(u32);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,

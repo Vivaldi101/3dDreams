@@ -72,14 +72,6 @@ align_struct
 
 align_struct
 {
-   u32 vertex_index_buffer[64];  // vertex indices into the main vertex buffer
-   u8 primitive_indices[127*3];  // up to 127 triangles (primitives) into the above buffer
-   u8 triangle_count;
-   u8 vertex_count;
-} meshlet;
-
-align_struct
-{
    scratch_array meshlet_buffer;
 } mesh;
 
@@ -116,7 +108,7 @@ align_struct
 
    u32 max_meshlet_count;
    u32 meshlet_count;
-   meshlet* meshlet_buffer;
+   struct meshlet* meshlet_buffer;
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
