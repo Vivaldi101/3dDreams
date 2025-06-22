@@ -102,10 +102,13 @@ align_struct
    VkRenderPass renderpass;
 
    // TODO: Pipelines into an scratch_array
+   VkPipeline rtx_pipeline;
    VkPipeline graphics_pipeline;
    VkPipeline axis_pipeline;
    VkPipeline frustum_pipeline;
+
    VkPipelineLayout pipeline_layout;
+   VkPipelineLayout rtx_pipeline_layout;
 
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
@@ -124,9 +127,10 @@ align_struct
    f32 time_period;
 
    bool rtx_supported;
-   bool rtx_enabled;
 } vk_context;
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size, bool rtx_supported);
+#define rtx_invariant(context, state) assert(implies(state->rtx_enabled, context->rtx_supported));
+
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
 
 #endif

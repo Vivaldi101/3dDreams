@@ -82,7 +82,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names, bool rtx_supported)
+static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names)
 {
    assert(vk_valid_handle(logical_device));
 
@@ -105,26 +105,19 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
 
       for(usize i = 0; i < shader_len; ++i)
       {
-         // TODO: cleanup this mess
-         if(rtx_supported)
+         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
          {
-            if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
-            {
-               vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
-               vk_shader_load(logical_device, scratch, *p, &ms);
-               spv_hash_insert(table, "meshlet", ms);
-               break;
-            }
+            vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
+            vk_shader_load(logical_device, scratch, *p, &ms);
+            spv_hash_insert(table, "meshlet", ms);
+            break;
          }
-         else
+         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
-            if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
-            {
-               vk_shader_modules gm = spv_hash_lookup(table, "graphics");
-               vk_shader_load(logical_device, scratch, *p, &gm);
-               spv_hash_insert(table, "graphics", gm);
-               break;
-            }
+            vk_shader_modules gm = spv_hash_lookup(table, "graphics");
+            vk_shader_load(logical_device, scratch, *p, &gm);
+            spv_hash_insert(table, "graphics", gm);
+            break;
          }
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
@@ -137,7 +130,7 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
    }
 }
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size, bool rtx_supported)
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
 {
    assert(data);
    assert(scratch.data && scratch.size >= size);
@@ -162,11 +155,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.size = size;
    copy_barrier.offset = 0;
 
-if(rtx_supported)
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT,
-                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
-else
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 
    vk_assert(vkEndCommandBuffer(cmd_buffer));
@@ -194,7 +183,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "dragon.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -847,6 +836,8 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
 
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
+   rtx_invariant(context, state);
+
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
@@ -913,8 +904,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
-   if(context->rtx_supported)
-      vkCmdPushConstants(command_buffer, context->pipeline_layout,
+   if(state->rtx_enabled)
+      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                    sizeof(mvp), &mvp);
    else
@@ -944,61 +935,60 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
-
    VkDescriptorBufferInfo vb_info = {};
    vb_info.buffer = context->vb.handle;
    vb_info.offset = 0;
    vb_info.range = context->vb.size;
 
-if(context->rtx_supported)
-{
-   VkDescriptorBufferInfo mb_info = {};
-   mb_info.buffer = context->mb.handle;
-   mb_info.offset = 0;
-   mb_info.range = context->mb.size;
+   if(state->rtx_enabled)
+   {
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline);
 
-   VkWriteDescriptorSet descriptors[2] = {};
-   descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptors[0].dstBinding = 0;
-   descriptors[0].descriptorCount = 1;
-   descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   descriptors[0].pBufferInfo = &vb_info;
+      VkDescriptorBufferInfo mb_info = {};
+      mb_info.buffer = context->mb.handle;
+      mb_info.offset = 0;
+      mb_info.range = context->mb.size;
 
-   descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptors[1].dstBinding = 1;
-   descriptors[1].descriptorCount = 1;
-   descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   descriptors[1].pBufferInfo = &mb_info;
+      VkWriteDescriptorSet descriptors[2] = {};
+      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[0].dstBinding = 0;
+      descriptors[0].descriptorCount = 1;
+      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[0].pBufferInfo = &vb_info;
 
-   // TODO: toggle mesh shading and vanilla vertex IA by button
-   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+      descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[1].dstBinding = 1;
+      descriptors[1].descriptorCount = 1;
+      descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[1].pBufferInfo = &mb_info;
 
-   // do 10 draw calls for measurement
-   assert(context->meshlet_count <= 0xffff);
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(descriptors), descriptors);
 
-   u32 draw_calls = 1;
-   for(u32 i = 0; i < draw_calls; ++i)
-      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
-}
-else
-{
+      // do 10 draw calls for measurement
+      assert(context->meshlet_count <= 0xffff);
 
-   VkWriteDescriptorSet descriptors[1] = {};
-   descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptors[0].dstBinding = 0;
-   descriptors[0].descriptorCount = 1;
-   descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-   descriptors[0].pBufferInfo = &vb_info;
+      u32 draw_calls = 1;
+      for(u32 i = 0; i < draw_calls; ++i)
+         vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
+   }
+   else
+   {
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
-   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+      VkWriteDescriptorSet descriptors[1] = {};
+      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptors[0].dstBinding = 0;
+      descriptors[0].descriptorCount = 1;
+      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      descriptors[0].pBufferInfo = &vb_info;
 
-   // TODO: toggle mesh shading and vanilla vertex IA by button
-   vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
-   u32 draw_calls = 1;
-   for(u32 i = 0; i < draw_calls; ++i)
-      vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
-}
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+
+      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+      u32 draw_calls = 1;
+      for(u32 i = 0; i < draw_calls; ++i)
+         vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+   }
 
 #if 0
    // draw axis
@@ -1090,6 +1080,8 @@ else
    }
 
    begin = end;
+
+   rtx_invariant(context, state);
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
@@ -1504,8 +1496,8 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   if(context->rtx_supported)
-      assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
+   // todo: remove
+   //if(context->rtx_supported) //assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
 
    if(!vk_swapchain_update(context))
       return false;
@@ -1519,26 +1511,23 @@ bool vk_initialize(hw* hw)
    spv_hash_table shader_hash_table = {};
    shader_hash_table.max_count = shader_count;
 
-   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names, context->rtx_supported);
+   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names);
 
    VkPipelineCache cache = 0; // TODO: enable
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->rtx_supported);
+   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, false);
+   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, true);
 
-   if(context->rtx_supported)
-   {
-      vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
-      context->graphics_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, layout, &mm);
-   }
-   else
-   {
-      vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
-      context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
-   }
+   vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
+   context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
+
+   vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
+   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
 
    vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
    context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
 
    context->pipeline_layout = layout;
+   context->rtx_pipeline_layout = rtx_layout;
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
@@ -1546,18 +1535,15 @@ bool vk_initialize(hw* hw)
    // TODO: fine tune these and get device memory limits
    // video memory
    size buffer_size = MB(1024);
+
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-   if(context->rtx_supported)
-   {
-      vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      context->mb = meshlet_buffer;
-   }
-   else
-      context->ib = index_buffer;
    context->vb = vertex_buffer;
+   context->mb = meshlet_buffer;
+   context->ib = index_buffer;
 
    vk_buffers_upload(context, scratch_buffer);
 

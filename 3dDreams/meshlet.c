@@ -186,21 +186,16 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    usize vb_size = vertex_index * sizeof(obj_vertex);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data.data, vb_size, context->rtx_supported);
+      scratch_buffer, vb_data.data, vb_size);
 
-   if(context->rtx_supported)
-   {
-      mesh obj_mesh = meshlet_build(scratch, context->storage, (u32)obj_table.count, ib_data, (u32)index_count);
+   mesh obj_mesh = meshlet_build(scratch, context->storage, (u32)obj_table.count, ib_data, (u32)index_count);
+   context->meshlet_count = (u32)obj_mesh.meshlet_buffer.count;
+   context->meshlet_buffer = obj_mesh.meshlet_buffer.data;
 
-      context->meshlet_count = (u32)obj_mesh.meshlet_buffer.count;
-      context->meshlet_buffer = obj_mesh.meshlet_buffer.data;
-      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-         scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(meshlet), context->rtx_supported);
-   }
-   else
-   {
-      usize ib_size = index_count * sizeof(u32);
-      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-         scratch_buffer, ib_data, ib_size, context->rtx_supported);
-   }
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(meshlet));
+
+   usize ib_size = index_count * sizeof(u32);
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
+      scratch_buffer, ib_data, ib_size);
 }
