@@ -144,6 +144,11 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    return result;
 }
 
+static array array_make(arena* a)
+{
+   return (array){.arena = a};
+}
+
 static bool arena_reset(arena* a)
 {
    return VirtualAlloc(a->beg, (byte*)a->end - (byte*)a->beg, MEM_RESET, PAGE_READWRITE) != 0;

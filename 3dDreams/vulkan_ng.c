@@ -408,8 +408,7 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   array extensions = {};
-   extensions.arena = &scratch;
+   array extensions = array_make(&scratch);
 
    *array_push(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
    *array_push(&extensions, const char*) = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
@@ -990,15 +989,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
    }
 
-#if 0
    // draw axis
    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
    vkCmdDraw(command_buffer, 18, 1, 0, 0);
-
-   // draw frustum
-   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
-   vkCmdDraw(command_buffer, 12, 1, 0, 0);
-#endif
 
    vkCmdEndRenderPass(command_buffer);
 
