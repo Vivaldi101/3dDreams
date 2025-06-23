@@ -21,7 +21,7 @@ static arena win32_file_read(arena* file_arena, const char* path)
    if(file_size_32 == 0)
       return (arena) {};
 
-   byte* buffer = push_size(file_arena, file_size_32);
+   byte* buffer = push(file_arena, byte, file_size_32);
 
    DWORD bytes_read = 0;
    if(!(ReadFile(file, buffer, file_size_32, &bytes_read, 0) && (file_size_32 == bytes_read)))
