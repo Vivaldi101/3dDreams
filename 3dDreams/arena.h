@@ -45,7 +45,7 @@ do { \
 #define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
-#define push_array(...)           newx(__VA_ARGS__,new4_array,new3_array,new2_array)(__VA_ARGS__)
+#define array_push(...)           newx(__VA_ARGS__,new4_array,new3_array,new2_array)(__VA_ARGS__)
 #define new2_array(a, t)          (t*)array_alloc(a, sizeof(t), __alignof(t), 1, 0)
 #define new3_array(a, t, n)       (t*)array_alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4_array(a, t, n, f)    (t*)array_alloc(a, sizeof(t), __alignof(t), n, f)
@@ -67,12 +67,12 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
-typedef struct scratch_array
+typedef struct array
 {
-   arena arena;
+   arena* arena;
    size count;
    void* data;
-} scratch_array;
+} array;
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -134,9 +134,9 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    return p;
 }
 
-static void* array_alloc(scratch_array* a, size alloc_size, size align, size count, u32 flag)
+static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
-   void* result = alloc(&a->arena, alloc_size, align, count, flag);
+   void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    a->count++;
    !a->data ? a->data = result : a->data;

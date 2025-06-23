@@ -28,7 +28,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
    struct meshlet ml = {};
 
    u8* meshlet_vertices = push(&scratch, u8, vertex_count);
-   result.meshlet_buffer.arena = scratch;
+   result.meshlet_buffer.arena = &scratch;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
@@ -53,7 +53,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         *push_array(&result.meshlet_buffer, struct meshlet) = ml;
+         *array_push(&result.meshlet_buffer, struct meshlet) = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -97,7 +97,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
 
    // add any left over meshlets
    if(ml.vertex_count > 0)
-      *push_array(&result.meshlet_buffer, struct meshlet) = ml;
+      *array_push(&result.meshlet_buffer, struct meshlet) = ml;
 
    return result;
 }
@@ -124,8 +124,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    u32 primitive_index = 0;
 
    u32* ib_data = push(&scratch, u32, index_count);
-   scratch_array vb_data = {};
-   vb_data.arena = scratch;
+   array vb_data = {};
+   vb_data.arena = &scratch;
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -168,7 +168,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
             hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index] = vertex_index++;
-            *push_array(&vb_data, struct vertex) = v;
+            *array_push(&vb_data, struct vertex) = v;
          }
          else
             ib_data[primitive_index] = lookup;

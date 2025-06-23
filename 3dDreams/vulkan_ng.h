@@ -72,7 +72,7 @@ align_struct
 
 align_struct
 {
-   scratch_array meshlet_buffer;
+   array meshlet_buffer;
 } mesh;
 
 align_struct
@@ -93,7 +93,7 @@ align_struct
    VkCommandBuffer command_buffer;
    VkRenderPass renderpass;
 
-   // TODO: Pipelines into an scratch_array
+   // TODO: Pipelines into an array
    VkPipeline rtx_pipeline;
    VkPipeline graphics_pipeline;
    VkPipeline axis_pipeline;
