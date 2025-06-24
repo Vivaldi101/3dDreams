@@ -24,9 +24,9 @@ do { \
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define array_push(...)           newx(__VA_ARGS__,new4_array,new3_array,new2_array)(__VA_ARGS__)
-#define new2_array(a, t)          (t*)array_alloc(a, sizeof(t), __alignof(t), 1, 0)
-#define new3_array(a, t, n)       (t*)array_alloc(a, sizeof(t), __alignof(t), n, 0)
-#define new4_array(a, t, n, f)    (t*)array_alloc(a, sizeof(t), __alignof(t), n, f)
+#define new2_array(a, t)          *(t*)array_alloc(a, sizeof(t), __alignof(t), 1, 0)
+#define new3_array(a, t, n)       *(t*)array_alloc(a, sizeof(t), __alignof(t), n, 0)
+#define new4_array(a, t, n, f)    *(t*)array_alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define sizeof(x)       (size)sizeof(x)
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
