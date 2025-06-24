@@ -183,7 +183,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "dragon.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -858,7 +858,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    {context->swapchain_info.image_width, context->swapchain_info.image_height};
 
    VkCommandBuffer command_buffer = context->command_buffer;
-   // begin command buffer
 
    vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
 
@@ -891,14 +890,13 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    VkImage color_image = context->swapchain_info.images[image_index];
    VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-   // TODO: Enable depth image barriers
-   //VkImage depth_image = context->swapchain_info.depths[image_index];
-   //VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-   //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                        //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
+   VkImage depth_image = context->swapchain_info.depths[image_index];
+   VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                        VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
 
 
    vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
@@ -996,13 +994,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdEndRenderPass(command_buffer);
 
    VkImageMemoryBarrier color_image_end_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_end_barrier);
-
-   // TODO: Enable depth image barriers
-   //VkImageMemoryBarrier depth_image_end_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED);
-   //vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                        //VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_end_barrier);
 
    vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1);
 
@@ -1207,7 +1200,6 @@ static VkPipeline vk_mesh_pipeline_create(VkDevice logical_device, VkRenderPass 
    depth_stencil_info.depthTestEnable = true;
    depth_stencil_info.depthWriteEnable = true;
    depth_stencil_info.depthBoundsTestEnable = true;
-   depth_stencil_info.stencilTestEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
@@ -1287,7 +1279,6 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_device, VkRenderP
    depth_stencil_info.depthTestEnable = true;
    depth_stencil_info.depthWriteEnable = true;
    depth_stencil_info.depthBoundsTestEnable = true;
-   depth_stencil_info.stencilTestEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
@@ -1363,9 +1354,9 @@ static VkPipeline vk_axis_pipeline_create(VkDevice logical_device, VkRenderPass 
    pipeline_info.pMultisampleState = &sample_info;
 
    VkPipelineDepthStencilStateCreateInfo depth_stencil_info = {vk_info(PIPELINE_DEPTH_STENCIL_STATE)};
-   depth_stencil_info.depthBoundsTestEnable = true;
    depth_stencil_info.depthTestEnable = true;
    depth_stencil_info.depthWriteEnable = true;
+   depth_stencil_info.depthBoundsTestEnable = true;
    depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;  // right handed NDC
    depth_stencil_info.minDepthBounds = 0.0f;
    depth_stencil_info.maxDepthBounds = 1.0f;
