@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(push_constant) uniform Transform
+layout(push_constant) uniform push_constants_uniform
 {
     mat4 projection;
     mat4 view;
@@ -9,7 +9,8 @@ layout(push_constant) uniform Transform
    float near;
    float far;
    float ar;
-} transform;
+   uint meshlet_offset;
+} push_constants;
 
 layout(location = 0) out vec3 axis_color;
 
@@ -63,7 +64,7 @@ vec3 colors[verts_count] = vec3[](
     vec3(0, 0, 1), vec3(0, 0, 1)
 );
     mat4 t = translate(vec3(0.0, -1.0, 0.0));
-    gl_Position = transform.projection * transform.view * t * vec4(positions[gl_VertexIndex], 1.0);
+    gl_Position = push_constants.projection * push_constants.view * t * vec4(positions[gl_VertexIndex], 1.0);
 
     axis_color = colors[gl_VertexIndex];
 }

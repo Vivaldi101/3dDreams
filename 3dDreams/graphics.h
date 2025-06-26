@@ -432,6 +432,7 @@ typedef struct mvp_transform
     f32 n;
     f32 f;
     f32 ar;
+    u32 meshlet_offset;
 } mvp_transform;
 #pragma pack(pop)
 

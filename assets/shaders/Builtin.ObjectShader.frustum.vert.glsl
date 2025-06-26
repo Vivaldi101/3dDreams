@@ -1,7 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(push_constant) uniform Transform
+layout(push_constant) uniform push_constants_uniform
 {
     mat4 projection;
     mat4 view;
@@ -9,17 +9,18 @@ layout(push_constant) uniform Transform
    float near;
    float far;
    float ar;
-} transform;
+   uint meshlet_offset;
+} push_constants;
 
 void main()
 {
    float fov_y = 90.0;
    float fov_half_y = fov_y/2.0;
    float tan = tan(radians(fov_half_y));
-   float ar = transform.ar;
+   float ar = push_constants.ar;
 
-   float t = transform.near*tan;
-   float r = t * transform.ar;
+   float t = push_constants.near*tan;
+   float r = t * push_constants.ar;
 
    if(ar < 1.0f)
    {
@@ -28,8 +29,8 @@ void main()
    }
 
    // near plane
-   float n = -transform.near;
-   float f = -transform.far;
+   float n = -push_constants.near;
+   float f = -push_constants.far;
 
    vec3 ntl = vec3(-r, t, n);
    vec3 ntr = vec3(r, t, n);
@@ -61,5 +62,5 @@ void main()
       origin, fbl, fbr
    };
 
-   gl_Position = transform.projection * transform.view * vec4(positions[gl_VertexIndex], 1.0);
+   gl_Position = push_constants.projection * push_constants.view * vec4(positions[gl_VertexIndex], 1.0);
 }

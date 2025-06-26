@@ -410,6 +410,7 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    array extensions = array_make(&scratch);
 
+   // TODO: fix this to this array_push(&extensions, value)
    array_push(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
    array_push(&extensions, const char*) = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
    array_push(&extensions, const char*) = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
@@ -878,7 +879,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    mvp.view = mat4_view(eye, dir);
 
    mvp.model = mat4_identity();
-   //mvp.model = mat4_scale(mvp.model, 0.025f);
+   mvp.meshlet_offset = 0;
+   mvp.model = mat4_scale(mvp.model, 1.f);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
@@ -961,12 +963,13 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(descriptors), descriptors);
 
-      // do 10 draw calls for measurement
-      assert(context->meshlet_count <= 0xffff);
+      u32 draw_calls = context->meshlet_count % 0xffff;
 
-      u32 draw_calls = 1;
-      for(u32 i = 0; i < draw_calls; ++i)
+      if(draw_calls == context->meshlet_count)
          vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
+      else
+      {
+      }
    }
    else
    {

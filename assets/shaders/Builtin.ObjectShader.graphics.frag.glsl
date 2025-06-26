@@ -4,7 +4,7 @@
 layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec4 in_color;
 
-layout(push_constant) uniform Transform
+layout(push_constant) uniform push_constants_uniform
 {
     mat4 projection;
     mat4 view;
@@ -12,7 +12,8 @@ layout(push_constant) uniform Transform
    float near;
    float far;
    float ar;
-} transform;
+   uint meshlet_offset;
+} push_constants;
 
 float ndc_to_linear_z(float ndc_z, float near, float far)
 {

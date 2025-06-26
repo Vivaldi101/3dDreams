@@ -5,7 +5,7 @@
 
 #include "mesh.h"
 
-layout(push_constant) uniform Transform
+layout(push_constant) uniform push_constants_uniform
 {
     mat4 projection;
     mat4 view;
@@ -13,7 +13,8 @@ layout(push_constant) uniform Transform
    float near;
    float far;
    float ar;
-} transform;
+   uint meshlet_offset;
+} push_constants;
 
 layout(set = 0, binding = 0) readonly buffer Verts
 {
@@ -26,7 +27,7 @@ void main()
 {
    vertex v = verts[gl_VertexIndex];
 
-   gl_Position = transform.projection * transform.view * transform.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+   gl_Position = push_constants.projection * push_constants.view * push_constants.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
    vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
 

@@ -3,7 +3,7 @@
 
 layout(location = 0) out vec4 out_color;
 
-layout(push_constant) uniform Transform
+layout(push_constant) uniform push_constants_uniform
 {
     mat4 projection;
     mat4 view;
@@ -11,7 +11,7 @@ layout(push_constant) uniform Transform
    float near;
    float far;
    float ar;
-} transform;
+} push_constants;
 
 float ndc_to_linear_z(float ndc_z, float near, float far)
 {
@@ -25,7 +25,7 @@ float ndc_to_linear_z(float ndc_z, float near, float far)
 
 void main()
 {
-    float linear_z = ndc_to_linear_z(gl_FragCoord.z, transform.near, transform.far);
+    float linear_z = ndc_to_linear_z(gl_FragCoord.z, push_constants.near, push_constants.far);
 
     //out_color = vec4(1.0);
     out_color = vec4(vec3(linear_z*0.125*0.5, 0.0, 0.0), 1.0);
