@@ -183,7 +183,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   const char* filename = "san-miguel.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -903,15 +903,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
-   if(state->rtx_enabled)
-      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
-                   sizeof(mvp), &mvp);
-   else
-      vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                   sizeof(mvp), &mvp);
-
    VkViewport viewport = {};
 
    // y-is-up
@@ -941,6 +932,10 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    if(state->rtx_enabled)
    {
+      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
+                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+                   sizeof(mvp), &mvp);
+
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline);
 
       VkDescriptorBufferInfo mb_info = {};
@@ -963,16 +958,24 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(descriptors), descriptors);
 
-      u32 draw_calls = context->meshlet_count % 0xffff;
-
-      if(draw_calls == context->meshlet_count)
-         vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count, 1, 1);
-      else
+      for(u32 base = 0; base < context->meshlet_count; base += 0xffff)
       {
+         u32 meshlet_count = min(context->meshlet_count - base, 0xffff);
+
+         vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
+                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
+                            offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+                            &base);
+
+         vkCmdDrawMeshTasksEXT(command_buffer, meshlet_count, 1, 1);
       }
    }
    else
    {
+      vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                   sizeof(mvp), &mvp);
+
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1060,7 +1063,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       if(hw->timer.time() - timer > 100)
       {
          if(hw->state.rtx_enabled)
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count > 0xffff ? 0xffff : context->meshlet_count);
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
             hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; RTX OFF"), end - begin, gpu_end - gpu_begin);
 
