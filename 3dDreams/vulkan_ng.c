@@ -943,6 +943,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       mb_info.offset = 0;
       mb_info.range = context->mb.size;
 
+      // TODO: descriptor templates
       VkWriteDescriptorSet descriptors[2] = {};
       descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       descriptors[0].dstBinding = 0;
@@ -958,17 +959,28 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(descriptors), descriptors);
 
-      for(u32 base = 0; base < context->meshlet_count; base += 0xffff)
-      {
-         u32 meshlet_count = min(context->meshlet_count - base, 0xffff);
+      u32 meshlet_limit = 0xffff;
+      u32 draw_calls = context->meshlet_count / meshlet_limit;
+      u32 base = 0;
 
+      // 0xffff is the AMD limit - check this also on nvidia
+      for(u32 i = 0; i < draw_calls; ++i)
+      {
          vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
                             offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
                             &base);
 
-         vkCmdDrawMeshTasksEXT(command_buffer, meshlet_count, 1, 1);
+         vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
+         base += meshlet_limit;
       }
+
+      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
+                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
+                         offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+                         &base);
+
+      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
    }
    else
    {
@@ -978,6 +990,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
+      // TODO: descriptor templates
       VkWriteDescriptorSet descriptors[1] = {};
       descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       descriptors[0].dstBinding = 0;
