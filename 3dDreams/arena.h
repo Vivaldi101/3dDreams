@@ -113,7 +113,7 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    a->count++;
-   !a->data ? a->data = result : a->data;
+   a->data = a->data ? a->data : result;
 
    return result;
 }
