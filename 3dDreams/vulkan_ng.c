@@ -183,7 +183,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "san-miguel.obj";
+   const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -410,16 +410,15 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    array extensions = array_make(&scratch);
 
-   // TODO: fix this to this array_push(&extensions, value)
-   array_push(&extensions, const char*) = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-   array_push(&extensions, const char*) = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
-   array_push(&extensions, const char*) = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
-   array_push(&extensions, const char*) = VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME;
+   array_push(&extensions, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+   array_push(&extensions, &VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+   array_push(&extensions, &VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+   array_push(&extensions, &VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
    if(rtx_supported)
    {
-      array_push(&extensions, const char*) = VK_EXT_MESH_SHADER_EXTENSION_NAME;
-      array_push(&extensions, const char*) = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
+      array_push(&extensions, &VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      array_push(&extensions, &VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
@@ -880,7 +879,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    mvp.model = mat4_identity();
    mvp.meshlet_offset = 0;
-   mvp.model = mat4_scale(mvp.model, 1.f);
+   mvp.model = mat4_scale(mvp.model, 1.0f);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};

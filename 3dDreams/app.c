@@ -26,6 +26,7 @@ static void app_camera_update(app_state* state)
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
+      // TODO: Correct speed
       radius -= 0.25f;
       state->input.mouse_wheel_state = 0;
    }
@@ -58,7 +59,7 @@ static void app_camera_update(app_state* state)
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
-      // TODO: base on scene size
+      // TODO: Correct speed
       f32 move_speed = 0.01f;
       vec3 dir = state->camera.dir;
 

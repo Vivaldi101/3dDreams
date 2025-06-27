@@ -23,10 +23,12 @@ do { \
 #define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
-#define array_push(...)           newx(__VA_ARGS__,new4_array,new3_array,new2_array)(__VA_ARGS__)
-#define new2_array(a, t)          *(t*)array_alloc(a, sizeof(t), __alignof(t), 1, 0)
-#define new3_array(a, t, n)       *(t*)array_alloc(a, sizeof(t), __alignof(t), n, 0)
-#define new4_array(a, t, n, f)    *(t*)array_alloc(a, sizeof(t), __alignof(t), n, f)
+#define array_push(arr, val) \
+    do { \
+        typeof(val) _v = (val); \
+        typeof(_v)* _p = (typeof(_v)*)array_alloc((arr), sizeof(_v), __alignof(_v), 1, 0); \
+        *_p = _v; \
+    } while (0)
 
 #define sizeof(x)       (size)sizeof(x)
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
