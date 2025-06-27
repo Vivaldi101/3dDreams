@@ -408,7 +408,7 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   array extensions = array_make(&scratch);
+   array(char) extensions = {.arena = &scratch};
 
    array_push(&extensions, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
    array_push(&extensions, &VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
@@ -461,7 +461,7 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
    ldev_info.enabledExtensionCount = (u32)extensions.count;
-   ldev_info.ppEnabledExtensionNames = extensions.data;
+   ldev_info.ppEnabledExtensionNames = (const char**)extensions.data;
    ldev_info.pNext = &features2;
 
    VkDevice logical_device;

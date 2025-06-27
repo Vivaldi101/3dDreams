@@ -26,7 +26,7 @@ do { \
 #define array_push(arr, val) \
     do { \
         typeof(val) _v = (val); \
-        typeof(_v)* _p = (typeof(_v)*)array_alloc((arr), sizeof(_v), __alignof(_v), 1, 0); \
+        typeof(_v)* _p = (typeof(_v)*)array_alloc((array*)(arr), sizeof(_v), __alignof(_v), 1, 0); \
         *_p = _v; \
     } while (0)
 
@@ -42,13 +42,16 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
-// heterogeneous
+// homogeneous
 typedef struct array
 {
    arena* arena;
    size count;
    void* data;
 } array;
+
+// heterogeneous
+#define array(T) struct array##T { arena* arena; size count; T* data; }
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -94,8 +97,6 @@ static void arena_expand(arena* a, size new_cap)
 
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
-   assert(align <= align_page_size);
-
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
