@@ -13,7 +13,7 @@ align_struct hw_window
 
 static void debug_message(const char* format, ...)
 {
-   static char temp[1 << 12];
+   static char temp[1 << 12] = {};
    assert(strlen(format)+1 <= array_count(temp));
 
    va_list args;

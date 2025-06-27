@@ -60,7 +60,7 @@ static void app_camera_update(app_state* state)
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
       // TODO: Correct speed
-      f32 move_speed = 0.01f;
+      f32 move_speed = 3.01f;
       vec3 dir = state->camera.dir;
 
       vec3_normalize(dir);

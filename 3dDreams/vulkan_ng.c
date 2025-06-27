@@ -349,7 +349,7 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
 #if _DEBUG
-         debug_message("Supported device extensions:\n\n");
+         debug_message("Supported Vulkan device extensions:\n\n");
 #endif
          for(u32 j = 0; j < extension_count; ++j)
          {
@@ -463,6 +463,16 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
    ldev_info.enabledExtensionCount = (u32)extensions.count;
    ldev_info.ppEnabledExtensionNames = (const char**)extensions.data;
    ldev_info.pNext = &features2;
+
+#if _DEBUG
+   debug_message("\n");
+   for(u32 i = 0; i < extensions.count; ++i)
+   {
+      const char* extension = ((const char**)extensions.data)[i];
+      debug_message("Using Vulkan device extension: %s\n", extension);
+   }
+   debug_message("\n");
+#endif
 
    VkDevice logical_device;
    vk_assert(vkCreateDevice(physical_device, &ldev_info, 0, &logical_device));
