@@ -351,7 +351,6 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    arena base_arena = {};
    base_arena.end = base;
 
-   //size total_arena_size = MB(2);
    size total_arena_size = KB(256);
    arena base_storage = arena_new(&base_arena, total_arena_size);
    assert(arena_left(&base_storage) == total_arena_size);

@@ -70,6 +70,17 @@ static arena arena_new(arena* base, size cap)
 
    arena result = {0};
 
+   // TODO: should prob move this in wide contract
+   if(hw_is_virtual_memory_commited(base->end))
+   {
+      result.beg = base->end;
+      result.end = (byte*)result.beg + cap;
+
+      assert(result.beg < result.end);
+
+      return result;
+   }
+
    result.beg = VirtualAlloc(base->end, cap, MEM_COMMIT, PAGE_READWRITE);
    result.end = (byte*)result.beg + cap;
 

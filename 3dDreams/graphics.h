@@ -225,8 +225,6 @@ static inline mat4 mat4_view(vec3 origin, vec3 dir)
 
 static inline mat4 mat4_perspective(f32 ar, f32 fov_y, f32 n, f32 f)
 {
-   //mat4 result = mat4_identity();
-
    f32 fov_half_y = fov_y/2.0f;
    f32 tan = tanf(DEG2RAD(fov_half_y));
 

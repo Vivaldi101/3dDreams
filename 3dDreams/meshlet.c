@@ -169,9 +169,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
             ib_data[primitive_index] = vertex_index++;
             array_push(&vb_data, v);
          }
-         else
-            ib_data[primitive_index] = lookup;
-
+         else ib_data[primitive_index] = lookup;
          ++primitive_index;
       }
    }

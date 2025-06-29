@@ -3,9 +3,9 @@
 
 struct vertex
 {
-   float vx, vy, vz;   // pos
-   uint8_t nx, ny, nz;   // normal
-   float tu, tv;       // texture
+   float vx, vy, vz;    // pos
+   uint8_t nx, ny, nz;  // normal
+   float tu, tv;        // texture
 };
 
 struct meshlet
