@@ -70,7 +70,6 @@ static arena arena_new(arena* base, size cap)
 
    arena result = {0};
 
-   // TODO: should prob move this in wide contract
    if(hw_is_virtual_memory_commited(base->end))
    {
       result.beg = base->end;
@@ -93,16 +92,13 @@ static void arena_expand(arena* a, size new_cap)
 {
    assert(new_cap > 0);
    assert((uintptr_t)a->end <= ((1ull << 48)-1) - page_size);
+
    arena new_arena = arena_new(a, new_cap);
-
-   new_arena.beg = a->end;
-
    assert(new_arena.beg == a->end);
    assert(new_arena.end > a->end);
 
    a->end = (byte*)new_arena.beg + new_cap;
 
-   // post
    assert(a->end == (byte*)new_arena.beg + new_cap);
 }
 
