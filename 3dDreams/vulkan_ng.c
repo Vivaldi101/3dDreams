@@ -183,7 +183,7 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   const char* filename = "buddha.obj";
+   const char* filename = "sponza.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
@@ -820,7 +820,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    mvp.f = 10000.0f;
    mvp.ar = ar;
 
-   mvp.projection = mat4_perspective(ar, 65.0f, mvp.n, mvp.f);
+   mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    hw->renderer.mvp = mvp;
 
    vkDeviceWaitIdle(context->logical_device);
@@ -1085,9 +1085,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       if(hw->timer.time() - timer > 100)
       {
          if(hw->state.rtx_enabled)
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; RTX OFF"), end - begin, gpu_end - gpu_begin);
+            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
 
          timer = hw->timer.time();
       }
