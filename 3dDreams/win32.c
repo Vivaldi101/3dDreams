@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include <Windows.h>
 
 #include "common.h"
@@ -38,10 +40,6 @@ static u32 win32_time()
    if(sys_time_base == 0) sys_time_base = timeGetTime();
    return timeGetTime() - sys_time_base;
 }
-
-#include <stdarg.h>
-#include <stdio.h>
-#include <windows.h>
 
 static void win32_log(hw* hw, s8 message, ...)
 {

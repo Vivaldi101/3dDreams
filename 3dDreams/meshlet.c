@@ -1,5 +1,10 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
+
+#define CGLTF_IMPLEMENTATION
+#include "../extern/cgltf/cgltf.h"
 
 #include "../assets/shaders/mesh.h"
 

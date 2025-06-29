@@ -30,7 +30,6 @@ do { \
         *_p = _v; \
     } while (0)
 
-#define sizeof(x)       (size)sizeof(x)
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
