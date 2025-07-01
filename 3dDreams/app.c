@@ -1,8 +1,11 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include "hw.h"
 #include "app.h"
 #include "graphics.h"
-#include "vulkan_ng.h"
 #include "arena.h"
+
+#include "vulkan_ng.c"
 
 #define FULLSCREEN 0
 

@@ -3,15 +3,17 @@
 
 #ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
+#pragma comment(lib,	"vulkan-1.lib")
 #elif
 // other plats for vulkan
 #endif
 
+#include <volk.h>
+
 #include "common.h"
 #include "arena.h"
 
-#include <vulkan/vulkan.h>
-
+// TODO: make vulkan_ng a shared lib
 bool vk_uninitialize(struct hw* hw);
 bool vk_initialize(struct hw* hw);
 

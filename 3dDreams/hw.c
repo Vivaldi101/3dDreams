@@ -2,44 +2,9 @@
 #include "common.h"
 #include "app.h"
 #include "graphics.h"
+#include "vulkan_ng.h"  // todo: should move this out
 
 #define MAX_ARGV 32
-
-align_struct hw_renderer
-{
-   void* backends[renderer_count];
-   void(*frame_present)(hw* hw, void* context, app_state* state);
-   void(*frame_resize)(hw* hw, u32 width, u32 height);
-   void(*frame_wait)(void* renderer);
-   void* (*window_surface_create)(void* instance, void* window_handle);
-   hw_window window;
-
-   // should be inside app.c
-   mvp_transform mvp;
-   // should be inside app.c
-
-   u32 renderer_index;
-} hw_renderer;
-
-align_struct hw_timer
-{
-   void(*sleep)(u32 ms);
-   u32(*time)();
-} hw_timer;
-
-align_struct hw
-{
-   hw_renderer renderer;
-   arena vk_storage;
-   hw_timer timer;
-   app_state state;
-   void (*log)(hw* hw, s8 message, ...);
-   bool(*platform_loop)();
-   bool finished;
-} hw;
-
-#define VK_USE_PLATFORM_WIN32_KHR
-#include "vulkan_ng.c"
 
 static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
 {

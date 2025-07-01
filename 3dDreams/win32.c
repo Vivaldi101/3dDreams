@@ -4,14 +4,9 @@
 
 #include "common.h"
 #include "arena.h"
+#include "stdio.h"
 
-align_struct hw_window
-{
-   HWND(*open)(const char* title, int x, int y, int width, int height);
-   void (*close)(struct hw_window window);
-   u32 width, height;
-   HWND handle;
-} hw_window;
+#include "hw.c"
 
 static void debug_message(const char* format, ...)
 {
@@ -26,8 +21,6 @@ static void debug_message(const char* format, ...)
    va_end(args);
    OutputDebugStringA(temp);
 }
-
-#include "hw.c"
 
 static void win32_sleep(u32 ms)
 {
@@ -76,9 +69,9 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
    {
       case WM_CREATE:
       {
-         CREATESTRUCT* pCreate = (CREATESTRUCT*)(lparam);
-         int width = pCreate->cx;
-         int height = pCreate->cy;
+         CREATESTRUCT* pcreate = (CREATESTRUCT*)lparam;
+         int width = pcreate->cx;
+         int height = pcreate->cy;
 
          if(win32_hw)
          {

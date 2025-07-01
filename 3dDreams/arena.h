@@ -1,9 +1,11 @@
-﻿#pragma once
+﻿#if !defined(_ARENA_H)
+#define _ARENA_H
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+
 #include "common.h"
 
 #define arena_iterate(a, s, type, var, code_block) \
@@ -141,3 +143,5 @@ static bool arena_decommit(arena* a)
 {
    return VirtualFree(a->beg, 0, MEM_DECOMMIT) != 0;
 }
+
+#endif

@@ -24,6 +24,9 @@ enum
    KEY_STATE_REPEATING = 1 << 4
 };
 
+// TODO: rename
+typedef enum { HW_INPUT_TYPE_KEY, HW_INPUT_TYPE_MOUSE, HW_INPUT_TYPE_TOUCH } hw_input_type;
+
 align_struct app_input
 {
    hw_input_type input_type;
@@ -55,6 +58,6 @@ align_struct app_state
    bool rtx_enabled;
 } app_state;
 
-void app_start(int argc, const char** argv, hw* hw);
+void app_start(int argc, const char** argv, struct hw* hw);
 
 #endif

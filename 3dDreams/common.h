@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "hw.h"
 
 typedef uint8_t         u8;
 typedef int32_t         i32;

@@ -2,7 +2,7 @@
 #include "common.h"
 #include "graphics.h"
 
-#include <volk.c>
+//#include <volk.c>
 
 #include "vulkan_ng.h"
 
@@ -10,8 +10,6 @@
 #include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
 #include "meshlet.c"
-
-#pragma comment(lib,	"vulkan-1.lib")
 
 static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
@@ -266,7 +264,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* pUserData)
 {
-   debug_message("Validation layer message: %s\n", data->pMessage);
+#if _DEBUG
+   // todo: enable
+   //debug_message("Validation layer message: %s\n", data->pMessage);
+#endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
 #endif
@@ -349,12 +350,12 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
 #if _DEBUG
-         debug_message("Supported Vulkan device extensions:\n\n");
+         //debug_message("Supported Vulkan device extensions:\n\n");
 #endif
          for(u32 j = 0; j < extension_count; ++j)
          {
 #if _DEBUG
-            debug_message("%s\n", extensions[j].extensionName);
+            //debug_message("%s\n", extensions[j].extensionName);
 #endif
             if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
             {
@@ -465,13 +466,13 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
    ldev_info.pNext = &features2;
 
 #if _DEBUG
-   debug_message("\n");
+   //debug_message("\n");
    for(u32 i = 0; i < extensions.count; ++i)
    {
       const char* extension = ((const char**)extensions.data)[i];
-      debug_message("Using Vulkan device extension: %s\n", extension);
+      //debug_message("Using Vulkan device extension: %s\n", extension);
    }
-   debug_message("\n");
+   //debug_message("\n");
 #endif
 
    VkDevice logical_device;
