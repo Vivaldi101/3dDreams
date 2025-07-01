@@ -5,6 +5,7 @@
 #include "graphics.h"
 #include "arena.h"
 
+#include <volk.c>
 #include "vulkan_ng.c"
 
 #define FULLSCREEN 0
