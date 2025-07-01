@@ -134,7 +134,7 @@ static void hw_frame_render(hw* hw)
 
 static void hw_log(hw* hw, s8 message, ...)
 {
-   hw->log(hw, message);
+   hw->window_title(hw, message);
 }
 
 void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_state* state), void (*app_input_function)(struct app_state* state))

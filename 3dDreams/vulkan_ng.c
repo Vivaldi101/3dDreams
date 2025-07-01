@@ -314,7 +314,7 @@ static swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice 
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scratch, VkInstance instance)
+static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, arena scratch, VkInstance instance)
 {
    assert(vk_valid_handle(instance));
 
@@ -346,14 +346,9 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context, arena scr
          VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
          vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
 
-#if _DEBUG
-         //debug_message("Supported Vulkan device extensions:\n\n");
-#endif
          for(u32 j = 0; j < extension_count; ++j)
          {
-#if _DEBUG
-            //debug_message("%s\n", extensions[j].extensionName);
-#endif
+            hw->log(s8("Available Vulkan device extension: \t%s\n"), extensions[j].extensionName);
             if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
             {
                context->rtx_supported = true;
@@ -394,7 +389,7 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
    return max_mesh_tasks;
 }
 
-static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena scratch, u32 queue_family_index, bool rtx_supported)
+static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_device, arena scratch, u32 queue_family_index, bool rtx_supported)
 {
    assert(vk_valid_handle(physical_device));
    f32 queue_prio = 1.0f;
@@ -462,15 +457,11 @@ static VkDevice vk_logical_device_create(VkPhysicalDevice physical_device, arena
    ldev_info.ppEnabledExtensionNames = (const char**)extensions.data;
    ldev_info.pNext = &features2;
 
-#if _DEBUG
-   //debug_message("\n");
    for(u32 i = 0; i < extensions.count; ++i)
    {
       const char* extension = ((const char**)extensions.data)[i];
-      //debug_message("Using Vulkan device extension: %s\n", extension);
+      hw->log(s8("Using Vulkan device extension: \t\t%s\n"), extension);
    }
-   //debug_message("\n");
-#endif
 
    VkDevice logical_device;
    vk_assert(vkCreateDevice(physical_device, &ldev_info, 0, &logical_device));
@@ -826,6 +817,8 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    vk_swapchain_destroy(context);
    context->swapchain_info = vk_swapchain_info_create(context, width, height, context->queue_family_index);
    vk_swapchain_update(context);
+
+   hw->log(s8("Viewport resized: [%u %u]\n"), width, height);
 }
 
 static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
@@ -920,8 +913,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    viewport.minDepth = 0.0f;
    viewport.maxDepth = 1.0f;
-
-   //debug_message("viewport: %d %d\n", (int)viewport.width, (int)viewport.height);
 
    VkRect2D scissor = {};
    scissor.offset.x = 0;
@@ -1083,9 +1074,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       if(hw->timer.time() - timer > 100)
       {
          if(hw->state.rtx_enabled)
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
+            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
-            hw->log(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
+            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
 
          timer = hw->timer.time();
       }
@@ -1491,8 +1482,8 @@ bool vk_initialize(hw* hw)
 #endif
 
    context->queue_family_index = vk_logical_device_select_family_index();
-   context->physical_device = vk_physical_device_select(context, *context->storage, instance);
-   context->logical_device = vk_logical_device_create(context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
+   context->physical_device = vk_physical_device_select(hw, context, *context->storage, instance);
+   context->logical_device = vk_logical_device_create(hw, context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);

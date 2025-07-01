@@ -61,7 +61,8 @@ typedef struct hw
    arena vk_storage;
    hw_timer timer;
    app_state state;
-   void (*log)(struct hw* hw, s8 message, ...);
+   void (*window_title)(struct hw* hw, s8 message, ...);
+   void (*log)(s8 message, ...);
    bool(*platform_loop)();
    bool finished;
 } hw;

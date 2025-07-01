@@ -8,15 +8,15 @@
 
 #include "hw.c"
 
-static void debug_message(const char* format, ...)
+static void win32_log(s8 format, ...)
 {
    static char temp[1 << 12] = {};
-   assert(strlen(format)+1 <= array_count(temp));
+   assert(strlen((const char*)format.data)+1 <= array_count(temp));
 
    va_list args;
    va_start(args, format);
 
-   wvsprintfA(temp, format, args);
+   wvsprintfA(temp, (const char*)format.data, args);
 
    va_end(args);
    OutputDebugStringA(temp);
@@ -34,7 +34,7 @@ static u32 win32_time()
    return timeGetTime() - sys_time_base;
 }
 
-static void win32_log(hw* hw, s8 message, ...)
+static void win32_window_title(hw* hw, s8 message, ...)
 {
    static char buffer[512];
 
@@ -356,6 +356,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
    hw.timer.time = win32_time;
 
    hw.platform_loop = win32_platform_loop;
+
+   hw.window_title = win32_window_title;
 
    hw.log = win32_log;
 
