@@ -17,13 +17,12 @@
 #include "arena.h"
 
 // TODO: Move this to general renderer.h
-// TODO: all caps
 enum
 {
-   vk_renderer_index, 
-	d3d12_renderer_index, 
-   soft_renderer_index,
-   renderer_count
+   VK_RENDERER_INDEX,
+   D3D12_RENDERER_INDEX,
+   SOFT_RENDERER_INDEX,
+   RENDERER_COUNT
 };
 
 typedef struct hw_window
@@ -36,7 +35,7 @@ typedef struct hw_window
 
 typedef struct hw_renderer
 {
-   void* backends[renderer_count];
+   void* backends[RENDERER_COUNT];
    void(*frame_present)(struct hw* hw, void* context, app_state* state);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
    void(*frame_wait)(void* renderer);

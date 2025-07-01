@@ -16,6 +16,4 @@ struct meshlet
    uint8_t vertex_count;
 };
 
-// TODO: add the transforms
-
 #endif

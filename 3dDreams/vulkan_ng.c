@@ -1,14 +1,12 @@
 #include "arena.h"
 #include "common.h"
 #include "graphics.h"
-
-//#include <volk.c>
-
 #include "vulkan_ng.h"
 
-#include "hash.c"
+// TODO: extract win32 shit out
 #include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
+#include "hash.c"
 #include "meshlet.c"
 
 static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
@@ -262,10 +260,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity_flags,
     VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* data,
-    void* pUserData)
+    void* userdata)
 {
 #if _DEBUG
-   // todo: enable
    //debug_message("Validation layer message: %s\n", data->pMessage);
 #endif
 #ifdef vk_break_on_validation
@@ -810,7 +807,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
       return;
 
    u32 renderer_index = hw->renderer.renderer_index;
-   assert(renderer_index < renderer_count);
+   assert(renderer_index < RENDERER_COUNT);
 
    vk_context* context = hw->renderer.backends[renderer_index];
 
@@ -1458,10 +1455,10 @@ bool vk_initialize(hw* hw)
    vk_context* context = push(&hw->vk_storage, vk_context);
 
    // app callbacks
-   hw->renderer.backends[vk_renderer_index] = context;
+   hw->renderer.backends[VK_RENDERER_INDEX] = context;
    hw->renderer.frame_present = vk_present;
    hw->renderer.frame_resize = vk_resize;
-   hw->renderer.renderer_index = vk_renderer_index;
+   hw->renderer.renderer_index = VK_RENDERER_INDEX;
 
    context->storage = &hw->vk_storage;
 
@@ -1565,7 +1562,7 @@ bool vk_initialize(hw* hw)
 
 bool vk_uninitialize(hw* hw)
 {
-   vk_context* context = hw->renderer.backends[vk_renderer_index];
+   vk_context* context = hw->renderer.backends[VK_RENDERER_INDEX];
 
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
