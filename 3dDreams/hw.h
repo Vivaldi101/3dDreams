@@ -15,6 +15,7 @@
 
 #include "app.h"
 #include "arena.h"
+#include "common.h"
 
 // TODO: Move this to general renderer.h
 enum
@@ -25,7 +26,7 @@ enum
    RENDERER_COUNT
 };
 
-typedef struct hw_window
+align_struct hw_window
 {
    void*(*open)(const char* title, int x, int y, int width, int height);
    void (*close)(struct hw_window window);
@@ -33,7 +34,7 @@ typedef struct hw_window
    void* handle;
 } hw_window;
 
-typedef struct hw_renderer
+align_struct hw_renderer
 {
    void* backends[RENDERER_COUNT];
    void(*frame_present)(struct hw* hw, void* context, app_state* state);
@@ -49,13 +50,13 @@ typedef struct hw_renderer
    u32 renderer_index;
 } hw_renderer;
 
-typedef struct hw_timer
+align_struct hw_timer
 {
    void(*sleep)(u32 ms);
    u32(*time)();
 } hw_timer;
 
-typedef struct hw
+align_struct hw
 {
    hw_renderer renderer;
    arena vk_storage;
