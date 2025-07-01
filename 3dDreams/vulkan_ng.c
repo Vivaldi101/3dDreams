@@ -179,11 +179,13 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
+   // obj
    const char* filename = "buddha.obj";
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
-
    obj_load(context, *context->storage, &attrib, scratch_buffer);
+
+   // gltf
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);

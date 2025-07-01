@@ -197,3 +197,30 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
       scratch_buffer, ib_data, ib_size);
 }
+
+static bool gltf_load(vk_context* context, arena scratch, s8 path)
+{
+   cgltf_options options = {};
+   cgltf_data* data = 0;
+   cgltf_result result = cgltf_parse_file(&options, (const char*)path.data, &data);
+
+   if(result != cgltf_result_success)
+      return false;
+
+   result = cgltf_load_buffers(&options, (const char*)data, path.data);
+   if(result != cgltf_result_success)
+   {
+      cgltf_free(data);
+      return false;
+   }
+
+   result = cgltf_validate(data);
+   if(result != cgltf_result_success)
+   {
+      cgltf_free(data);
+      return false;
+   }
+
+   cgltf_free(data);
+   return true;
+}
