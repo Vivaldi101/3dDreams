@@ -207,7 +207,7 @@ static bool gltf_load(vk_context* context, arena scratch, s8 path)
    if(result != cgltf_result_success)
       return false;
 
-   result = cgltf_load_buffers(&options, (const char*)data, path.data);
+   result = cgltf_load_buffers(&options, data, (const char*)path.data);
    if(result != cgltf_result_success)
    {
       cgltf_free(data);

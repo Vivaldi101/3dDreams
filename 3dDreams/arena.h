@@ -36,14 +36,12 @@ do { \
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
 
-// heterogeneous
 typedef struct arena
 {
    void* beg;
    void* end;  // one past the end
 } arena;
 
-// homogeneous
 typedef struct array
 {
    arena* arena;
@@ -51,7 +49,6 @@ typedef struct array
    void* data;
 } array;
 
-// heterogeneous
 #define array(T) struct array##T { arena* arena; size count; T* data; }
 
 static bool hw_is_virtual_memory_commited(void* address)
