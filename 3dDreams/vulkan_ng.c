@@ -9,21 +9,40 @@
 #include "hash.c"
 #include "meshlet.c"
 
-static void obj_file_read(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
+static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
-   char shader_path[MAX_PATH];
+   char file_path[MAX_PATH] = {};
 
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
 
    arena project_dir = vk_project_directory(&user_data->scratch);
 
-   wsprintf(shader_path, project_dir.beg, array_count(shader_path));
-   wsprintf(shader_path, "%s\\assets\\objs\\%s", (const char*)project_dir.beg, filename);
+   wsprintf(file_path, project_dir.beg, array_count(file_path));
+   wsprintf(file_path, "%s\\assets\\objs\\%s", (const char*)project_dir.beg, filename);
 
-   arena file_read = win32_file_read(&user_data->scratch, shader_path);
+   arena file_read = win32_file_read(&user_data->scratch, file_path);
 
    *len = scratch_left(file_read);
    *buf = file_read.beg;
+}
+
+static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
+{
+   char file_path[MAX_PATH] = {};
+
+   // TODO: pass our own file IO callbacks in the options instead of the default I/O and use our scratch arenas
+   gltf_user_ctx* user_data = (gltf_user_ctx*)user_context;
+
+   arena project_dir = vk_project_directory(&user_data->scratch);
+
+   wsprintf(file_path, project_dir.beg, array_count(file_path));
+   wsprintf(file_path, "%s\\assets\\gltf\\%s", (const char*)project_dir.beg, filename.data);
+
+   s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
+
+   // TODO: pass our own file IO callbacks in the options instead of the default I/O
+   if(!gltf_load(gltf_file_path))
+      hw_message_box("Could not load .gltf file");
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
@@ -165,8 +184,11 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
+// TODO: cleanup this and separate .obj and .gltf loading
 static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 {
+   // obj
+#if 1
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
    tinyobj_attrib_t attrib = {};
@@ -175,21 +197,25 @@ static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
    size_t material_count = 0;
 
    tinyobj_attrib_init(&attrib);
-
+   s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   // obj
-   const char* filename = "buddha.obj";
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, filename, obj_file_read, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, (const char*)asset_file.data, obj_file_read_callback, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
    obj_load(context, *context->storage, &attrib, scratch_buffer);
-
-   // gltf
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
+#else
+   // gltf
+   s8 asset_file = s8("DamagedHelmet.gltf");
+   gltf_user_ctx user_data = {};
+   user_data.scratch = *context->storage;
+
+   gltf_file_read(context, &user_data, asset_file);
+#endif
 }
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)

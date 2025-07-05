@@ -8,10 +8,16 @@
 
 #include "../assets/shaders/mesh.h"
 
+// TODO: semcompress
 typedef struct 
 {
    arena scratch;
 } obj_user_ctx;
+
+typedef struct 
+{
+   arena scratch;
+} gltf_user_ctx;
 
 static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct meshlet* ml)
 {
@@ -198,16 +204,16 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
       scratch_buffer, ib_data, ib_size);
 }
 
-static bool gltf_load(vk_context* context, arena scratch, s8 path)
+static bool gltf_load(s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
-   cgltf_result result = cgltf_parse_file(&options, (const char*)path.data, &data);
+   cgltf_result result = cgltf_parse_file(&options, (const char*)gltf_path.data, &data);
 
    if(result != cgltf_result_success)
       return false;
 
-   result = cgltf_load_buffers(&options, data, (const char*)path.data);
+   result = cgltf_load_buffers(&options, data, (const char*)gltf_path.data);
    if(result != cgltf_result_success)
    {
       cgltf_free(data);
