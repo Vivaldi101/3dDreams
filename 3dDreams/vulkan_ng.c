@@ -7,7 +7,7 @@
 #include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
-#include "meshlet.c"
+#include "meshes.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
@@ -41,7 +41,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_load(gltf_file_path))
+   if(!gltf_load(context, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -188,7 +188,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
 {
    // obj
-#if 1
+#if 0
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
    tinyobj_attrib_t attrib = {};

@@ -113,6 +113,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
    return result;
 }
 
+// TODO: extract the non-obj parts out of this
 static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
    index_hash_table obj_table = {};
@@ -204,7 +205,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
       scratch_buffer, ib_data, ib_size);
 }
 
-static bool gltf_load(s8 gltf_path)
+static bool gltf_load(vk_context* context, s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
@@ -225,6 +226,15 @@ static bool gltf_load(s8 gltf_path)
    {
       cgltf_free(data);
       return false;
+   }
+
+   for(usize i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* mesh = &data->meshes[i];
+      assert(mesh->primitives_count == 1);   // TODO:
+
+      cgltf_primitive* prim = &mesh->primitives[0];
+      assert(prim->type == cgltf_primitive_type_triangles);
    }
 
    cgltf_free(data);
