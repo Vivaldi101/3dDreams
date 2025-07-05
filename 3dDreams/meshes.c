@@ -187,13 +187,14 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
       }
    }
 
-   context->index_count = (u32)index_count;
+   u32 vertex_count = (u32)obj_table.count;
 
    usize vb_size = vertex_index * sizeof(struct vertex);
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data.data, vb_size);
 
-   mesh obj_mesh = meshlet_build(scratch, context->storage, (u32)obj_table.count, ib_data, (u32)index_count);
+   mesh obj_mesh = meshlet_build(scratch, context->storage, vertex_count, ib_data, (u32)index_count);
+   context->index_count = (u32)index_count;
    context->meshlet_count = (u32)obj_mesh.meshlet_buffer.count;
    context->meshlet_buffer = obj_mesh.meshlet_buffer.data;
 

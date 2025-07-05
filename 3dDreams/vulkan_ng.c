@@ -26,6 +26,29 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
+// TODO: clean up these top-level read apis
+static void obj_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
+{
+   tinyobj_shape_t* shapes = 0;
+   tinyobj_material_t* materials = 0;
+   tinyobj_attrib_t attrib = {};
+
+   size_t shape_count = 0;
+   size_t material_count = 0;
+
+   tinyobj_attrib_init(&attrib);
+
+   obj_user_ctx* user_data = (obj_user_ctx*)user_context;
+
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, (const char*)filename.data, obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+      hw_message_box("Could not load .obj file");
+   obj_load(context, *context->storage, &attrib, scratch_buffer);
+
+   tinyobj_materials_free(materials, material_count);
+   tinyobj_shapes_free(shapes, shape_count);
+   tinyobj_attrib_free(&attrib);
+}
+
 static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
    char file_path[MAX_PATH] = {};
@@ -184,40 +207,6 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-// TODO: cleanup this and separate .obj and .gltf loading
-static void vk_buffers_upload(vk_context* context, vk_buffer scratch_buffer)
-{
-   // obj
-#if 0
-   tinyobj_shape_t* shapes = 0;
-   tinyobj_material_t* materials = 0;
-   tinyobj_attrib_t attrib = {};
-
-   size_t shape_count = 0;
-   size_t material_count = 0;
-
-   tinyobj_attrib_init(&attrib);
-   s8 asset_file = s8("buddha.obj");
-   obj_user_ctx user_data = {};
-   user_data.scratch = *context->storage;
-
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, (const char*)asset_file.data, obj_file_read_callback, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
-      hw_message_box("Could not load .obj file");
-   obj_load(context, *context->storage, &attrib, scratch_buffer);
-
-   tinyobj_materials_free(materials, material_count);
-   tinyobj_shapes_free(shapes, shape_count);
-   tinyobj_attrib_free(&attrib);
-#else
-   // gltf
-   s8 asset_file = s8("DamagedHelmet.gltf");
-   gltf_user_ctx user_data = {};
-   user_data.scratch = *context->storage;
-
-   gltf_file_read(context, &user_data, asset_file);
-#endif
-}
-
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
    vk_buffer buffer = {};
@@ -265,6 +254,31 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    buffer.memory = memory;
 
    return buffer;
+}
+
+// TODO: cleanup this and separate .obj and .gltf loading
+static void vk_buffers_upload(vk_context* context)
+{
+   // obj
+#if 1
+   s8 asset_file = s8("buddha.obj");
+   obj_user_ctx user_data = {};
+   user_data.scratch = *context->storage;
+
+   VkPhysicalDeviceMemoryProperties memory_props;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+
+   size buffer_size = MB(1024);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   obj_file_read(context, &user_data, scratch_buffer, asset_file);
+#else
+   // gltf
+   s8 asset_file = s8("DamagedHelmet.gltf");
+   gltf_user_ctx user_data = {};
+   user_data.scratch = *context->storage;
+
+   gltf_file_read(context, &user_data, asset_file);
+#endif
 }
 
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
@@ -1565,7 +1579,6 @@ bool vk_initialize(hw* hw)
    // video memory
    size buffer_size = MB(1024);
 
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -1574,7 +1587,8 @@ bool vk_initialize(hw* hw)
    context->mb = meshlet_buffer;
    context->ib = index_buffer;
 
-   vk_buffers_upload(context, scratch_buffer);
+   // TODO: Dont pass scratch buffer here 
+   vk_buffers_upload(context);
 
    return true;
 }
