@@ -22,7 +22,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 
    arena file_read = win32_file_read(&user_data->scratch, file_path);
 
-   *len = scratch_left(file_read);
+   *len = arena_left(&file_read);
    *buf = file_read.beg;
 }
 
@@ -446,15 +446,15 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    array(s8) extensions = {.arena = &scratch};
 
-   *array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-   *array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-   *array_push(extensions) = s8(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-   *array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+   array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+   array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+   array_push(extensions) = s8(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+   array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
    if(rtx_supported)
    {
-      *array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-      *array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
