@@ -260,6 +260,7 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
 static void vk_buffers_upload(vk_context* context)
 {
    // obj
+   // TODO: separate paths for .obj and .gltf
 #if 1
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
@@ -445,15 +446,15 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    array(char) extensions = {.arena = &scratch};
 
-   array_push(&extensions, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-   array_push(&extensions, &VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-   array_push(&extensions, &VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-   array_push(&extensions, &VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+   array_push(extensions, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+   array_push(extensions, &VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+   array_push(extensions, &VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+   array_push(extensions, &VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
    if(rtx_supported)
    {
-      array_push(&extensions, &VK_EXT_MESH_SHADER_EXTENSION_NAME);
-      array_push(&extensions, &VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+      array_push(extensions, &VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      array_push(extensions, &VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};

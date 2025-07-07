@@ -8,6 +8,8 @@
 
 #include "../assets/shaders/mesh.h"
 
+typedef struct vertex vertex;
+
 // TODO: semcompress
 typedef struct 
 {
@@ -39,7 +41,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
    struct meshlet ml = {};
 
    u8* meshlet_vertices = push(&scratch, u8, vertex_count);
-   result.meshlet_buffer = array_make(&scratch);
+   result.meshlets.arena = &scratch;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
@@ -64,7 +66,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         array_push(&result.meshlet_buffer, ml);
+         array_push(result.meshlets, ml);
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -108,7 +110,7 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
 
    // add any left over meshlets
    if(ml.vertex_count > 0)
-      array_push(&result.meshlet_buffer, ml);
+      array_push(result.meshlets, ml);
 
    return result;
 }
@@ -179,7 +181,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
             hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index] = vertex_index++;
-            array_push(&vb_data, v);
+            array_push(vb_data, v);
          }
          else
             ib_data[primitive_index] = lookup;
@@ -195,8 +197,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    mesh obj_mesh = meshlet_build(scratch, context->storage, vertex_count, ib_data, (u32)index_count);
    context->index_count = (u32)index_count;
-   context->meshlet_count = (u32)obj_mesh.meshlet_buffer.count;
-   context->meshlet_buffer = obj_mesh.meshlet_buffer.data;
+   context->meshlet_count = (u32)obj_mesh.meshlets.count;
+   context->meshlet_buffer = obj_mesh.meshlets.data;
 
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
       scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(struct meshlet));
@@ -232,10 +234,13 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* mesh = &data->meshes[i];
-      assert(mesh->primitives_count == 1);   // TODO:
+      assert(mesh->primitives_count == 1);
 
       cgltf_primitive* prim = &mesh->primitives[0];
       assert(prim->type == cgltf_primitive_type_triangles);
+
+      array(vertex) vertices = {};
+      array(u32) indices = {};
    }
 
    cgltf_free(data);

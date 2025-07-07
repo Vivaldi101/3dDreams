@@ -74,7 +74,7 @@ align_struct
 
 align_struct
 {
-   array meshlet_buffer;
+   array meshlets;
 } mesh;
 
 align_struct

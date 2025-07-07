@@ -28,7 +28,7 @@ do { \
 #define array_push(arr, val) \
     do { \
         typeof(val) _v = (val); \
-        typeof(_v)* _p = (typeof(_v)*)array_alloc((array*)(arr), sizeof(_v), __alignof(_v), 1, 0); \
+        typeof(_v)* _p = (typeof(_v)*)array_alloc((array*)(&arr), sizeof(_v), __alignof(_v), 1, 0); \
         *_p = _v; \
     } while (0)
 
