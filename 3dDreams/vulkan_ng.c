@@ -444,17 +444,17 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   array(char) extensions = {.arena = &scratch};
+   array(s8) extensions = {.arena = &scratch};
 
-   array_push(extensions, &VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-   array_push(extensions, &VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-   array_push(extensions, &VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-   array_push(extensions, &VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
+   *array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+   *array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+   *array_push(extensions) = s8(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+   *array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
    if(rtx_supported)
    {
-      array_push(extensions, &VK_EXT_MESH_SHADER_EXTENSION_NAME);
-      array_push(extensions, &VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+      *array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      *array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
@@ -494,17 +494,20 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    features2.features.fillModeNonSolid = true;
    features2.features.sampleRateShading = true;
 
-   ldev_info.queueCreateInfoCount = 1;
-   ldev_info.pQueueCreateInfos = &queue_info;
-   ldev_info.enabledExtensionCount = (u32)extensions.count;
-   ldev_info.ppEnabledExtensionNames = (const char**)extensions.data;
-   ldev_info.pNext = &features2;
+   const char** extension_names = push(&scratch, char*, extensions.count);
 
    for(u32 i = 0; i < extensions.count; ++i)
    {
-      const char* extension = ((const char**)extensions.data)[i];
-      hw->log(s8("Using Vulkan device extension: \t\t%s\n"), extension);
+      extension_names[i] = (const char*)extensions.data[i].data;
+
+      hw->log(s8("Using Vulkan device extension: \t\t%s\n"), extension_names[i]);
    }
+
+   ldev_info.queueCreateInfoCount = 1;
+   ldev_info.pQueueCreateInfos = &queue_info;
+   ldev_info.enabledExtensionCount = (u32)extensions.count;
+   ldev_info.ppEnabledExtensionNames = extension_names;
+   ldev_info.pNext = &features2;
 
    VkDevice logical_device;
    vk_assert(vkCreateDevice(physical_device, &ldev_info, 0, &logical_device));

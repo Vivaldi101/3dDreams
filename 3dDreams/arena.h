@@ -25,12 +25,17 @@ do { \
 #define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
-#define array_push(arr, val) \
-    do { \
-        typeof(val) _v = (val); \
-        typeof(_v)* _p = (typeof(_v)*)array_alloc((array*)(&arr), sizeof(_v), __alignof(_v), 1, 0); \
-        *_p = _v; \
-    } while (0)
+//#define array_push(arr, val) \
+    //do { \
+        //typeof(val) _v = (val); \
+        //typeof(_v)* _p = (typeof(_v)*)array_alloc((array*)(&arr), sizeof(_v), __alignof(_v), 1, 0); \
+        //*_p = _v; \
+    //} while (0)
+
+//#define array_push(...)           newx(__VA_ARGS__,array_new4,array_new3,array_new2)(__VA_ARGS__)
+#define array_push(a)          (typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
+#define array_new3(a, n)       (typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), n, 0)
+#define array_new4(a, n, f)    (typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), n, f)
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)

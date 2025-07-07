@@ -13,6 +13,8 @@
 #include "common.h"
 #include "arena.h"
 
+#include "../assets/shaders/mesh.h"
+
 // TODO: make vulkan_ng a shared lib
 bool vk_uninitialize(struct hw* hw);
 bool vk_initialize(struct hw* hw);
@@ -72,9 +74,10 @@ align_struct
    u32 count;
 } vk_meshlet;
 
+typedef struct meshlet meshlet;
 align_struct
 {
-   array meshlets;
+   array(meshlet) meshlets;
 } mesh;
 
 align_struct
