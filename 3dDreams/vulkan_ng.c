@@ -49,7 +49,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
    tinyobj_attrib_free(&attrib);
 }
 
-static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
+static void gltf_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
 {
    char file_path[MAX_PATH] = {};
 
@@ -64,7 +64,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_parse(context, gltf_file_path))
+   if(!gltf_parse(context, *context->storage, scratch_buffer, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -261,16 +261,16 @@ static void vk_buffers_upload(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
+   size buffer_size = MB(1024);
+   VkPhysicalDeviceMemoryProperties memory_props;
+
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 #if 0
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-
-   size buffer_size = MB(1024);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    obj_file_read(context, &user_data, scratch_buffer, asset_file);
 #else
    // gltf
@@ -278,7 +278,7 @@ static void vk_buffers_upload(vk_context* context)
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   gltf_file_read(context, &user_data, asset_file);
+   gltf_file_read(context, &user_data, scratch_buffer, asset_file);
 #endif
 }
 

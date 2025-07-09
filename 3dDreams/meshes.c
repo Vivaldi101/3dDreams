@@ -34,7 +34,7 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* index_buffer, u32 index_count)
+static mesh meshlet_build(arena scratch, arena* storage, size vertex_count, u32* index_buffer, size index_count)
 {
    mesh result = {};
 
@@ -115,6 +115,26 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
    return result;
 }
 
+static void mesh_load(vk_context* context, arena scratch, vk_buffer scratch_buffer, vertex* vb_data, size vertex_count, u32* ib_data, size index_count)
+{
+   usize vb_size = vertex_count * sizeof(struct vertex);
+
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+      scratch_buffer, vb_data, vb_size);
+
+   mesh obj_mesh = meshlet_build(scratch, context->storage, vertex_count, ib_data, index_count);
+   context->index_count = (u32)index_count;
+   context->meshlet_count = (u32)obj_mesh.meshlets.count;
+   context->meshlet_buffer = obj_mesh.meshlets.data;
+
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+      scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(struct meshlet));
+
+   usize ib_size = index_count * sizeof(u32);
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
+      scratch_buffer, ib_data, ib_size);
+}
+
 // TODO: extract the non-obj parts out of this
 static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
@@ -190,28 +210,10 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
       }
    }
 
-   u32 vertex_count = (u32)obj_table.count;
-
-   usize vb_size = vertex_index * sizeof(struct vertex);
-
-   // TODO: non-obj part
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data.data, vb_size);
-
-   mesh obj_mesh = meshlet_build(scratch, context->storage, vertex_count, ib_data, (u32)index_count);
-   context->index_count = (u32)index_count;
-   context->meshlet_count = (u32)obj_mesh.meshlets.count;
-   context->meshlet_buffer = obj_mesh.meshlets.data;
-
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, context->meshlet_buffer, context->meshlet_count * sizeof(struct meshlet));
-
-   usize ib_size = index_count * sizeof(u32);
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-      scratch_buffer, ib_data, ib_size);
+   mesh_load(context, scratch, scratch_buffer, vb_data.data, vertex_index, ib_data, index_count);
 }
 
-static bool gltf_parse(vk_context* context, s8 gltf_path)
+static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buffer, s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
@@ -353,8 +355,11 @@ static bool gltf_parse(vk_context* context, s8 gltf_path)
 
          array_push(indices) = index;
       }
+
+      mesh_load(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
    }
 
    cgltf_free(data);
+
    return true;
 }
