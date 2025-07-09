@@ -40,7 +40,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
 
    obj_user_ctx* user_data = (obj_user_ctx*)user_context;
 
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, (const char*)filename.data, obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(filename), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
    obj_parse(context, *context->storage, &attrib, scratch_buffer);
 

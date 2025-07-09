@@ -217,12 +217,12 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
-   cgltf_result result = cgltf_parse_file(&options, (const char*)gltf_path.data, &data);
+   cgltf_result result = cgltf_parse_file(&options, s8_data(gltf_path), &data);
 
    if(result != cgltf_result_success)
       return false;
 
-   result = cgltf_load_buffers(&options, data, (const char*)gltf_path.data);
+   result = cgltf_load_buffers(&options, data, s8_data(gltf_path));
    if(result != cgltf_result_success)
    {
       cgltf_free(data);

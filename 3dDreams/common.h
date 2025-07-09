@@ -18,6 +18,7 @@ typedef ptrdiff_t       size;
 typedef size_t          usize;
 
 #define s8(s) (s8){(u8 *)s, lengthof(s)}
+#define s8_data(s) (const char*)(s).data
 typedef struct
 {
    u8* data;
