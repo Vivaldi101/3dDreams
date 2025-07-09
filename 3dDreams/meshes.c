@@ -116,8 +116,9 @@ static mesh meshlet_build(arena scratch, arena* storage, u32 vertex_count, u32* 
 }
 
 // TODO: extract the non-obj parts out of this
-static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
+static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
+   // TODO: obj part
    index_hash_table obj_table = {};
 
    // only triangles allowed
@@ -192,6 +193,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    u32 vertex_count = (u32)obj_table.count;
 
    usize vb_size = vertex_index * sizeof(struct vertex);
+
+   // TODO: non-obj part
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data.data, vb_size);
 
@@ -208,7 +211,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
       scratch_buffer, ib_data, ib_size);
 }
 
-static bool gltf_load(vk_context* context, s8 gltf_path)
+static bool gltf_parse(vk_context* context, s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
@@ -231,7 +234,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       return false;
    }
 
-   for(usize i = 0; i < data->meshes_count; ++i)
+   for(cgltf_size i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* mesh = &data->meshes[i];
       assert(mesh->primitives_count == 1);
@@ -239,8 +242,116 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       cgltf_primitive* prim = &mesh->primitives[0];
       assert(prim->type == cgltf_primitive_type_triangles);
 
-      array(vertex) vertices = {};
-      array(u32) indices = {};
+      // TODO: Pre-resize
+      array(vertex) vertices = {.arena = context->storage};
+      array(u32) indices = {.arena = context->storage};
+
+      cgltf_size vertex_count = 0;
+      cgltf_accessor* position_accessor = 0;
+      cgltf_accessor* normal_accessor = 0;
+      cgltf_accessor* texcoord_accessor = 0;
+
+      // parse attribute types
+      for(cgltf_size j = 0; j < prim->attributes_count; ++j)
+      {
+         cgltf_attribute* attr = &prim->attributes[j];
+
+         cgltf_attribute_type attr_type;
+         i32 attr_index;
+         cgltf_parse_attribute_type(attr->name, &attr_type, &attr_index);
+
+         switch(attr_type)
+         {
+            case cgltf_attribute_type_position:
+               position_accessor = attr->data;
+               vertex_count = position_accessor->count;
+               break;
+
+            case cgltf_attribute_type_normal:
+               normal_accessor = attr->data;
+               break;
+
+            case cgltf_attribute_type_texcoord:
+               if(attr_index == 0) // first uv set only
+                  texcoord_accessor = attr->data;
+               break;
+
+            default:
+               // ignore other attributes (e.g., color, joints, etc.)
+               break;
+         }
+
+         // load vertices
+         for(cgltf_size k = 0; k < vertex_count; ++k)
+         {
+            vertex vert = {};
+
+            if(position_accessor)
+            {
+               f32 pos[3] = {};
+               cgltf_accessor_read_float(position_accessor, k, pos, 3);
+               vert.vx = pos[0];
+               vert.vy = pos[1];
+               vert.vz = pos[2];
+            }
+            if(normal_accessor)
+            {
+               f32 norm[3] = {};
+               cgltf_accessor_read_float(normal_accessor, k, norm, 3);
+               // pack normals
+               vert.nx = (uint8_t)((norm[0] * 0.5f + 0.5f) * 255.0f);
+               vert.ny = (uint8_t)((norm[1] * 0.5f + 0.5f) * 255.0f);
+               vert.nz = (uint8_t)((norm[2] * 0.5f + 0.5f) * 255.0f);
+            }
+            if(texcoord_accessor)
+            {
+               f32 uv[2] = {};
+               cgltf_accessor_read_float(texcoord_accessor, k, uv, 2);
+               vert.tu = uv[0];
+               vert.tv = uv[1];
+            }
+
+            array_push(vertices) = vert;
+         }
+         // load indices
+         if(prim->indices)
+         {
+            cgltf_accessor* accessor = prim->indices;
+            for(usize k = 0; k < accessor->count; ++k)
+            {
+               u32 index = 0;
+
+               switch(accessor->component_type)
+               {
+                  case cgltf_component_type_r_8u:  // UNSIGNED_BYTE
+                  {
+                     u32 value = 0;
+                     cgltf_accessor_read_uint(accessor, k, &value, 1);
+                     index = (u8)value;
+                     break;
+                  }
+                  case cgltf_component_type_r_16u: // UNSIGNED_SHORT
+                  {
+                     u32 value = 0;
+                     cgltf_accessor_read_uint(accessor, k, &value, 1);
+                     index = (u16)value;
+                     break;
+                  }
+                  case cgltf_component_type_r_32u: // UNSIGNED_INT
+                  {
+                     u32 value = 0;
+                     cgltf_accessor_read_uint(accessor, k, &value, 1);
+                     index = value;
+                     break;
+                  }
+                  default:
+                     hw_message_box("Unsupported gltf index component type"); break;
+               }
+
+               array_push(indices) = index;
+            }
+         }
+      }
    }
 
    cgltf_free(data);

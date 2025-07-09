@@ -42,7 +42,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, (const char*)filename.data, obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
-   obj_load(context, *context->storage, &attrib, scratch_buffer);
+   obj_parse(context, *context->storage, &attrib, scratch_buffer);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
@@ -64,7 +64,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_load(context, gltf_file_path))
+   if(!gltf_parse(context, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -261,7 +261,7 @@ static void vk_buffers_upload(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-#if 1
+#if 0
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;

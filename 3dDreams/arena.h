@@ -122,7 +122,7 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    return result;
 }
 
-static array array_make(arena* a)
+static array array_make(arena* a, size count)
 {
    return (array){.arena = a};
 }
