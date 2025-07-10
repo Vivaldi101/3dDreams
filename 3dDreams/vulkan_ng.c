@@ -268,8 +268,8 @@ static void vk_buffers_upload(vk_context* context)
 
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-#if 1
-   s8 asset_file = s8("buddha.obj");
+#if 0
+   s8 asset_file = s8("dragon.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 

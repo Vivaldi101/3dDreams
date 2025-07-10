@@ -1,21 +1,26 @@
 #include "vulkan_shader_module.h"
 
-typedef struct hash_key
+typedef struct hash_key_obj
 {
    i32 vi, vti, vni;
-} hash_key;
+} hash_key_obj;
+
+typedef struct hash_key_gltf
+{
+   i32 vi, vti, vni;
+} hash_key_gltf;
 
 // Ordered open addressing with linear probing
 typedef u32 hash_value;
 typedef struct index_hash_table
 {
    u32* values;
-   hash_key* keys;
+   void* keys;
    size max_count;
    size count;
 } index_hash_table;
 
-#define index_hash_table(T) struct index_hash_table##T {   u32* values; T* keys; size max_count; size count; }
+#define index_hash_table(T) struct index_hash_table##T {  u32* values; T* keys; size max_count; size count; }
 
 typedef struct 
 {
@@ -25,23 +30,23 @@ typedef struct
    size count;
 } spv_hash_table;
 
-static bool key_equals(hash_key a, hash_key b)
+static bool obj_key_equals(hash_key_obj a, hash_key_obj b)
 {
-   return memcmp(&a, &b, sizeof(hash_key)) == 0;
+   return memcmp(&a, &b, sizeof(hash_key_obj)) == 0;
 }
 
-static bool key_less(hash_key a, hash_key b)
+static bool obj_key_less(hash_key_obj a, hash_key_obj b)
 {
-   return memcmp(&a, &b, sizeof(hash_key)) < 0;
+   return memcmp(&a, &b, sizeof(hash_key_obj)) < 0;
 }
 
-static inline bool key_is_empty(hash_key k)
+static inline bool obj_key_is_empty(hash_key_obj k)
 {
-   hash_key empty = {-1, -1, -1};
-   return memcmp(&k, &empty, sizeof(hash_key)) == 0;
+   hash_key_obj empty = {-1, -1, -1};
+   return memcmp(&k, &empty, sizeof(hash_key_obj)) == 0;
 }
 
-static u32 hash_index(hash_key k)
+static u32 obj_hash_index(hash_key_obj k)
 {
    u32 hash = 2166136261u;
 
@@ -73,23 +78,23 @@ static u32 spv_hash(const char* key)
    return hash;
 }
 
-static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
+static void hash_insert(index_hash_table(hash_key_obj)* table, hash_key_obj key, hash_value value)
 {
    if(table->count == table->max_count)
       return;
 
-   u32 index = hash_index(key) % table->max_count;
+   u32 index = obj_hash_index(key) % table->max_count;
 
-   while(!key_is_empty(table->keys[index]))
+   while(!obj_key_is_empty(table->keys[index]))
    {
-      if(key_equals(table->keys[index], key))
+      if(obj_key_equals(table->keys[index], key))
       {
          table->values[index] = value; // update
          return;
       }
-      if(key_less(key, table->keys[index]))
+      if(obj_key_less(key, table->keys[index]))
       {
-         hash_key tmp_key = table->keys[index];
+         hash_key_obj tmp_key = table->keys[index];
          hash_value tmp_value = table->values[index];
 
          table->keys[index] = key;
@@ -107,14 +112,14 @@ static void hash_insert(index_hash_table* table, hash_key key, hash_value value)
    table->count++;
 }
 
-static hash_value hash_lookup(index_hash_table* table, hash_key key)
+static hash_value hash_lookup(index_hash_table(hash_key_obj)* table, hash_key_obj key)
 {
-   u32 index = hash_index(key) % table->max_count;
+   u32 index = obj_hash_index(key) % table->max_count;
 
-   while(!key_is_empty(table->keys[index]) && key_less(table->keys[index], key))
+   while(!obj_key_is_empty(table->keys[index]) && obj_key_less(table->keys[index], key))
       index = (index + 1) % table->max_count;
 
-   if(key_equals(table->keys[index], key))
+   if(obj_key_equals(table->keys[index], key))
       return table->values[index];
 
    return ~0u;

@@ -145,7 +145,7 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
 {
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
-   index_hash_table(hash_key) obj_table = {};
+   index_hash_table(hash_key_obj) obj_table = {};
 
    // only triangles allowed
    assert(attrib->num_face_num_verts * 3 == attrib->num_faces);
@@ -156,10 +156,10 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
 
    obj_table.max_count = index_count;
 
-   obj_table.keys = push(&scratch, hash_key, obj_table.max_count);
+   obj_table.keys = push(&scratch, hash_key_obj, obj_table.max_count);
    obj_table.values = push(&scratch, hash_value, obj_table.max_count);
 
-   memset(obj_table.keys, -1, sizeof(hash_key) * obj_table.max_count);
+   memset(obj_table.keys, -1, sizeof(hash_key_obj) * obj_table.max_count);
 
    u32 vertex_index = 0;
    u32 primitive_index = 0;
@@ -177,8 +177,8 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
          i32 vti = vidx[i].vt_idx;
          i32 vni = vidx[i].vn_idx;
 
-         hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-         hash_value lookup = hash_lookup((index_hash_table*)&obj_table, index);
+         hash_key_obj index = (hash_key_obj){.vi = vi, .vni = vni, .vti = vti};
+         hash_value lookup = hash_lookup(&obj_table, index);
 
          if(lookup == ~0u)
          {
@@ -206,7 +206,7 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
                v.tv = attrib->texcoords[vti * 2 + 1];
             }
 
-            hash_insert((index_hash_table*)&obj_table, index, vertex_index);
+            hash_insert(&obj_table, index, vertex_index);
             ib_data[primitive_index] = vertex_index++;
             array_push(vb_data) = v;
          }
@@ -226,10 +226,10 @@ static void vertex_deduplicate(arena scratch, size index_count)
 
    hash_table.max_count = index_count;
 
-   hash_table.keys = push(&scratch, hash_key, hash_table.max_count);
+   hash_table.keys = push(&scratch, hash_key_obj, hash_table.max_count);
    hash_table.values = push(&scratch, hash_value, hash_table.max_count);
 
-   memset(hash_table.keys, -1, sizeof(hash_key) * hash_table.max_count);
+   memset(hash_table.keys, -1, sizeof(hash_key_obj) * hash_table.max_count);
 
    u32 vertex_index = 0;
    u32 primitive_index = 0;
@@ -248,7 +248,7 @@ static void vertex_deduplicate(arena scratch, size index_count)
          i32 vti = vidx[i].vt_idx;
          i32 vni = vidx[i].vn_idx;
 
-         hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+         hash_key_obj index = (hash_key_obj){.vi = vi, .vni = vni, .vti = vti};
          hash_value lookup = hash_lookup(&hash_table, index);
 
          if(lookup == ~0u)
@@ -312,10 +312,6 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       return false;
    }
 
-   // TODO: Pre-resize based on vertex/index count
-   array(vertex) vertices = {.arena = context->storage};
-   array(u32) indices = {.arena = context->storage};
-
    for(cgltf_size i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* mesh = &data->meshes[i];
@@ -325,7 +321,6 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       assert(prim->type == cgltf_primitive_type_triangles);
 
       cgltf_size vertex_count = 0;
-      cgltf_size index_count = 0;
       cgltf_accessor* position_accessor = 0;
       cgltf_accessor* normal_accessor = 0;
       cgltf_accessor* texcoord_accessor = 0;
@@ -344,8 +339,6 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
             case cgltf_attribute_type_position:
                position_accessor = attr->data;
                vertex_count = position_accessor->count;
-               if(prim->indices)
-                  index_count = prim->indices->count;
                break;
 
             case cgltf_attribute_type_normal:
@@ -364,6 +357,7 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       }
 
       // load vertices
+      array vertices = array_make(context->storage, sizeof(vertex), vertex_count);
       for(cgltf_size k = 0; k < vertex_count; ++k)
       {
          vertex vert = {};
@@ -393,48 +387,17 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
             vert.tv = uv[1];
          }
 
-         array_push(vertices) = vert;
+         array_add(vertices, vert);
       }
 
       // load indices
       cgltf_accessor* accessor = prim->indices;
-      for(usize k = 0; k < index_count; ++k)
-      {
-         u32 index = 0;
+      array indices = array_make(context->storage, sizeof(u32), prim->indices->count);
+      cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data, 4, prim->indices->count);
+      indices.count = index_count;
 
-         switch(accessor->component_type)
-         {
-            case cgltf_component_type_r_8u:  // UNSIGNED_BYTE
-            {
-               u32 value = 0;
-               cgltf_accessor_read_uint(accessor, k, &value, 1);
-               index = (u8)value;
-               break;
-            }
-            case cgltf_component_type_r_16u: // UNSIGNED_SHORT
-            {
-               u32 value = 0;
-               cgltf_accessor_read_uint(accessor, k, &value, 1);
-               index = (u16)value;
-               break;
-            }
-            case cgltf_component_type_r_32u: // UNSIGNED_INT
-            {
-               u32 value = 0;
-               cgltf_accessor_read_uint(accessor, k, &value, 1);
-               index = value;
-               break;
-            }
-            default:
-               hw_message_box("Unsupported gltf index component type"); break;
-         }
-
-         array_push(indices) = index;
-      }
+      mesh_load(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
    }
-
-   //vertex_deduplicate(scratch, indices.count);
-   mesh_load(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
 
    cgltf_free(data);
 
