@@ -68,7 +68,7 @@ static arena arena_new(arena* base, size cap)
 
    arena result = {0};
 
-   if(hw_is_virtual_memory_commited(base->end))
+   if(hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       result.beg = base->end;
       result.end = (byte*)result.beg + cap;
