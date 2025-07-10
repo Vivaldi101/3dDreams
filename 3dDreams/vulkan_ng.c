@@ -457,10 +457,10 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
-   array foos = array_make(&scratch, sizeof(f32), 100);
+   array foos = array_make(&scratch, sizeof(int), 100);
 
    for(int i = 0; i < 100; ++i)
-      array_add(foos, i + 42.0f);
+      array_add(foos, i);
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 

@@ -25,7 +25,7 @@ do { \
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define array_push(a)          *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
-#define array_add(a, v) (*(((typeof(v)*)a.data + a.count)) = (v), (a).count++)
+#define array_add(a, v)        (*(((typeof(v)*)a.data + a.count)) = (v), (a).count++, assert((typeof(v)*)a.data + a.count <= (typeof(v)*)a.arena->beg))
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
