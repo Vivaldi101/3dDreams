@@ -26,6 +26,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
+#if 1
 // TODO: clean up these top-level read apis
 static void obj_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
 {
@@ -48,6 +49,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
 }
+#endif
 
 static void gltf_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
 {

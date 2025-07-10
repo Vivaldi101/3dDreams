@@ -10,7 +10,6 @@
 
 typedef struct vertex vertex;
 
-// TODO: semcompress
 typedef struct 
 {
    arena scratch;
@@ -124,8 +123,8 @@ static void mesh_load(vk_context* context, arena scratch, vk_buffer scratch_buff
 
    const mesh m = meshlet_build(context->storage, vertex_count, ib_data, index_count);
 
-   context->index_count += (u32)index_count;
-   context->meshlet_count += (u32)m.meshlets.count;
+   context->index_count = (u32)index_count;
+   context->meshlet_count = (u32)m.meshlets.count;
 
    if(!context->meshlet_buffer)
       context->meshlet_buffer = m.meshlets.data;
@@ -140,11 +139,13 @@ static void mesh_load(vk_context* context, arena scratch, vk_buffer scratch_buff
       scratch_buffer, ib_data, ib_size);
 }
 
+#if 1
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
 static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
 {
    // TODO: obj part
-   index_hash_table obj_table = {};
+   // TODO: remove and use vertex_deduplicate()
+   index_hash_table(hash_key) obj_table = {};
 
    // only triangles allowed
    assert(attrib->num_face_num_verts * 3 == attrib->num_faces);
@@ -177,7 +178,7 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
          i32 vni = vidx[i].vn_idx;
 
          hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
-         hash_value lookup = hash_lookup(&obj_table, index);
+         hash_value lookup = hash_lookup((index_hash_table*)&obj_table, index);
 
          if(lookup == ~0u)
          {
@@ -205,7 +206,7 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
                v.tv = attrib->texcoords[vti * 2 + 1];
             }
 
-            hash_insert(&obj_table, index, vertex_index);
+            hash_insert((index_hash_table*)&obj_table, index, vertex_index);
             ib_data[primitive_index] = vertex_index++;
             array_push(vb_data) = v;
          }
@@ -216,6 +217,76 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
    }
 
    mesh_load(context, scratch, scratch_buffer, vb_data.data, vertex_index, ib_data, index_count);
+}
+#endif
+
+static void vertex_deduplicate(arena scratch, size index_count)
+{
+   index_hash_table hash_table = {};
+
+   hash_table.max_count = index_count;
+
+   hash_table.keys = push(&scratch, hash_key, hash_table.max_count);
+   hash_table.values = push(&scratch, hash_value, hash_table.max_count);
+
+   memset(hash_table.keys, -1, sizeof(hash_key) * hash_table.max_count);
+
+   u32 vertex_index = 0;
+   u32 primitive_index = 0;
+
+   u32* ib_data = push(&scratch, u32, index_count);
+   array(vertex) vb_data = {.arena = &scratch};
+
+#if 0
+   for(usize f = 0; f < index_count; f += 3)
+   {
+      const tinyobj_vertex_index_t* vidx = attrib->faces + f;
+
+      for(usize i = 0; i < 3; ++i)
+      {
+         i32 vi = vidx[i].v_idx;
+         i32 vti = vidx[i].vt_idx;
+         i32 vni = vidx[i].vn_idx;
+
+         hash_key index = (hash_key){.vi = vi, .vni = vni, .vti = vti};
+         hash_value lookup = hash_lookup(&hash_table, index);
+
+         if(lookup == ~0u)
+         {
+            struct vertex v = {};
+            if(vi >= 0)
+            {
+               v.vx = attrib->vertices[vi * 3 + 0];
+               v.vy = attrib->vertices[vi * 3 + 1];
+               v.vz = attrib->vertices[vi * 3 + 2];
+            }
+
+            if(vni >= 0)
+            {
+               f32 nx = attrib->normals[vni * 3 + 0];
+               f32 ny = attrib->normals[vni * 3 + 1];
+               f32 nz = attrib->normals[vni * 3 + 2];
+               v.nx = (u8)(nx * 127.f + 127.f);
+               v.ny = (u8)(ny * 127.f + 127.f);
+               v.nz = (u8)(nz * 127.f + 127.f);
+            }
+
+            if(vti >= 0)
+            {
+               v.tu = attrib->texcoords[vti * 2 + 0];
+               v.tv = attrib->texcoords[vti * 2 + 1];
+            }
+
+            hash_insert(&hash_table, index, vertex_index);
+            ib_data[primitive_index] = vertex_index++;
+            array_push(vb_data) = v;
+         }
+         else
+            ib_data[primitive_index] = lookup;
+         ++primitive_index;
+      }
+   }
+#endif
 }
 
 static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buffer, s8 gltf_path)
@@ -362,6 +433,7 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       }
    }
 
+   //vertex_deduplicate(scratch, indices.count);
    mesh_load(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
 
    cgltf_free(data);

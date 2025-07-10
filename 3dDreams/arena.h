@@ -37,6 +37,8 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
+#define array(T) struct array##T { arena* arena; size count; T* data; }
+
 typedef struct array
 {
    arena* arena;
@@ -49,7 +51,6 @@ enum
    FIXED_ARRAY_PUSH_FLAG = 1 << 0,
 };
 
-#define array(T) struct array##T { arena* arena; size count; T* data; }
 
 static bool hw_is_virtual_memory_commited(void* address)
 {

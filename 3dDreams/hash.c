@@ -1,19 +1,21 @@
 #include "vulkan_shader_module.h"
 
-typedef struct 
+typedef struct hash_key
 {
    i32 vi, vti, vni;
 } hash_key;
 
 // Ordered open addressing with linear probing
 typedef u32 hash_value;
-typedef struct 
+typedef struct index_hash_table
 {
    u32* values;
    hash_key* keys;
    size max_count;
    size count;
 } index_hash_table;
+
+#define index_hash_table(T) struct index_hash_table##T {   u32* values; T* keys; size max_count; size count; }
 
 typedef struct 
 {
