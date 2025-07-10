@@ -25,8 +25,8 @@ do { \
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
 #define array_push(a)          *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
-//#define array_new3(a, n)       (typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), n, 0)
-//#define array_new4(a, n, f)    (typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), n, f)
+
+#define array_fixed_push(a, v) (*(((typeof(v)*)a.data + a.count)) = (v), (a).count++)
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
@@ -44,6 +44,11 @@ typedef struct array
    size count;
    void* data;
 } array;
+
+enum
+{
+   FIXED_ARRAY_PUSH_FLAG = 1 << 0,
+};
 
 #define array(T) struct array##T { arena* arena; size count; T* data; }
 
@@ -101,10 +106,13 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
+   if(flag != FIXED_ARRAY_PUSH_FLAG)
    {
-      arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
-      p = a->beg;
+      if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
+      {
+         arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
+         p = a->beg;
+      }
    }
 
    a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
@@ -122,9 +130,14 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    return result;
 }
 
-static array array_make(arena* a, size count)
+static array array_make(arena* a, size alloc_size, size count)
 {
-   return (array){.arena = a};
+   array result = {};
+   result.arena = a;
+   result.data = array_alloc(&result, alloc_size, 4, count, 0);
+   result.count = 0;
+
+   return result;
 }
 
 static bool arena_reset(arena* a)

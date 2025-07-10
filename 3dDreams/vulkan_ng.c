@@ -266,7 +266,7 @@ static void vk_buffers_upload(vk_context* context)
 
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-#if 0
+#if 1
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
@@ -456,6 +456,11 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
+
+   array foos = array_make(&scratch, sizeof(f32), 100);
+
+   for(int i = 0; i < 100; ++i)
+      array_fixed_push(foos, i + 42.0f);
 
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
