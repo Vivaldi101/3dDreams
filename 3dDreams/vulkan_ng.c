@@ -170,6 +170,12 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
    }
 }
 
+static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
+{
+   vkFreeMemory(device, buffer->memory, 0);
+   vkDestroyBuffer(device, buffer->handle, 0);
+}
+
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
 {
    assert(data);
@@ -259,6 +265,7 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
 }
 
 // TODO: cleanup this and separate .obj and .gltf loading
+// TODO: rename
 static void vk_buffers_upload(vk_context* context)
 {
    // obj
@@ -282,12 +289,8 @@ static void vk_buffers_upload(vk_context* context)
 
    gltf_file_read(context, &user_data, scratch_buffer, asset_file);
 #endif
-}
 
-static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
-{
-   vkFreeMemory(device, buffer->memory, 0);
-   vkDestroyBuffer(device, buffer->handle, 0);
+   vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
@@ -1596,7 +1599,6 @@ bool vk_initialize(hw* hw)
    context->mb = meshlet_buffer;
    context->ib = index_buffer;
 
-   // TODO: Dont pass scratch buffer here 
    vk_buffers_upload(context);
 
    return true;
