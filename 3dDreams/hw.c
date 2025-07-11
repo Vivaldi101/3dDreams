@@ -143,11 +143,12 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
-   hw->state.camera.radius = 1.5f;
-   vec3 eye = {1.f*hw->state.camera.radius, 0, 0};
+   hw->state.camera.radius = 2.0f;
+   vec3 eye = {hw->state.camera.radius, 0, 0};
    vec3 origin = {0.f, 0.f, 0.f};
    hw->state.camera.pos = eye;
    hw->state.camera.dir = vec3_sub(&eye, &origin);
+
    for (;;)
    {
       if (!hw->platform_loop()) 
@@ -162,17 +163,6 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       // TODO: Use perf counters for better granularity
       hw_frame_sync(hw);
       hw_frame_render(hw);
-
-      f32 fps = 1.0f/(((f32)hw->timer.time() - t) / 1000.0f);
-
-      t = hw->timer.time();
-
-      // TODO: Remove
-      if((hw->timer.time() - s) > 500)
-      {
-         //hw_print_fps(hw, (u32)(fps + 0.5f));
-         s = hw->timer.time();
-      }
    }
 }
 
