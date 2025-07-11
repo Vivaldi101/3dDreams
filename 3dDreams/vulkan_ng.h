@@ -42,6 +42,7 @@ bool vk_initialize(struct hw* hw);
 #define vk_assert(v) (v)
 #endif
 
+// TODO: Remove these and use arena arrays
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 
 align_struct swapchain_surface_info
@@ -82,7 +83,16 @@ align_struct
 
 align_struct
 {
+   size index_offset;
+   size index_count;
+   size vertex_offset;
+   size vertex_count;
+} mesh_draw;
+
+align_struct
+{
    VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
+   array(mesh_draw) mesh_draws;
 
    VkInstance instance;
    VkPhysicalDevice physical_device;

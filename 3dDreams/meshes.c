@@ -114,10 +114,11 @@ static mesh meshlet_build(arena* storage, size vertex_count, u32* index_buffer, 
    return result;
 }
 
-static void mesh_load(vk_context* context, arena scratch, vk_buffer scratch_buffer, vertex* vb_data, size vertex_count, u32* ib_data, size index_count)
+static void mesh_upload(vk_context* context, arena scratch, vk_buffer scratch_buffer, vertex* vb_data, size vertex_count, u32* ib_data, size index_count)
 {
    usize vb_size = vertex_count * sizeof(struct vertex);
 
+   // upload vertex data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data, vb_size);
 
@@ -131,10 +132,13 @@ static void mesh_load(vk_context* context, arena scratch, vk_buffer scratch_buff
 
    usize mb_size = context->meshlet_count * sizeof(struct meshlet);
 
+   // upload meshlet data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
       scratch_buffer, context->meshlet_buffer, mb_size);
 
    usize ib_size = index_count * sizeof(u32);
+
+   // upload index data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
       scratch_buffer, ib_data, ib_size);
 }
@@ -216,7 +220,7 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
       }
    }
 
-   mesh_load(context, scratch, scratch_buffer, vb_data.data, vertex_index, ib_data, index_count);
+   mesh_upload(context, scratch, scratch_buffer, vb_data.data, vertex_index, ib_data, index_count);
 }
 #endif
 
@@ -312,6 +316,8 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       return false;
    }
 
+   context->mesh_draws.arena = context->storage;
+
    for(cgltf_size i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* mesh = &data->meshes[i];
@@ -396,7 +402,10 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data, 4, prim->indices->count);
       indices.count = index_count;
 
-      mesh_load(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
+      // TODO: Fill
+      array_push(context->mesh_draws) = (mesh_draw){};
+
+      mesh_upload(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
    }
 
    cgltf_free(data);

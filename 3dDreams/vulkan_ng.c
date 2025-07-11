@@ -1052,9 +1052,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
-      u32 draw_calls = 1;
-      for(u32 i = 0; i < draw_calls; ++i)
-         vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+      vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
    }
 
    // draw axis
