@@ -86,11 +86,11 @@ align_struct
    size index_offset;
    size index_count;
    size vertex_offset;
-   size vertex_count;
 } mesh_draw;
 
 align_struct
 {
+   // TODO: array(VkFramebuffer)
    VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
    array(mesh_draw) mesh_draws;
 
@@ -121,8 +121,11 @@ align_struct
    vk_buffer mb;        // mesh buffer
 
    u32 max_meshlet_count;
+
+   // TODO: array(meshlet)
    u32 meshlet_count;
    struct meshlet* meshlet_buffer;
+
    u32 index_count;
 
    swapchain_surface_info swapchain_info;
