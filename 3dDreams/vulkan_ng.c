@@ -892,8 +892,6 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
 
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
-   rtx_invariant(context, state);
-
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
@@ -1137,8 +1135,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
 
    begin = end;
-
-   rtx_invariant(context, state);
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
@@ -1583,21 +1579,6 @@ bool vk_initialize(hw* hw)
 
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
-
-   VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-
-   // TODO: fine tune these and get device memory limits
-   // video memory
-   size buffer_size = MB(1024);
-
-   vk_buffer index_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-   context->vb = vertex_buffer;
-   context->mb = meshlet_buffer;
-   context->ib = index_buffer;
 
    vk_buffers_upload(context);
 

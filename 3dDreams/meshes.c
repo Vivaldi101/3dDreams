@@ -5,8 +5,9 @@
 
 #define CGLTF_IMPLEMENTATION
 #include "../extern/cgltf/cgltf.h"
-
 #include "../assets/shaders/mesh.h"
+
+#include "vulkan_ng.h"
 
 typedef struct vertex vertex;
 
@@ -114,6 +115,7 @@ static mesh meshlet_build(arena* storage, size vertex_count, u32* index_buffer, 
    return result;
 }
 
+// TODO: just pass ib,vb, and mb sizes
 static void mesh_upload(vk_context* context, arena scratch, vk_buffer scratch_buffer, vertex* vb_data, size vertex_count, u32* ib_data, size index_count)
 {
    usize vb_size = vertex_count * sizeof(struct vertex);
@@ -121,14 +123,6 @@ static void mesh_upload(vk_context* context, arena scratch, vk_buffer scratch_bu
    // upload vertex data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data, vb_size);
-
-   const mesh m = meshlet_build(context->storage, vertex_count, ib_data, index_count);
-
-   context->index_count = (u32)index_count;
-   context->meshlet_count = (u32)m.meshlets.count;
-
-   if(!context->meshlet_buffer)
-      context->meshlet_buffer = m.meshlets.data;
 
    usize mb_size = context->meshlet_count * sizeof(struct meshlet);
 
@@ -293,6 +287,8 @@ static void vertex_deduplicate(arena scratch, size index_count)
 #endif
 }
 
+static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+
 static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buffer, s8 gltf_path)
 {
    cgltf_options options = {};
@@ -320,10 +316,10 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
 
    for(cgltf_size i = 0; i < data->meshes_count; ++i)
    {
-      cgltf_mesh* mesh = &data->meshes[i];
-      assert(mesh->primitives_count == 1);
+      cgltf_mesh* gltf_mesh = &data->meshes[i];
+      assert(gltf_mesh->primitives_count == 1);
 
-      cgltf_primitive* prim = &mesh->primitives[0];
+      cgltf_primitive* prim = &gltf_mesh->primitives[0];
       assert(prim->type == cgltf_primitive_type_triangles);
 
       cgltf_size vertex_count = 0;
@@ -402,8 +398,29 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data, 4, prim->indices->count);
       indices.count = index_count;
 
-      // TODO: Fill
+      // TODO: Fill mesh draw offsets for multi-mesh rendering
       array_push(context->mesh_draws) = (mesh_draw){};
+
+      VkPhysicalDeviceMemoryProperties memory_props;
+      vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+
+      mesh m = meshlet_build(context->storage, vertex_count, indices.data, index_count);
+
+      usize vb_size = vertex_count * sizeof(struct vertex);
+      usize mb_size = m.meshlets.count * sizeof(struct meshlet);
+      usize ib_size = index_count * sizeof(u32);
+
+      context->index_count = (u32)index_count;
+      context->meshlet_count = (u32)m.meshlets.count;
+      context->meshlet_buffer = m.meshlets.data;
+
+      vk_buffer index_buffer = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      context->vb = vertex_buffer;
+      context->mb = meshlet_buffer;
+      context->ib = index_buffer;
 
       mesh_upload(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
    }

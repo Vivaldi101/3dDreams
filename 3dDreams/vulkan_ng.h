@@ -76,7 +76,7 @@ align_struct
 } vk_meshlet;
 
 typedef struct meshlet meshlet;
-align_struct
+align_struct mesh
 {
    array(meshlet) meshlets;
 } mesh;
@@ -135,10 +135,10 @@ align_struct
    u32 queue_family_index;
    f32 time_period;
 
+   size geometry_buffer_size;
+
    bool rtx_supported;
 } vk_context;
-
-#define rtx_invariant(context, state) assert(implies(state->rtx_enabled, context->rtx_supported));
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
 
