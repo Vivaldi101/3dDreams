@@ -217,11 +217,11 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 
 // TODO: cleanup this and separate .obj and .gltf loading
 // TODO: rename
-static void vk_buffers_upload(vk_context* context)
+static void vk_assets_load(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-#if 0
+#if 1
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
@@ -1524,7 +1524,7 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_buffers_upload(context);
+   vk_assets_load(context);
 
    return true;
 }

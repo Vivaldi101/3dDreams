@@ -124,8 +124,6 @@ align_struct
 
    // TODO: array(meshlet)
    u32 meshlet_count;
-   struct meshlet* meshlet_buffer;
-
    u32 index_count;
 
    swapchain_surface_info swapchain_info;

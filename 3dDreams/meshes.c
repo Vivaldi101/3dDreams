@@ -11,6 +11,7 @@
 
 typedef struct vertex vertex;
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
+static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 typedef struct 
 {
@@ -165,7 +166,21 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    return buffer;
 }
 
-#if 1
+static void vk_buffers_upload(vk_context* context, vertex* vertices, size vb_size, u32* indices, size ib_size, meshlet* meshlets, size mb_size, vk_buffer scratch_buffer)
+{
+   // upload vertex data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+      scratch_buffer, vertices, vb_size);
+   // upload index data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
+      scratch_buffer, indices, ib_size);
+   // upload meshlet data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+      scratch_buffer, meshlets, mb_size);
+
+   vk_buffer_destroy(context->logical_device, &scratch_buffer);
+};
+
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
 static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
@@ -253,33 +268,19 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
 
    context->index_count = (u32)index_count;
    context->meshlet_count = (u32)m.meshlets.count;
-   context->meshlet_buffer = m.meshlets.data;
 
-   vk_buffer index_buffer = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-   context->vb = vertex_buffer;
-   context->mb = meshlet_buffer;
-   context->ib = index_buffer;
+   context->vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   context->mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   context->ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    // temp buffer
    size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   // upload vertex data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data.data, vb_size);
-   // upload meshlet data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, context->meshlet_buffer, mb_size);
-   // upload index data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-      scratch_buffer, ib_data, ib_size);
+   vk_buffers_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
-#endif
 
 static void vertex_deduplicate(arena scratch, size index_count)
 {
@@ -349,8 +350,6 @@ static void vertex_deduplicate(arena scratch, size index_count)
    }
 #endif
 }
-
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 {
@@ -475,29 +474,16 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 
       context->index_count = (u32)index_count;
       context->meshlet_count = (u32)m.meshlets.count;
-      context->meshlet_buffer = m.meshlets.data;
 
-      vk_buffer index_buffer = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-      context->vb = vertex_buffer;
-      context->mb = meshlet_buffer;
-      context->ib = index_buffer;
+      context->vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      context->mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      context->ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
       // temp buffer
       size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
       vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-      // upload vertex data
-      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-         scratch_buffer, vertices.data, vb_size);
-      // upload meshlet data
-      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-         scratch_buffer, context->meshlet_buffer, mb_size);
-      // upload index data
-      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-         scratch_buffer, indices.data, ib_size);
+      vk_buffers_upload(context, vertices.data, vb_size, indices.data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
 
       vk_buffer_destroy(context->logical_device, &scratch_buffer);
    }
