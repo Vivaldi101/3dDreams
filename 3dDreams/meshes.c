@@ -115,26 +115,53 @@ static mesh meshlet_build(arena* storage, size vertex_count, u32* index_buffer, 
    return result;
 }
 
-// TODO: just pass ib,vb, and mb sizes
-static void mesh_upload(vk_context* context, arena scratch, vk_buffer scratch_buffer, vertex* vb_data, size vertex_count, u32* ib_data, size index_count)
+static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
-   usize vb_size = vertex_count * sizeof(struct vertex);
+   vk_buffer buffer = {};
 
-   // upload vertex data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vb_data, vb_size);
+   VkBufferCreateInfo create_info = {vk_info(BUFFER)};
+   create_info.size = size;
+   create_info.usage = usage;
 
-   usize mb_size = context->meshlet_count * sizeof(struct meshlet);
+   if(!vk_valid(vkCreateBuffer(device, &create_info, 0, &buffer.handle)))
+      return (vk_buffer){};
 
-   // upload meshlet data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, context->meshlet_buffer, mb_size);
+   VkMemoryRequirements memory_reqs;
+   vkGetBufferMemoryRequirements(device, buffer.handle, &memory_reqs);
 
-   usize ib_size = index_count * sizeof(u32);
+   u32 memory_index = memory_properties.memoryTypeCount;
+   u32 i = 0;
 
-   // upload index data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-      scratch_buffer, ib_data, ib_size);
+   while(i < memory_index)
+   {
+      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags))
+         memory_index = i;
+
+      ++i;
+   }
+
+   if(i == memory_properties.memoryTypeCount)
+      return (vk_buffer){};
+
+   VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
+   allocate_info.allocationSize = memory_reqs.size;
+   allocate_info.memoryTypeIndex = memory_index;
+
+   VkDeviceMemory memory = 0;
+   if(!vk_valid(vkAllocateMemory(device, &allocate_info, 0, &memory)))
+      return (vk_buffer){};
+
+   if(!vk_valid(vkBindBufferMemory(device, buffer.handle, memory, 0)))
+      return (vk_buffer){};
+
+   if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+      if(!vk_valid(vkMapMemory(device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
+         return (vk_buffer) {};
+
+   buffer.size = allocate_info.allocationSize;
+   buffer.memory = memory;
+
+   return buffer;
 }
 
 #if 1
@@ -214,7 +241,36 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
       }
    }
 
-   mesh_upload(context, scratch, scratch_buffer, vb_data.data, vertex_index, ib_data, index_count);
+   VkPhysicalDeviceMemoryProperties memory_props;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+
+   mesh m = meshlet_build(context->storage, vb_data.count, ib_data, index_count);
+
+   usize vb_size = vb_data.count * sizeof(struct vertex);
+   usize mb_size = m.meshlets.count * sizeof(struct meshlet);
+   usize ib_size = index_count * sizeof(u32);
+
+   context->index_count = (u32)index_count;
+   context->meshlet_count = (u32)m.meshlets.count;
+   context->meshlet_buffer = m.meshlets.data;
+
+   vk_buffer index_buffer = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer vertex_buffer = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer meshlet_buffer = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   context->vb = vertex_buffer;
+   context->mb = meshlet_buffer;
+   context->ib = index_buffer;
+
+   // upload vertex data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+      scratch_buffer, vb_data.data, vb_size);
+   // upload meshlet data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+      scratch_buffer, context->meshlet_buffer, mb_size);
+   // upload index data
+   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
+      scratch_buffer, ib_data, ib_size);
 }
 #endif
 
@@ -422,7 +478,15 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       context->mb = meshlet_buffer;
       context->ib = index_buffer;
 
-      mesh_upload(context, scratch, scratch_buffer, vertices.data, vertices.count, indices.data, indices.count);
+      // upload vertex data
+      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
+         scratch_buffer, vertices.data, vb_size);
+      // upload meshlet data
+      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+         scratch_buffer, context->meshlet_buffer, mb_size);
+      // upload index data
+      vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
+         scratch_buffer, indices.data, ib_size);
    }
 
    cgltf_free(data);

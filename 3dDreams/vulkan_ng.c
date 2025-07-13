@@ -215,55 +215,6 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
-{
-   vk_buffer buffer = {};
-
-   VkBufferCreateInfo create_info = {vk_info(BUFFER)};
-   create_info.size = size;
-   create_info.usage = usage;
-
-   if(!vk_valid(vkCreateBuffer(device, &create_info, 0, &buffer.handle)))
-      return (vk_buffer){};
-
-   VkMemoryRequirements memory_reqs;
-   vkGetBufferMemoryRequirements(device, buffer.handle, &memory_reqs);
-
-   u32 memory_index = memory_properties.memoryTypeCount;
-   u32 i = 0;
-
-   while(i < memory_index)
-   {
-      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags))
-         memory_index = i;
-
-      ++i;
-   }
-
-   if(i == memory_properties.memoryTypeCount)
-      return (vk_buffer){};
-
-   VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
-   allocate_info.allocationSize = memory_reqs.size;
-   allocate_info.memoryTypeIndex = memory_index;
-
-   VkDeviceMemory memory = 0;
-   if(!vk_valid(vkAllocateMemory(device, &allocate_info, 0, &memory)))
-      return (vk_buffer){};
-
-   if(!vk_valid(vkBindBufferMemory(device, buffer.handle, memory, 0)))
-      return (vk_buffer){};
-
-   if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-      if(!vk_valid(vkMapMemory(device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
-         return (vk_buffer) {};
-
-   buffer.size = allocate_info.allocationSize;
-   buffer.memory = memory;
-
-   return buffer;
-}
-
 // TODO: cleanup this and separate .obj and .gltf loading
 // TODO: rename
 static void vk_buffers_upload(vk_context* context)
@@ -275,8 +226,8 @@ static void vk_buffers_upload(vk_context* context)
 
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-#if 0
-   s8 asset_file = s8("dragon.obj");
+#if 1
+   s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
