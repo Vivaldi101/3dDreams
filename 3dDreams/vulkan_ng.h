@@ -76,10 +76,10 @@ align_struct
 } vk_meshlet;
 
 typedef struct meshlet meshlet;
-align_struct mesh
+align_struct geometry
 {
    array(meshlet) meshlets;
-} mesh;
+} geometry;
 
 align_struct
 {

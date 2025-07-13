@@ -221,7 +221,7 @@ static void vk_assets_load(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-#if 1
+#if 0
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
@@ -996,8 +996,12 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
-      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+      for(u32 i = 0; i < context->mesh_draws.count; ++i)
+      {
+         // Draw the entire index buffer
+         vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+         vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+      }
    }
 
    // draw axis
