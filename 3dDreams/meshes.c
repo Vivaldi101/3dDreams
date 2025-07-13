@@ -10,6 +10,7 @@
 #include "vulkan_ng.h"
 
 typedef struct vertex vertex;
+static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
 
 typedef struct 
 {
@@ -166,7 +167,7 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
 
 #if 1
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
-static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib, vk_buffer scratch_buffer)
+static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -262,6 +263,10 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
    context->mb = meshlet_buffer;
    context->ib = index_buffer;
 
+   // temp buffer
+   size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
    // upload vertex data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
       scratch_buffer, vb_data.data, vb_size);
@@ -271,6 +276,8 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
    // upload index data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
       scratch_buffer, ib_data, ib_size);
+
+   vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
 #endif
 
@@ -345,7 +352,7 @@ static void vertex_deduplicate(arena scratch, size index_count)
 
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
-static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buffer, s8 gltf_path)
+static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
@@ -478,6 +485,10 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       context->mb = meshlet_buffer;
       context->ib = index_buffer;
 
+      // temp buffer
+      size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
+      vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
       // upload vertex data
       vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
          scratch_buffer, vertices.data, vb_size);
@@ -487,6 +498,8 @@ static bool gltf_parse(vk_context* context, arena scratch, vk_buffer scratch_buf
       // upload index data
       vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
          scratch_buffer, indices.data, ib_size);
+
+      vk_buffer_destroy(context->logical_device, &scratch_buffer);
    }
 
    cgltf_free(data);

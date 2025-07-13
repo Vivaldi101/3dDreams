@@ -28,7 +28,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 
 #if 1
 // TODO: clean up these top-level read apis
-static void obj_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
+static void obj_file_read(vk_context* context, void *user_context, s8 filename)
 {
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
@@ -43,7 +43,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(filename), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
-   obj_parse(context, *context->storage, &attrib, scratch_buffer);
+   obj_parse(context, *context->storage, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
@@ -51,7 +51,7 @@ static void obj_file_read(vk_context* context, void *user_context, vk_buffer scr
 }
 #endif
 
-static void gltf_file_read(vk_context* context, void *user_context, vk_buffer scratch_buffer, s8 filename)
+static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
    char file_path[MAX_PATH] = {};
 
@@ -66,7 +66,7 @@ static void gltf_file_read(vk_context* context, void *user_context, vk_buffer sc
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_parse(context, *context->storage, scratch_buffer, gltf_file_path))
+   if(!gltf_parse(context, *context->storage, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -221,27 +221,20 @@ static void vk_buffers_upload(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-   size buffer_size = MB(1024);
-   VkPhysicalDeviceMemoryProperties memory_props;
-
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-#if 1
+#if 0
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   obj_file_read(context, &user_data, scratch_buffer, asset_file);
+   obj_file_read(context, &user_data, asset_file);
 #else
    // gltf
    s8 asset_file = s8("DamagedHelmet.gltf");
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
-   gltf_file_read(context, &user_data, scratch_buffer, asset_file);
+   gltf_file_read(context, &user_data, asset_file);
 #endif
-
-   vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
