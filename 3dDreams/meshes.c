@@ -396,6 +396,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
    size vertex_offset = 0;
    size scratch_buffer_size = 0;
 
+   // TODO: cleanup these
    array(vertex) vertices = {.arena = context->storage};
    array(u32) indices = {.arena = context->storage};
    // preallocate indices
@@ -484,6 +485,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       cgltf_accessor* accessor = prim->indices;
       cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
       indices.count += index_count;
+      context->index_count += (u32)index_count;
 
       // mesh offsets
       mesh_draw md = {};
@@ -492,11 +494,6 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       md.vertex_offset = vertex_offset;
 
       array_add(context->mesh_draws, md);
-
-      size vb_size = vertex_count * sizeof(struct vertex);
-      size ib_size = index_count * sizeof(u32);
-
-      context->index_count += (u32)index_count;
 
       index_offset += index_count;
       vertex_offset += vertex_count;

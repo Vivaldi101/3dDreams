@@ -229,7 +229,7 @@ static void vk_assets_load(vk_context* context)
    obj_file_read(context, &user_data, asset_file);
 #else
    // gltf
-   s8 asset_file = s8("glamvelvetsofa.gltf");
+   s8 asset_file = s8("lantern.gltf");
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
@@ -960,6 +960,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       u32 base = 0;
 
       // 0xffff is the AMD limit - check this also on nvidia
+      // draw meshlets in chunks
       for(u32 i = 0; i < draw_calls; ++i)
       {
          vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
@@ -976,6 +977,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
                          offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
                          &base);
 
+      // draw rest of the meshlets
       vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
    }
    else

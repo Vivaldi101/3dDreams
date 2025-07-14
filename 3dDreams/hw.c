@@ -143,7 +143,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
-   hw->state.camera.radius = 2.0f;
+   hw->state.camera.radius = 1.0f;
    vec3 eye = {hw->state.camera.radius, 0, 0};
    vec3 origin = {0.f, 0.f, 0.f};
    hw->state.camera.pos = eye;
