@@ -229,7 +229,7 @@ static void vk_assets_load(vk_context* context)
    obj_file_read(context, &user_data, asset_file);
 #else
    // gltf
-   s8 asset_file = s8("lantern.gltf");
+   s8 asset_file = s8("glamvelvetsofa.gltf");
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
@@ -1494,9 +1494,6 @@ bool vk_initialize(hw* hw)
    context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_info.format, VK_FORMAT_D32_SFLOAT);
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
-
-   // todo: remove
-   //if(context->rtx_supported) //assert(vk_mesh_shader_max_tasks(context->physical_device) >= 256);
 
    if(!vk_swapchain_update(context))
       return false;
