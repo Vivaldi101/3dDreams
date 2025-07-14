@@ -134,7 +134,7 @@ static array array_make(arena* a, size alloc_size, size count)
 {
    array result = {};
    result.arena = a;
-   result.data = array_alloc(&result, alloc_size, 4, count, 0);
+   result.data = array_alloc(&result, alloc_size, alloc_size, count, 0);
    result.count = 0;
 
    return result;

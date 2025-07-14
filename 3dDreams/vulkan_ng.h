@@ -81,7 +81,7 @@ align_struct geometry
    array(meshlet) meshlets;
 } geometry;
 
-align_struct
+align_struct mesh_draw
 {
    size index_offset;
    size index_count;

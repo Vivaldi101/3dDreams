@@ -166,7 +166,8 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    return buffer;
 }
 
-static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, u32* indices, size ib_size, meshlet* meshlets, size mb_size, vk_buffer scratch_buffer)
+//static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, u32* indices, size ib_size, meshlet* meshlets, size mb_size, vk_buffer scratch_buffer)
+static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, u32* indices, size ib_size, vk_buffer scratch_buffer)
 {
    // upload vertex data
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
@@ -175,10 +176,8 @@ static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, 
    vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
       scratch_buffer, indices, ib_size);
    // upload meshlet data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, meshlets, mb_size);
-
-   vk_buffer_destroy(context->logical_device, &scratch_buffer);
+   //vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
+      //scratch_buffer, meshlets, mb_size);
 };
 
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
@@ -277,7 +276,8 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
    size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
+   //vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
+   vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, scratch_buffer);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
@@ -351,6 +351,23 @@ static void vertex_deduplicate(arena scratch, size index_count)
 #endif
 }
 
+static size gltf_index_count(cgltf_data* data)
+{
+   size index_count = 0;
+   for(cgltf_size i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = &data->meshes[i];
+      assert(gltf_mesh->primitives_count == 1);
+
+      cgltf_primitive* prim = &gltf_mesh->primitives[0];
+      assert(prim->type == cgltf_primitive_type_triangles);
+
+      index_count += prim->indices->count;
+   }
+
+   return index_count;
+}
+
 static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 {
    cgltf_options options = {};
@@ -378,6 +395,14 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 
    size index_offset = 0;
    size vertex_offset = 0;
+   size scratch_buffer_size = 0;
+
+   array(vertex) vertices = {.arena = context->storage};
+   array(u32) indices = {.arena = context->storage};
+   // preallocate indices
+   indices.data = alloc(indices.arena, sizeof(u32), __alignof(u32), gltf_index_count(data), 0);
+   // preallocate meshes
+   context->mesh_draws.data = alloc(context->mesh_draws.arena, sizeof(mesh_draw), __alignof(mesh_draw), data->meshes_count, 0);
 
    for(cgltf_size i = 0; i < data->meshes_count; ++i)
    {
@@ -424,7 +449,6 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       }
 
       // load vertices
-      array vertices = array_make(context->storage, sizeof(vertex), vertex_count);
       for(cgltf_size k = 0; k < vertex_count; ++k)
       {
          vertex vert = {};
@@ -454,50 +478,53 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
             vert.tv = uv[1];
          }
 
-         array_add(vertices, vert);
+         array_push(vertices) = vert;
       }
 
       // load indices
       cgltf_accessor* accessor = prim->indices;
-      array indices = array_make(context->storage, sizeof(u32), prim->indices->count);
-      cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data, 4, prim->indices->count);
-      indices.count = index_count;
+      cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
+      indices.count += index_count;
 
-      array_push(context->mesh_draws) = (mesh_draw)
-      {
-         .index_count = indices.count,
-         .index_offset = index_offset,
-         .vertex_offset = vertex_offset,
-      };
+      // mesh offsets
+      mesh_draw md = {};
+      md.index_count = index_count;
+      md.index_offset = index_offset;
+      md.vertex_offset = vertex_offset;
 
-      VkPhysicalDeviceMemoryProperties memory_props;
-      vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+      array_add(context->mesh_draws, md);
 
-      geometry m = meshlet_build(context->storage, vertex_count, indices.data, index_count);
+      //geometry g = meshlet_build(context->storage, vertex_count, indices.data, index_count);
 
-      usize vb_size = vertex_count * sizeof(struct vertex);
-      usize mb_size = m.meshlets.count * sizeof(struct meshlet);
-      usize ib_size = index_count * sizeof(u32);
+      size vb_size = vertex_count * sizeof(struct vertex);
+      //size mb_size = g.meshlets.count * sizeof(struct meshlet);
+      size ib_size = index_count * sizeof(u32);
 
-      context->index_count = (u32)index_count;
-      context->meshlet_count = (u32)m.meshlets.count;
-
-      context->vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      context->mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      context->ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-      // temp buffer
-      size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
-      vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-      // TODO: curretly
-      vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
-
-      vk_buffer_destroy(context->logical_device, &scratch_buffer);
+      context->index_count += (u32)index_count;
+      context->meshlet_count += 0;
 
       index_offset += index_count;
       vertex_offset += vertex_count;
    }
+
+   usize vb_size = vertices.count * sizeof(struct vertex);
+   usize ib_size = indices.count * sizeof(u32);
+
+   scratch_buffer_size = max(vb_size, ib_size);
+
+   // temp buffer
+   VkPhysicalDeviceMemoryProperties memory_props;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+   //vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, g.meshlets.data, mb_size, scratch_buffer);
+
+   context->vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   //context->mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   context->ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, scratch_buffer);
+   vk_buffer_destroy(context->logical_device, &scratch_buffer);
 
    cgltf_free(data);
 

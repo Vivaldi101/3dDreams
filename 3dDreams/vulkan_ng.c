@@ -229,7 +229,7 @@ static void vk_assets_load(vk_context* context)
    obj_file_read(context, &user_data, asset_file);
 #else
    // gltf
-   s8 asset_file = s8("DamagedHelmet.gltf");
+   s8 asset_file = s8("lantern.gltf");
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
@@ -878,7 +878,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    mvp.model = mat4_identity();
    mvp.meshlet_offset = 0;
-   mvp.model = mat4_scale(mvp.model, 1.0f);
+   mvp.model = mat4_scale(mvp.model, 0.25f);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
@@ -996,11 +996,11 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
+      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
       for(u32 i = 0; i < context->mesh_draws.count; ++i)
       {
-         // Draw the entire index buffer
-         vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
-         vkCmdDrawIndexed(command_buffer, context->index_count, 1, 0, 0, 0);
+         mesh_draw md = context->mesh_draws.data[i];
+         vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
       }
    }
 
