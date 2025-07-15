@@ -878,7 +878,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    mvp.model = mat4_identity();
    mvp.meshlet_offset = 0;
-   mvp.model = mat4_scale(mvp.model, 0.25f);
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
@@ -982,10 +981,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
    else
    {
-      vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                   sizeof(mvp), &mvp);
-
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
       // TODO: descriptor templates
@@ -999,9 +994,25 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+
       for(u32 i = 0; i < context->mesh_draws.count; ++i)
       {
          mesh_draw md = context->mesh_draws.data[i];
+         vec3 pos = md.pos;
+         vec3 scale = md.scale;
+
+         mvp.model.data[12] = pos.x;
+         mvp.model.data[13] = pos.y;
+         mvp.model.data[14] = pos.z;
+
+         mvp.model.data[0] = scale.x ? scale.x : 1.f;
+         mvp.model.data[5] = scale.y ? scale.y : 1.f;
+         mvp.model.data[10] = scale.z ? scale.z : 1.f;
+
+         vkCmdPushConstants(command_buffer, context->pipeline_layout,
+                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+                      sizeof(mvp), &mvp);
+
          vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
       }
    }

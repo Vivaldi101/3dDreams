@@ -31,12 +31,12 @@ static void app_camera_update(app_state* state)
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       // TODO: Correct speed
-      radius -= 0.25f;
+      radius -= 2.25f;
       state->input.mouse_wheel_state = 0;
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
-      radius += 0.25f;
+      radius += 2.25f;
       state->input.mouse_wheel_state = 0;
    }
 

@@ -83,6 +83,8 @@ align_struct geometry
 
 align_struct mesh_draw
 {
+   vec3 pos;
+   vec3 scale;
    size index_offset;
    size index_count;
    size vertex_offset;

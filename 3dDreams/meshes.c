@@ -353,7 +353,7 @@ static void vertex_deduplicate(arena scratch, size index_count)
 static size gltf_index_count(cgltf_data* data)
 {
    size index_count = 0;
-   for(cgltf_size i = 0; i < data->meshes_count; ++i)
+   for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = &data->meshes[i];
       assert(gltf_mesh->primitives_count == 1);
@@ -404,7 +404,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
    // preallocate meshes
    context->mesh_draws.data = alloc(context->mesh_draws.arena, sizeof(mesh_draw), __alignof(mesh_draw), data->meshes_count, 0);
 
-   for(cgltf_size i = 0; i < data->meshes_count; ++i)
+   for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = &data->meshes[i];
       assert(gltf_mesh->primitives_count == 1);
@@ -412,13 +412,13 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       cgltf_primitive* prim = &gltf_mesh->primitives[0];
       assert(prim->type == cgltf_primitive_type_triangles);
 
-      cgltf_size vertex_count = 0;
+      usize vertex_count = 0;
       cgltf_accessor* position_accessor = 0;
       cgltf_accessor* normal_accessor = 0;
       cgltf_accessor* texcoord_accessor = 0;
 
       // parse attribute types
-      for(cgltf_size j = 0; j < prim->attributes_count; ++j)
+      for(usize j = 0; j < prim->attributes_count; ++j)
       {
          cgltf_attribute* attr = &prim->attributes[j];
 
@@ -449,7 +449,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       }
 
       // load vertices
-      for(cgltf_size k = 0; k < vertex_count; ++k)
+      for(usize k = 0; k < vertex_count; ++k)
       {
          vertex vert = {};
 
@@ -483,7 +483,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 
       // load indices
       cgltf_accessor* accessor = prim->indices;
-      cgltf_size index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
+      usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
       indices.count += index_count;
       context->index_count += (u32)index_count;
 
@@ -520,6 +520,20 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 
    vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, gm.meshlets.data, mb_size, scratch_buffer);
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
+
+   for(usize i = 0; i < data->nodes_count; ++i)
+   {
+      cgltf_node* node = &data->nodes[i];
+      if(node->mesh)
+      {
+         usize mesh_index = cgltf_mesh_index(data, node->mesh);
+
+         if(node->has_translation)
+            context->mesh_draws.data[mesh_index].pos = (vec3){node->translation[0], node->translation[1], node->translation[2]};
+         if(node->has_scale)
+            context->mesh_draws.data[mesh_index].scale = (vec3){node->scale[0], node->scale[1], node->scale[2]};
+      }
+   }
 
    cgltf_free(data);
 
