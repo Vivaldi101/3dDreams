@@ -229,7 +229,7 @@ static void vk_assets_load(vk_context* context)
    obj_file_read(context, &user_data, asset_file);
 #else
    // gltf
-   s8 asset_file = s8("lantern.gltf");
+   s8 asset_file = s8("glamvelvetsofa.gltf");
    gltf_user_ctx user_data = {};
    user_data.scratch = *context->storage;
 
@@ -252,10 +252,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity_flags,
     VkDebugUtilsMessageTypeFlagsEXT type,
     const VkDebugUtilsMessengerCallbackDataEXT* data,
-    void* userdata)
+    void* user_data)
 {
+   hw* h = (hw*)user_data;
 #if _DEBUG
    //debug_message("Validation layer message: %s\n", data->pMessage);
+   h->log(s8("Validation layer message: %s\n"), data->pMessage);
 #endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
@@ -406,13 +408,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
-   array foos = array_make(&scratch, sizeof(int), 100);
-
-   for(int i = 0; i < 100; ++i)
-      array_add(foos, i);
-
    VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
-
    VkPhysicalDeviceVulkan12Features vk12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
    vk12.storageBuffer8BitAccess = true;
    vk12.uniformAndStorageBuffer8BitAccess = true;
@@ -1005,9 +1001,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          mvp.model.data[13] = pos.y;
          mvp.model.data[14] = pos.z;
 
-         mvp.model.data[0] = scale.x ? scale.x : 1.f;
-         mvp.model.data[5] = scale.y ? scale.y : 1.f;
-         mvp.model.data[10] = scale.z ? scale.z : 1.f;
+         mvp.model.data[0] *= scale.x ? scale.x : 1.0f;
+         mvp.model.data[5] *= scale.y ? scale.y : 1.0f;
+         mvp.model.data[10] *= scale.z ? scale.z : 1.0f;
 
          vkCmdPushConstants(command_buffer, context->pipeline_layout,
                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -1201,7 +1197,6 @@ static VkPipeline vk_mesh_pipeline_create(VkDevice logical_device, VkRenderPass 
    pipeline_info.pStages = stages;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
-
    pipeline_info.pVertexInputState = &vertex_input_info;
 
    VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
@@ -1280,7 +1275,6 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_device, VkRenderP
    pipeline_info.pStages = stages;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
-
    pipeline_info.pVertexInputState = &vertex_input_info;
 
    VkPipelineInputAssemblyStateCreateInfo assembly_info = {vk_info(PIPELINE_INPUT_ASSEMBLY_STATE)};
@@ -1484,6 +1478,8 @@ bool vk_initialize(hw* hw)
          VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
          VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
       messenger_info.pfnUserCallback = vk_debug_callback;
+
+      messenger_info.pUserData = hw;
 
       VkDebugUtilsMessengerEXT messenger;
 

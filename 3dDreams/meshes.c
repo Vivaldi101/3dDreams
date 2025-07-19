@@ -275,79 +275,9 @@ static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attr
    size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   //vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
-   //vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, scratch_buffer);
+   vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
-}
-
-static void vertex_deduplicate(arena scratch, size index_count)
-{
-   index_hash_table hash_table = {};
-
-   hash_table.max_count = index_count;
-
-   hash_table.keys = push(&scratch, hash_key_obj, hash_table.max_count);
-   hash_table.values = push(&scratch, hash_value, hash_table.max_count);
-
-   memset(hash_table.keys, -1, sizeof(hash_key_obj) * hash_table.max_count);
-
-   u32 vertex_index = 0;
-   u32 primitive_index = 0;
-
-   u32* ib_data = push(&scratch, u32, index_count);
-   array(vertex) vb_data = {.arena = &scratch};
-
-#if 0
-   for(usize f = 0; f < index_count; f += 3)
-   {
-      const tinyobj_vertex_index_t* vidx = attrib->faces + f;
-
-      for(usize i = 0; i < 3; ++i)
-      {
-         i32 vi = vidx[i].v_idx;
-         i32 vti = vidx[i].vt_idx;
-         i32 vni = vidx[i].vn_idx;
-
-         hash_key_obj index = (hash_key_obj){.vi = vi, .vni = vni, .vti = vti};
-         hash_value lookup = hash_lookup(&hash_table, index);
-
-         if(lookup == ~0u)
-         {
-            struct vertex v = {};
-            if(vi >= 0)
-            {
-               v.vx = attrib->vertices[vi * 3 + 0];
-               v.vy = attrib->vertices[vi * 3 + 1];
-               v.vz = attrib->vertices[vi * 3 + 2];
-            }
-
-            if(vni >= 0)
-            {
-               f32 nx = attrib->normals[vni * 3 + 0];
-               f32 ny = attrib->normals[vni * 3 + 1];
-               f32 nz = attrib->normals[vni * 3 + 2];
-               v.nx = (u8)(nx * 127.f + 127.f);
-               v.ny = (u8)(ny * 127.f + 127.f);
-               v.nz = (u8)(nz * 127.f + 127.f);
-            }
-
-            if(vti >= 0)
-            {
-               v.tu = attrib->texcoords[vti * 2 + 0];
-               v.tv = attrib->texcoords[vti * 2 + 1];
-            }
-
-            hash_insert(&hash_table, index, vertex_index);
-            ib_data[primitive_index] = vertex_index++;
-            array_push(vb_data) = v;
-         }
-         else
-            ib_data[primitive_index] = lookup;
-         ++primitive_index;
-      }
-   }
-#endif
 }
 
 static size gltf_index_count(cgltf_data* data)
