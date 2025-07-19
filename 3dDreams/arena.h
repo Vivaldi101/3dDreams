@@ -26,10 +26,17 @@ do { \
 
 #define array_push(a)          (a).count++; *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
+// TODO: function
+#define array_resize(a, t, s)  (a).data = alloc(a.arena, sizeof(t), __alignof(t), (s), FIXED_ARRAY_PUSH_FLAG);
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
+
+enum
+{
+   FIXED_ARRAY_PUSH_FLAG = 1 << 0,
+};
 
 typedef struct arena
 {
@@ -45,12 +52,6 @@ typedef struct array
    size count;
    void* data;
 } array;
-
-enum
-{
-   FIXED_ARRAY_PUSH_FLAG = 1 << 0,
-};
-
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -106,13 +107,10 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
 
-   if(flag != FIXED_ARRAY_PUSH_FLAG)
+   if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
-      if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
-      {
-         arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
-         p = a->beg;
-      }
+      arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
+      p = a->beg;
    }
 
    a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
@@ -125,16 +123,6 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    a->data = a->data ? a->data : result;
-
-   return result;
-}
-
-static array array_make(arena* a, size alloc_size, size count)
-{
-   array result = {};
-   result.arena = a;
-   result.data = alloc(a, alloc_size, alloc_size, count, 0);
-   result.count = 0;
 
    return result;
 }
