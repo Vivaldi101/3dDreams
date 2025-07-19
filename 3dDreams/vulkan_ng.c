@@ -26,7 +26,6 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
-#if 1
 // TODO: clean up these top-level read apis
 static void obj_file_read(vk_context* context, void *user_context, s8 filename)
 {
@@ -43,13 +42,12 @@ static void obj_file_read(vk_context* context, void *user_context, s8 filename)
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(filename), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
-   obj_parse(context, *context->storage, &attrib);
+   obj_load(context, *context->storage, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
 }
-#endif
 
 static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
@@ -66,7 +64,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_parse(context, *context->storage, gltf_file_path))
+   if(!gltf_load(context, *context->storage, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 

@@ -180,7 +180,7 @@ static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, 
 };
 
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
-static void obj_parse(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
+static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -297,7 +297,7 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
+static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
 {
    cgltf_options options = {};
    cgltf_data* data = 0;
@@ -322,7 +322,6 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
 
    size index_offset = 0;
    size vertex_offset = 0;
-   size scratch_buffer_size = 0;
 
    array(vertex) vertices = {.arena = context->storage};
    array(u32) indices = {.arena = context->storage};
@@ -436,8 +435,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
    usize mb_size = gm.meshlets.count * sizeof(struct meshlet);
    usize vb_size = vertices.count * sizeof(struct vertex);
    usize ib_size = indices.count * sizeof(u32);
-
-   scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
+   usize scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
 
    // temp buffer
    VkPhysicalDeviceMemoryProperties memory_props;
