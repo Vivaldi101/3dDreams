@@ -24,8 +24,8 @@ do { \
 #define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
-#define array_push(a)          *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
-#define array_add(a, v)        (*(((typeof(v)*)a.data + a.count)) = (v), (a).count++, assert((typeof(v)*)a.data + a.count <= (typeof(v)*)a.arena->beg))
+#define array_push(a)          (a).count++; *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
+#define array_add(a, v)        *((a.data + a.count++)) = (v)
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
@@ -124,7 +124,6 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
 {
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
-   a->count++;
    a->data = a->data ? a->data : result;
 
    return result;

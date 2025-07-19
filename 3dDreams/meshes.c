@@ -320,8 +320,6 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
       return false;
    }
 
-   context->mesh_draws.arena = context->storage;
-
    size index_offset = 0;
    size vertex_offset = 0;
    size scratch_buffer_size = 0;
@@ -332,6 +330,7 @@ static bool gltf_parse(vk_context* context, arena scratch, s8 gltf_path)
    // preallocate indices
    indices.data = alloc(indices.arena, sizeof(u32), __alignof(u32), gltf_index_count(data), 0);
    // preallocate meshes
+   context->mesh_draws.arena = context->storage;
    context->mesh_draws.data = alloc(context->mesh_draws.arena, sizeof(mesh_draw), __alignof(mesh_draw), data->meshes_count, 0);
 
    for(usize i = 0; i < data->meshes_count; ++i)
