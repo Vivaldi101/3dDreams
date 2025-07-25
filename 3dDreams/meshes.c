@@ -182,6 +182,9 @@ static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, 
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
 static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
+   context->mesh_draws.arena = context->storage;
+   array_resize(context->mesh_draws, mesh_draw, 1);
+
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
    index_hash_table(hash_key_obj) obj_table = {};
@@ -276,6 +279,11 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
+
+   // single .obj mesh
+   mesh_draw md = {};
+   md.index_count = index_count;
+   array_add(context->mesh_draws, md);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }

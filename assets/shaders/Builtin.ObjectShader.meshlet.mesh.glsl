@@ -6,7 +6,7 @@
 #extension GL_ARB_shading_language_include: require
 #extension GL_GOOGLE_include_directive: require
 
-#define DEBUG 0
+#define DEBUG 1
 
 #include "mesh.h"
 

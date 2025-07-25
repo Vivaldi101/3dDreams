@@ -219,7 +219,7 @@ static void vk_assets_load(vk_context* context)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-#if 0
+#if 1
    s8 asset_file = s8("buddha.obj");
    obj_user_ctx user_data = {};
    user_data.scratch = *context->storage;
