@@ -215,24 +215,27 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 
 // TODO: cleanup this and separate .obj and .gltf loading
 // TODO: rename
-static void vk_assets_load(vk_context* context)
+static void vk_assets_load(vk_context* context, file_format format)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
-#if 1
-   s8 asset_file = s8("exterior.obj");
-   obj_user_ctx user_data = {};
-   user_data.scratch = *context->storage;
+   if(format == FILE_FORMAT_OBJ)
+   {
+      s8 asset_file = s8("dragon.obj");
+      obj_user_ctx user_data = {};
+      user_data.scratch = *context->storage;
 
-   obj_file_read(context, &user_data, asset_file);
-#else
-   // gltf
-   s8 asset_file = s8("damagedhelmet.gltf");
-   gltf_user_ctx user_data = {};
-   user_data.scratch = *context->storage;
+      obj_file_read(context, &user_data, asset_file);
+   }
+   else if(format == FILE_FORMAT_GLTF)
+   {
+      // gltf
+      s8 asset_file = s8("damagedhelmet.gltf");
+      gltf_user_ctx user_data = {};
+      user_data.scratch = *context->storage;
 
-   gltf_file_read(context, &user_data, asset_file);
-#endif
+      gltf_file_read(context, &user_data, asset_file);
+   }
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
@@ -1532,7 +1535,7 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_assets_load(context);
+   vk_assets_load(context, FILE_FORMAT_GLTF);
 
    return true;
 }
