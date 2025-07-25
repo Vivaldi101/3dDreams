@@ -21,22 +21,24 @@ static void app_camera_update(app_state* state)
    f32 radius = state->camera.radius;
 
    // half turn across view plane extents (in azimuth)
-   f32 speed_x = PI / state->camera.viewplane_width;
-   f32 speed_y = PI / state->camera.viewplane_height;
+   f32 rotation_speed_x = PI / state->camera.viewplane_width;
+   f32 rotation_speed_y = PI / state->camera.viewplane_height;
 
    // delta in pixels
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
+   f32 movement_speed = 10.f;
+
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       // TODO: Correct speed
-      radius -= 0.25f;
+      radius -= movement_speed;
       state->input.mouse_wheel_state = 0;
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
-      radius += 0.25f;
+      radius += movement_speed;
       state->input.mouse_wheel_state = 0;
    }
 
@@ -45,8 +47,8 @@ static void app_camera_update(app_state* state)
    {
       const f32 max_altitude = PI / 2.0f - 0.01f;
 
-      state->camera.azimuth += speed_x * delta_x;
-      state->camera.altitude += speed_y * delta_y;
+      state->camera.azimuth += rotation_speed_x * delta_x;
+      state->camera.altitude += rotation_speed_y * delta_y;
 
       state->camera.altitude > max_altitude ? state->camera.altitude = max_altitude : state->camera.altitude;
       state->camera.altitude < -max_altitude ? state->camera.altitude = -max_altitude : state->camera.altitude;
@@ -63,12 +65,10 @@ static void app_camera_update(app_state* state)
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_MIDDLE)
    {
-      // TODO: Correct speed
-      f32 move_speed = 0.01f;
       vec3 dir = state->camera.dir;
 
       vec3_normalize(dir);
-      dir = vec3_scale(&dir, move_speed);
+      dir = vec3_scale(&dir, movement_speed);
 
       state->camera.pos = vec3_add(&state->camera.pos, &dir);
    }

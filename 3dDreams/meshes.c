@@ -183,6 +183,7 @@ static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, 
 static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
    context->mesh_draws.arena = context->storage;
+   // single .obj mesh
    array_resize(context->mesh_draws, mesh_draw, 1);
 
    // TODO: obj part
@@ -280,7 +281,6 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
 
-   // single .obj mesh
    mesh_draw md = {};
    md.index_count = index_count;
    array_add(context->mesh_draws, md);
