@@ -23,7 +23,8 @@ layout(set = 0, binding = 0) readonly buffer Verts
 };
 
 layout(location = 0) out vec3 out_normal;
-layout(location = 1) out vec3 out_frag_pos;
+layout(location = 1) out vec3 out_world_frag_pos;
+layout(location = 2) out vec2 out_frag_uv;
 
 void main()
 {
@@ -39,5 +40,6 @@ void main()
     vec3 world_normal = normalize(normal_matrix * normal);
 
     out_normal = world_normal;
-    out_frag_pos = world_position.xyz;
+    out_world_frag_pos = world_position.xyz;
+    out_frag_uv = world_pos.xy * 0.5 + 0.5;
 }
