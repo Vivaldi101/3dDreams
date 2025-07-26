@@ -214,14 +214,13 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 }
 
 // TODO: cleanup this and separate .obj and .gltf loading
-// TODO: rename
-static void vk_assets_load(vk_context* context, file_format format)
+// TODO: pass the assets to load
+static void vk_assets_load(vk_context* context, file_format format, s8 asset_file)
 {
    // obj
    // TODO: separate paths for .obj and .gltf
    if(format == FILE_FORMAT_OBJ)
    {
-      s8 asset_file = s8("dragon.obj");
       obj_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
@@ -230,7 +229,6 @@ static void vk_assets_load(vk_context* context, file_format format)
    else if(format == FILE_FORMAT_GLTF)
    {
       // gltf
-      s8 asset_file = s8("damagedhelmet.gltf");
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
@@ -1231,10 +1229,26 @@ static VkPipeline vk_mesh_pipeline_create(VkDevice logical_device, VkRenderPass 
 
    VkPipelineColorBlendAttachmentState color_blend_attachment = {};
    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+   color_blend_attachment.blendEnable = true;
+   // Src color: output color alpha
+   color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+   // Dst color: one minus source alpha (transparency)
+   color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+   color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+   // Same for alpha channel blending
+   color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+   color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+   color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
    VkPipelineColorBlendStateCreateInfo color_blend_info = {vk_info(PIPELINE_COLOR_BLEND_STATE)};
    color_blend_info.attachmentCount = 1;
    color_blend_info.pAttachments = &color_blend_attachment;
+   color_blend_info.logicOpEnable = false;
+   color_blend_info.blendConstants[0] = 0.f;
+   color_blend_info.blendConstants[1] = 0.f;
+   color_blend_info.blendConstants[2] = 0.f;
+   color_blend_info.blendConstants[3] = 0.f;
+
    pipeline_info.pColorBlendState = &color_blend_info;
 
    VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
@@ -1309,10 +1323,26 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_device, VkRenderP
 
    VkPipelineColorBlendAttachmentState color_blend_attachment = {};
    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+   color_blend_attachment.blendEnable = true;
+   // Src color: output color alpha
+   color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+   // Dst color: one minus source alpha (transparency)
+   color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+   color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+   // Same for alpha channel blending
+   color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+   color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+   color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 
    VkPipelineColorBlendStateCreateInfo color_blend_info = {vk_info(PIPELINE_COLOR_BLEND_STATE)};
    color_blend_info.attachmentCount = 1;
    color_blend_info.pAttachments = &color_blend_attachment;
+   color_blend_info.logicOpEnable = false;
+   color_blend_info.blendConstants[0] = 0.f;
+   color_blend_info.blendConstants[1] = 0.f;
+   color_blend_info.blendConstants[2] = 0.f;
+   color_blend_info.blendConstants[3] = 0.f;
+
    pipeline_info.pColorBlendState = &color_blend_info;
 
    VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
@@ -1535,7 +1565,8 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_assets_load(context, FILE_FORMAT_GLTF);
+   // todo: precond on file extensions
+   vk_assets_load(context, FILE_FORMAT_OBJ, s8("dragon.obj"));
 
    return true;
 }

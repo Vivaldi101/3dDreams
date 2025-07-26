@@ -32,7 +32,7 @@ vec3 hsvToRgb(vec3 c)
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-void main() 
+void main()
 {
     out_color = in_color;
 }

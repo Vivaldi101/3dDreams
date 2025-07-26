@@ -1,4 +1,5 @@
 #version 450
+
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
@@ -21,15 +22,22 @@ layout(set = 0, binding = 0) readonly buffer Verts
    vertex verts[];
 };
 
-layout(location = 0) out vec4 out_color;
+layout(location = 0) out vec3 out_normal;
+layout(location = 1) out vec3 out_frag_pos;
 
 void main()
 {
    vertex v = verts[gl_VertexIndex];
 
-   gl_Position = push_constants.projection * push_constants.view * push_constants.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+    vec3 world_pos = vec3(v.vx, v.vy, v.vz);
+    vec4 world_position = push_constants.model * vec4(world_pos, 1.0);
+    gl_Position = push_constants.projection * push_constants.view * world_position;
 
-   vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+    // Decode normal and transform to world space using inverse transpose
+    vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+    mat3 normal_matrix = transpose(inverse(mat3(push_constants.model)));
+    vec3 world_normal = normalize(normal_matrix * normal);
 
-   out_color = vec4(vec3(normal), 1.0);
+    out_normal = world_normal;
+    out_frag_pos = world_position.xyz;
 }
