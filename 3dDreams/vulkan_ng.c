@@ -213,22 +213,17 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-// TODO: cleanup this and separate .obj and .gltf loading
-// TODO: pass the assets to load
-static void vk_assets_load(vk_context* context, file_format format, s8 asset_file)
+static void vk_assets_load(vk_context* context, s8 asset_file)
 {
-   // obj
-   // TODO: separate paths for .obj and .gltf
-   if(format == FILE_FORMAT_OBJ)
+   if(s8_is_substr(asset_file, s8(".obj")))
    {
       obj_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
       obj_file_read(context, &user_data, asset_file);
    }
-   else if(format == FILE_FORMAT_GLTF)
+   else if(s8_is_substr(asset_file, s8(".gltf")))
    {
-      // gltf
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
@@ -1565,8 +1560,7 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   // todo: precond on file extensions
-   vk_assets_load(context, FILE_FORMAT_OBJ, s8("dragon.obj"));
+   vk_assets_load(context, s8("dragon.obj"));
 
    return true;
 }

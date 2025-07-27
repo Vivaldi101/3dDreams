@@ -25,6 +25,15 @@ typedef struct
    size len;
 } s8;
 
+static bool s8_is_substr(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strcmp((char*)str.data + i, (char*)sub.data))
+         return true;
+
+   return false;
+}
+
 #ifdef _DEBUG
 #define pre(p)  {if(!(p))hw_message_box(p)}
 #define post(p) {if(!(p))hw_message_box(p)}
