@@ -229,6 +229,8 @@ static void vk_assets_load(vk_context* context, s8 asset_file)
 
       gltf_file_read(context, &user_data, asset_file);
    }
+   else
+      hw_message_box("Unsupported asset format");
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
