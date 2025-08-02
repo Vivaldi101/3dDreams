@@ -22,14 +22,6 @@ typedef struct index_hash_table
 
 #define index_hash_table(T) struct index_hash_table##T {  u32* values; T* keys; size max_count; size count; }
 
-typedef struct 
-{
-   vk_shader_modules* values;
-   const char** keys;
-   size max_count;
-   size count;
-} spv_hash_table;
-
 static bool obj_key_equals(hash_key_obj a, hash_key_obj b)
 {
    return memcmp(&a, &b, sizeof(hash_key_obj)) == 0;

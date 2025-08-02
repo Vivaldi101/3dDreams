@@ -10,4 +10,12 @@ align_struct
    VkShaderModule ms;
 } vk_shader_modules;
 
+typedef struct 
+{
+   vk_shader_modules* values;
+   const char** keys;
+   size max_count;
+   size count;
+} spv_hash_table;
+
 #endif

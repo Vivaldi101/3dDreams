@@ -12,12 +12,14 @@
 
 #include "common.h"
 #include "arena.h"
+#include "vulkan_shader_module.h"
 
 #include "../assets/shaders/mesh.h"
 
 // TODO: make vulkan_ng a shared lib
-bool vk_uninitialize(struct hw* hw);
+// init => uninit
 bool vk_initialize(struct hw* hw);
+void vk_uninitialize(struct hw* hw);
 
 #define vk_valid_handle(v) ((v) != VK_NULL_HANDLE)
 #define vk_valid_format(v) ((v) != VK_FORMAT_UNDEFINED)
@@ -118,6 +120,7 @@ align_struct
 
    VkPipelineLayout pipeline_layout;
    VkPipelineLayout rtx_pipeline_layout;
+   spv_hash_table shader_modules;
 
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer

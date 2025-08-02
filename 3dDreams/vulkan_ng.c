@@ -120,13 +120,13 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* table, const char** shader_names)
+static void spv_lookup(VkDevice logical_device, arena* storage, spv_hash_table* table, const char** shader_names)
 {
    assert(vk_valid_handle(logical_device));
 
    // TODO: make function for hash tables
-   table->keys = push(&scratch, const char*, table->max_count);
-   table->values = push(&scratch, vk_shader_modules, table->max_count);
+   table->keys = push(storage, const char*, table->max_count);
+   table->values = push(storage, vk_shader_modules, table->max_count);
 
    memset(table->values, 0, table->max_count * sizeof(vk_shader_modules));
 
@@ -146,21 +146,22 @@ static void spv_lookup(VkDevice logical_device, arena scratch, spv_hash_table* t
          if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
          {
             vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
-            vk_shader_load(logical_device, scratch, *p, &ms);
+            // TODO: optimize shader loading - load all the shaders at once
+            vk_shader_load(logical_device, *storage, *p, &ms);
             spv_hash_insert(table, "meshlet", ms);
             break;
          }
          if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
             vk_shader_modules gm = spv_hash_lookup(table, "graphics");
-            vk_shader_load(logical_device, scratch, *p, &gm);
+            vk_shader_load(logical_device, *storage, *p, &gm);
             spv_hash_insert(table, "graphics", gm);
             break;
          }
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
             vk_shader_modules am = spv_hash_lookup(table, "axis");
-            vk_shader_load(logical_device, scratch, *p, &am);
+            vk_shader_load(logical_device, *storage, *p, &am);
             spv_hash_insert(table, "axis", am);
             break;
          }
@@ -1555,23 +1556,21 @@ bool vk_initialize(hw* hw)
    for(const char** p = shader_names; p && *p; ++p)
       shader_count++;
 
-   // TODO: store this inside the context?
-   spv_hash_table shader_hash_table = {};
-   shader_hash_table.max_count = shader_count;
+   context->shader_modules.max_count = shader_count;
 
-   spv_lookup(context->logical_device, *context->storage, &shader_hash_table, shader_names);
+   spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
    VkPipelineCache cache = 0; // TODO: enable
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, false);
    VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, true);
 
-   vk_shader_modules mm = spv_hash_lookup(&shader_hash_table, "meshlet");
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
    context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
 
-   vk_shader_modules gm = spv_hash_lookup(&shader_hash_table, "graphics");
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
    context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
 
-   vk_shader_modules am = spv_hash_lookup(&shader_hash_table, "axis");
+   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
    context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
 
    context->pipeline_layout = layout;
@@ -1582,9 +1581,22 @@ bool vk_initialize(hw* hw)
    return true;
 }
 
-bool vk_uninitialize(hw* hw)
+void vk_uninitialize(hw* hw)
 {
    vk_context* context = hw->renderer.backends[VK_RENDERER_INDEX];
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
+   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
+
+   assert(mm.ms && mm.fs);
+   vkDestroyShaderModule(context->logical_device, mm.ms, 0);
+   vkDestroyShaderModule(context->logical_device, mm.fs, 0);
+   assert(gm.vs && gm.fs);
+   vkDestroyShaderModule(context->logical_device, gm.vs, 0);
+   vkDestroyShaderModule(context->logical_device, gm.fs, 0);
+   assert(am.vs && am.fs);
+   vkDestroyShaderModule(context->logical_device, am.vs, 0);
+   vkDestroyShaderModule(context->logical_device, am.fs, 0);
 
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
@@ -1593,10 +1605,6 @@ bool vk_uninitialize(hw* hw)
    vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
-
-   // TODO this
-   //vkDestroyShaderModule(context->logical_device, context->sha
-   //vkDestroyShaderModule(context->logical_device, context->sha
 
    vkDestroyBuffer(context->logical_device, context->ib.handle, 0);
    vkDestroyBuffer(context->logical_device, context->vb.handle, 0);
@@ -1608,9 +1616,7 @@ bool vk_uninitialize(hw* hw)
 
    vkDestroySurfaceKHR(context->instance, context->surface, 0);
 
-   // TODO this - must destroy all buffers before instance
+   // TODO this - must destroy all image buffers etc. before instance
    //vkDestroyDevice(context->logical_device, 0);
    //vkDestroyInstance(context->instance, 0);
-
-   return true;
 }
