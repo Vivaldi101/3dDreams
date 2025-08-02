@@ -259,7 +259,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
 #endif
 
-   return VK_FALSE;
+   return false;
 }
 
 static VkFormat vk_swapchain_format(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
@@ -355,10 +355,25 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
    return fallback_gpu;
 }
 
-static u32 vk_logical_device_select_family_index()
+static u32 vk_logical_device_select_family_index(VkPhysicalDevice physical_device, VkSurfaceKHR surface, arena scratch)
 {
-   // TODO: select the queue family
-   return 0;
+   u32 queue_family_count = 0;
+   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, 0);
+
+   VkQueueFamilyProperties* queue_families = push(&scratch, VkQueueFamilyProperties, queue_family_count);
+   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families);
+
+   for(u32 i = 0; i < queue_family_count; i++)
+   {
+      VkBool32 present_support = false;
+      vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
+
+      // graphics and presentation within same queue for simplicity
+      if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
+         return i;
+   }
+
+   return (u32)-1;
 }
 
 static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
@@ -411,7 +426,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    vk12.storagePushConstant8 = true;
 
    VkPhysicalDeviceFragmentShadingRateFeaturesKHR frag_shading_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
-   frag_shading_features.primitiveFragmentShadingRate = VK_TRUE;
+   frag_shading_features.primitiveFragmentShadingRate = true;
 
    // TODO: Dont expose if no rtx was supported
    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
@@ -1516,10 +1531,10 @@ bool vk_initialize(hw* hw)
    }
 #endif
 
-   context->queue_family_index = vk_logical_device_select_family_index();
    context->physical_device = vk_physical_device_select(hw, context, *context->storage, instance);
-   context->logical_device = vk_logical_device_create(hw, context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
+   context->queue_family_index = vk_logical_device_select_family_index(context->physical_device, context->surface, *context->storage);
+   context->logical_device = vk_logical_device_create(hw, context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
    context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
    context->image_done_semaphore = vk_semaphore_create(context->logical_device);
    context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
