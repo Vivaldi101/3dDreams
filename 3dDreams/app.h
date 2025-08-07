@@ -56,6 +56,7 @@ align_struct app_state
    app_input input;
    app_camera camera;
    bool rtx_enabled;
+   bool is_fullscreen;
 } app_state;
 
 void app_start(int argc, const char** argv, struct hw* hw);

@@ -103,7 +103,7 @@ align_struct
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
    VkSurfaceKHR surface;
-   VkAllocationCallbacks* allocator;
+   VkAllocationCallbacks allocator;
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;
    VkQueue graphics_queue;

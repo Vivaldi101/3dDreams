@@ -779,7 +779,7 @@ static void vk_swapchain_destroy(vk_context* context)
    vkDestroySwapchainKHR(context->logical_device, context->swapchain_info.swapchain, 0);
 }
 
-static bool vk_swapchain_update(vk_context* context)
+static void vk_swapchain_update(vk_context* context)
 {
    vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_info.swapchain, &context->swapchain_info.image_count, context->swapchain_info.images));
 
@@ -796,8 +796,6 @@ static bool vk_swapchain_update(vk_context* context)
 
       context->framebuffers[i] = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_info, attachments, array_count(attachments));
    }
-
-   return true;
 }
 
 static void vk_resize(hw* hw, u32 width, u32 height)
@@ -1189,7 +1187,7 @@ static VkPipeline vk_mesh_pipeline_create(VkDevice logical_device, VkRenderPass 
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(shaders->ms));
    assert(vk_valid_handle(shaders->fs));
-   assert(!vk_valid_handle(cache));
+   assert(!vk_valid_handle(cache)); // TODO: enable
 
    VkPipeline pipeline = 0;
 
@@ -1532,6 +1530,10 @@ bool vk_initialize(hw* hw)
    }
 #endif
 
+   // TODO:
+   VkAllocationCallbacks allocator = {};
+   context->allocator = allocator;
+
    context->physical_device = vk_physical_device_select(hw, context, *context->storage, instance);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context->physical_device, context->surface, *context->storage);
@@ -1548,8 +1550,7 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   if(!vk_swapchain_update(context))
-      return false;
+   vk_swapchain_update(context);
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, "bin\\assets\\shaders");

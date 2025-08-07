@@ -8,8 +8,6 @@
 #include <volk.c>
 #include "vulkan_ng.c"
 
-#define FULLSCREEN 0
-
 static void app_frame(arena scratch, app_state* state)
 {
    // ...
@@ -17,7 +15,7 @@ static void app_frame(arena scratch, app_state* state)
 
 static void app_camera_update(app_state* state)
 {
-   // Spherical camera
+   // spherical camera
    f32 radius = state->camera.radius;
 
    // half turn across view plane extents (in azimuth)
@@ -103,20 +101,19 @@ static void app_input_handle(app_state* state)
       state->input.key_state = 0;
       state->rtx_enabled = !state->rtx_enabled;
    }
+   if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
+   {
+      state->input.key_state = 0;
+      state->is_fullscreen = !state->is_fullscreen;
+   }
 }
 
 void app_start(int argc, const char** argv, hw* hw)
 {
    pre(implies(argc > 0, argv[argc - 1]));
 
-   // TODO: key press to toggle
-#if FULLSCREEN
-	int w = 1920, h = 1080;
-	int x = 0, y = 0;
-#else
 	int w = 800, h = 600;
 	int x = 100, y = 100;
-#endif
 
    hw_window_open(hw, "Vulkan App", x, y, w, h);
 
