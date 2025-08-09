@@ -1554,7 +1554,7 @@ bool vk_initialize(hw* hw)
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, "bin\\assets\\shaders");
-   for(const char** p = shader_names; p && *p; ++p)
+   for(const char** p = shader_names; *p; ++p)
       shader_count++;
 
    context->shader_modules.max_count = shader_count;
