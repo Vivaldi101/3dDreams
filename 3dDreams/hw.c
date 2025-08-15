@@ -145,7 +145,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    f32 radius = hw->state.camera.radius = 2.0f;
    vec3 origin = {0.f, 0.f, 0.f};
-   f32 azimuth = hw->state.camera.azimuth = -(PI / 2.f); // 1/4 turn to watch align +z
+   f32 azimuth = hw->state.camera.azimuth = (PI / 2.f); // 1/4 turn to align camera in -z
    f32 altitude = 0.f;
    f32 x = radius * cosf(altitude) * cosf(azimuth);
    f32 z = radius * cosf(altitude) * sinf(azimuth);

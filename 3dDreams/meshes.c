@@ -305,6 +305,53 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
+static void transform_decompose(f32 translation[3], f32 rotation[4], f32 scale[3], const f32* transform)
+{
+	f32 m[4][4] = {};
+	memcpy(m, transform, 16 * sizeof(f32));
+
+	// extract translation from last row
+	translation[0] = m[3][0];
+	translation[1] = m[3][1];
+	translation[2] = m[3][2];
+
+	// compute determinant to determine handedness
+	f32 det =
+	    m[0][0] * (m[1][1] * m[2][2] - m[2][1] * m[1][2]) -
+	    m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
+	    m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+
+	f32 sign = (det < 0.f) ? -1.f : 1.f;
+
+	// recover scale from axis lengths
+	scale[0] = sqrtf(m[0][0] * m[0][0] + m[0][1] * m[0][1] + m[0][2] * m[0][2]) * sign;
+	scale[1] = sqrtf(m[1][0] * m[1][0] + m[1][1] * m[1][1] + m[1][2] * m[1][2]) * sign;
+	scale[2] = sqrtf(m[2][0] * m[2][0] + m[2][1] * m[2][1] + m[2][2] * m[2][2]) * sign;
+
+	// normalize axes to get a pure rotation matrix
+	f32 rsx = (scale[0] == 0.f) ? 0.f : 1.f / scale[0];
+	f32 rsy = (scale[1] == 0.f) ? 0.f : 1.f / scale[1];
+	f32 rsz = (scale[2] == 0.f) ? 0.f : 1.f / scale[2];
+
+	f32 r00 = m[0][0] * rsx, r10 = m[1][0] * rsy, r20 = m[2][0] * rsz;
+	f32 r01 = m[0][1] * rsx, r11 = m[1][1] * rsy, r21 = m[2][1] * rsz;
+	f32 r02 = m[0][2] * rsx, r12 = m[1][2] * rsy, r22 = m[2][2] * rsz;
+
+	// "branchless" version of Mike Day's matrix to quaternion conversion
+	int qc = r22 < 0 ? (r00 > r11 ? 0 : 1) : (r00 < -r11 ? 2 : 3);
+	f32 qs1 = qc & 2 ? -1.f : 1.f;
+	f32 qs2 = qc & 1 ? -1.f : 1.f;
+	f32 qs3 = (qc - 1) & 2 ? -1.f : 1.f;
+
+	f32 qt = 1.f - qs3 * r00 - qs2 * r11 - qs1 * r22;
+	f32 qs = 0.5f / sqrtf(qt);
+
+	rotation[qc ^ 0] = qs * qt;
+	rotation[qc ^ 1] = qs * (r01 + qs1 * r10);
+	rotation[qc ^ 2] = qs * (r20 + qs2 * r02);
+	rotation[qc ^ 3] = qs * (r12 + qs3 * r21);
+}
+
 static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
 {
    cgltf_options options = {};
@@ -462,12 +509,17 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
       cgltf_node* node = &data->nodes[i];
       if(node->mesh)
       {
+         f32 wm[16];
+         cgltf_node_transform_world(node, wm);
+
+         f32 s[3], r[4], t[3];
+         transform_decompose(t, r, s, wm);
+
          usize mesh_index = cgltf_mesh_index(data, node->mesh);
 
-         if(node->has_translation)
-            context->mesh_draws.data[mesh_index].pos = (vec3){node->translation[0], node->translation[1], node->translation[2]};
-         if(node->has_scale)
-            context->mesh_draws.data[mesh_index].scale = (vec3){node->scale[0], node->scale[1], node->scale[2]};
+         context->mesh_draws.data[mesh_index].orientation = (vec4){r[0], r[1], r[2], r[3]};
+         context->mesh_draws.data[mesh_index].pos = (vec3){t[0], t[1], t[2]};
+         context->mesh_draws.data[mesh_index].scale = max(max(s[0], s[1]), s[2]);
       }
    }
 

@@ -30,9 +30,9 @@ void main()
 {
    vertex v = verts[gl_VertexIndex];
 
-    vec3 world_pos = vec3(v.vx, v.vy, v.vz);
-    vec4 world_position = push_constants.model * vec4(world_pos, 1.0);
-    gl_Position = push_constants.projection * push_constants.view * world_position;
+    vec3 local_pos = vec3(v.vx, v.vy, v.vz);
+    vec4 world_pos = push_constants.model * vec4(local_pos, 1.0);
+    gl_Position = push_constants.projection * push_constants.view * world_pos;
 
     // Decode normal and transform to world space using inverse transpose
     vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
@@ -40,6 +40,6 @@ void main()
     vec3 world_normal = normalize(normal_matrix * normal);
 
     out_normal = world_normal;
-    out_world_frag_pos = world_position.xyz;
+    out_world_frag_pos = world_pos.xyz;
     out_frag_uv = world_pos.xy * 0.5 + 0.5;
 }

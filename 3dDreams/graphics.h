@@ -434,4 +434,49 @@ typedef struct mvp_transform
 } mvp_transform;
 #pragma pack(pop)
 
+static void quaternion_to_matrix(const float q[4], float out_matrix[16])
+{
+   float x = q[0];
+   float y = q[1];
+   float z = q[2];
+   float w = q[3];
+
+   float x2 = x + x;
+   float y2 = y + y;
+   float z2 = z + z;
+
+   float xx = x * x2;
+   float xy = x * y2;
+   float xz = x * z2;
+
+   float yy = y * y2;
+   float yz = y * z2;
+   float zz = z * z2;
+
+   float wx = w * x2;
+   float wy = w * y2;
+   float wz = w * z2;
+
+   // Column-major order (OpenGL style)
+   out_matrix[0] = 1.0f - (yy + zz);
+   out_matrix[1] = xy + wz;
+   out_matrix[2] = xz - wy;
+   out_matrix[3] = 0.0f;
+
+   out_matrix[4] = xy - wz;
+   out_matrix[5] = 1.0f - (xx + zz);
+   out_matrix[6] = yz + wx;
+   out_matrix[7] = 0.0f;
+
+   out_matrix[8] = xz + wy;
+   out_matrix[9] = yz - wx;
+   out_matrix[10] = 1.0f - (xx + yy);
+   out_matrix[11] = 0.0f;
+
+   out_matrix[12] = 0.0f;
+   out_matrix[13] = 0.0f;
+   out_matrix[14] = 0.0f;
+   out_matrix[15] = 1.0f;
+}
+
 #endif

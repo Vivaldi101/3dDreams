@@ -63,7 +63,7 @@ vec3 colors[verts_count] = vec3[](
     vec3(0, 0, 1), vec3(0, 0, 1),
     vec3(0, 0, 1), vec3(0, 0, 1)
 );
-    float height = 0.70;
+    float height = 0.90;
     mat4 t = translate(vec3(0.0, height, 0.0));
     gl_Position = push_constants.projection * push_constants.view * t * vec4(positions[gl_VertexIndex], 1.0);
 

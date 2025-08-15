@@ -983,6 +983,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
                          &base);
 
       // draw rest of the meshlets
+      // TODO: Handle multi-meshes in the mesh shader
       vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
    }
    else
@@ -1004,16 +1005,22 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       for(u32 i = 0; i < context->mesh_draws.count; ++i)
       {
          mesh_draw md = context->mesh_draws.data[i];
-         vec3 pos = md.pos;
-         vec3 scale = md.scale;
+         f32 s = md.scale;
+         vec4 r = md.orientation;
+         vec3 t = md.pos;
 
-         mvp.model.data[12] = pos.x;
-         mvp.model.data[13] = pos.y;
-         mvp.model.data[14] = pos.z;
+         quaternion_to_matrix(&r, mvp.model.data);
 
-         mvp.model.data[0] *= scale.x ? scale.x : 1.0f;
-         mvp.model.data[5] *= scale.y ? scale.y : 1.0f;
-         mvp.model.data[10] *= scale.z ? scale.z : 1.0f;
+         assert(s > .0f);
+
+         // TODO: negative scales?
+         mvp.model.data[0] *= s;
+         mvp.model.data[5] *= s;
+         mvp.model.data[10] *= s;
+
+         mvp.model.data[12] = t.x;
+         mvp.model.data[13] = t.y;
+         mvp.model.data[14] = t.z;
 
          vkCmdPushConstants(command_buffer, context->pipeline_layout,
                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -1577,7 +1584,12 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_assets_load(context, s8("dragon.obj"));
+   //vk_assets_load(context, s8("clearcoatring.gltf"));
+   //vk_assets_load(context, s8("glamvelvetsofa.gltf"));
+   //vk_assets_load(context, s8("flighthelmet.gltf"));
+   vk_assets_load(context, s8("damagedhelmet.gltf"));
+   //vk_assets_load(context, s8("bistro.gltf"));
+   //vk_assets_load(context, s8("lantern.gltf"));
 
    return true;
 }
