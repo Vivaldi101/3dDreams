@@ -541,9 +541,9 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
+   cgltf_free(data);
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
-   cgltf_free(data);
 
    return true;
 }
