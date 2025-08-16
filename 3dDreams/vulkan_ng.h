@@ -73,7 +73,6 @@ align_struct
    u32 count;
 } vk_meshlet;
 
-// TODO: Rename to vk_meshlet_buffer
 typedef struct meshlet meshlet;
 align_struct
 {
