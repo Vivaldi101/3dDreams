@@ -24,9 +24,9 @@ do { \
 #define new3(a, t, n)       (t*)alloc(a, sizeof(t), __alignof(t), n, 0)
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
+// TODO: functions?
 #define array_push(a)          (a).count++; *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
-// TODO: function
 #define array_resize(a, t, s)  (a).data = alloc(a.arena, sizeof(t), __alignof(t), (s), FIXED_ARRAY_PUSH_FLAG);
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))

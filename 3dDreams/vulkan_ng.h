@@ -78,7 +78,7 @@ typedef struct meshlet meshlet;
 align_struct
 {
    array(meshlet) meshlets;
-} vk_geometry;
+} vk_meshlet_buffer;
 
 align_struct
 {
