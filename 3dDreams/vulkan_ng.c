@@ -7,7 +7,7 @@
 #include "win32_file_io.c"
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
-#include "meshes.c"
+#include "mesh.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
@@ -931,6 +931,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vb_info.offset = 0;
    vb_info.range = context->vb.size;
 
+   // TODO: Currently this is broken
+   // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
    {
       vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
@@ -983,7 +985,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
                          &base);
 
       // draw rest of the meshlets
-      // TODO: Handle multi-meshes in the mesh shader
       vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
    }
    else
@@ -1002,12 +1003,13 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
-      for(u32 i = 0; i < context->mesh_draws.count; ++i)
+      for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
-         mesh_draw md = context->mesh_draws.data[i];
-         f32 s = md.scale;
-         vec4 r = md.orientation;
-         vec3 t = md.pos;
+         vk_mesh_instance mi = context->mesh_instances.data[i];
+#if 0
+         f32 s = mi.scale;
+         vec4 r = mi.orientation;
+         vec3 t = mi.pos;
 
          quaternion_to_matrix(&r, mvp.model.data);
 
@@ -1021,11 +1023,15 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          mvp.model.data[12] = t.x;
          mvp.model.data[13] = t.y;
          mvp.model.data[14] = t.z;
+#else
+         mvp.model = mi.model;
+#endif
 
          vkCmdPushConstants(command_buffer, context->pipeline_layout,
                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
                       sizeof(mvp), &mvp);
 
+         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
          vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
       }
    }
@@ -1584,12 +1590,9 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   //vk_assets_load(context, s8("clearcoatring.gltf"));
+   vk_assets_load(context, s8("bistro.gltf"));
    //vk_assets_load(context, s8("glamvelvetsofa.gltf"));
-   //vk_assets_load(context, s8("flighthelmet.gltf"));
-   vk_assets_load(context, s8("damagedhelmet.gltf"));
-   //vk_assets_load(context, s8("bistro.gltf"));
-   //vk_assets_load(context, s8("lantern.gltf"));
+   //vk_assets_load(context, s8("damagedhelmet.gltf"));
 
    return true;
 }

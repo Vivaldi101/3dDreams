@@ -16,11 +16,6 @@
 
 #include "../assets/shaders/mesh.h"
 
-// TODO: make vulkan_ng a shared lib
-// init => uninit
-bool vk_initialize(struct hw* hw);
-void vk_uninitialize(struct hw* hw);
-
 #define vk_valid_handle(v) ((v) != VK_NULL_HANDLE)
 #define vk_valid_format(v) ((v) != VK_FORMAT_UNDEFINED)
 
@@ -78,29 +73,39 @@ align_struct
    u32 count;
 } vk_meshlet;
 
+// TODO: Rename to vk_meshlet_buffer
 typedef struct meshlet meshlet;
-align_struct geometry
+align_struct
 {
    array(meshlet) meshlets;
-} geometry;
-
-align_struct mesh_draw
-{
-   vec3 pos;
-   f32 scale;
-   vec4 orientation;
-
-   // u32 sizes
-   size index_offset;
-   size index_count;
-   size vertex_offset;
-} mesh_draw;
+} vk_geometry;
 
 align_struct
 {
-   // TODO: array(VkFramebuffer)
+   size mesh_index;  // which mesh this instance draws
+#if 0
+   vec3 pos;
+   vec4 orientation;
+   f32 scale;
+#else
+   mat4 model;
+#endif
+} vk_mesh_instance;
+
+align_struct
+{
+   // TODO: u32 sizes
+   size index_offset;
+   size index_count;
+   size vertex_offset;
+} vk_mesh_draw;
+
+align_struct
+{
+   // TODO: array(VkFramebuffer) framebuffers
    VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
-   array(mesh_draw) mesh_draws;
+   array(vk_mesh_draw) mesh_draws;
+   array(vk_mesh_instance) mesh_instances;
 
    VkInstance instance;
    VkPhysicalDevice physical_device;
@@ -133,7 +138,6 @@ align_struct
 
    // TODO: array(meshlet)
    u32 meshlet_count;
-   u32 index_count;
 
    swapchain_surface_info swapchain_info;
 
@@ -146,6 +150,12 @@ align_struct
 
    bool rtx_supported;
 } vk_context;
+
+// TODO: make vulkan_ng a shared lib
+// init => uninit
+// make init also narrow
+bool vk_initialize(struct hw* hw);
+void vk_uninitialize(struct hw* hw);
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
 

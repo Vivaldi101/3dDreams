@@ -36,9 +36,9 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static geometry meshlet_build(arena* storage, size vertex_count, u32* index_buffer, size index_count)
+static vk_geometry meshlet_build(arena* storage, size vertex_count, u32* index_buffer, size index_count)
 {
-   geometry result = {};
+   vk_geometry result = {};
 
    struct meshlet ml = {};
 
@@ -184,7 +184,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 {
    context->mesh_draws.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_draws, mesh_draw, 1);
+   array_resize(context->mesh_draws, vk_mesh_draw, 1);
 
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -262,13 +262,12 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
-   geometry m = meshlet_build(context->storage, vb_data.count, ib_data, index_count);
+   vk_geometry m = meshlet_build(context->storage, vb_data.count, ib_data, index_count);
 
    usize vb_size = vb_data.count * sizeof(struct vertex);
    usize mb_size = m.meshlets.count * sizeof(struct meshlet);
    usize ib_size = index_count * sizeof(u32);
 
-   context->index_count = (u32)index_count;
    context->meshlet_count = (u32)m.meshlets.count;
 
    context->vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -281,8 +280,8 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 
    vk_mesh_upload(context, vb_data.data, vb_size, ib_data, ib_size, m.meshlets.data, mb_size, scratch_buffer);
 
-   mesh_draw md = {};
-   md.index_count = index_count;
+   vk_mesh_draw md = {};
+   //md.index_count = index_count;
    array_add(context->mesh_draws, md);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
@@ -386,7 +385,7 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
 
    // preallocate meshes
    context->mesh_draws.arena = context->storage;
-   array_resize(context->mesh_draws, mesh_draw, data->meshes_count);
+   array_resize(context->mesh_draws, vk_mesh_draw, data->meshes_count);
 
    for(usize i = 0; i < data->meshes_count; ++i)
    {
@@ -469,10 +468,9 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
       cgltf_accessor* accessor = prim->indices;
       usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
       indices.count += index_count;
-      context->index_count += (u32)index_count;
 
       // mesh offsets
-      mesh_draw md = {};
+      vk_mesh_draw md = {};
       md.index_count = index_count;
       md.index_offset = index_offset;
       md.vertex_offset = vertex_offset;
@@ -483,7 +481,7 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
       vertex_offset += vertex_count;
    }
 
-   geometry gm = meshlet_build(context->storage, vertices.count, indices.data, indices.count);
+   vk_geometry gm = meshlet_build(context->storage, vertices.count, indices.data, indices.count);
 
    context->meshlet_count = (u32)gm.meshlets.count;
 
@@ -504,6 +502,8 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
    vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, gm.meshlets.data, mb_size, scratch_buffer);
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 
+   context->mesh_instances.arena = context->storage;
+   array_resize(context->mesh_instances, vk_mesh_instance, data->nodes_count);
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = &data->nodes[i];
@@ -512,14 +512,27 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
          f32 wm[16];
          cgltf_node_transform_world(node, wm);
 
+         usize mesh_index = cgltf_mesh_index(data, node->mesh);
+
+         vk_mesh_instance mi = {};
+
+         // index into the mesh to draw
+         mi.mesh_index = mesh_index;
+#if 0
+
          f32 s[3], r[4], t[3];
          transform_decompose(t, r, s, wm);
 
-         usize mesh_index = cgltf_mesh_index(data, node->mesh);
+         // mesh instance geometry
+         mi.orientation = (vec4){r[0], r[1], r[2], r[3]};
+         mi.pos = (vec3){t[0], t[1], t[2]};
+         // TODO: no uniform scaling
+         mi.scale = max(max(s[0], s[1]), s[2]);
+#else
+         memcpy(mi.model.data, wm, sizeof(wm));
+#endif
 
-         context->mesh_draws.data[mesh_index].orientation = (vec4){r[0], r[1], r[2], r[3]};
-         context->mesh_draws.data[mesh_index].pos = (vec3){t[0], t[1], t[2]};
-         context->mesh_draws.data[mesh_index].scale = max(max(s[0], s[1]), s[2]);
+         array_add(context->mesh_instances, mi);
       }
    }
 
