@@ -64,7 +64,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_load(context, *context->storage, gltf_file_path))
+   if(!gltf_load(context, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
