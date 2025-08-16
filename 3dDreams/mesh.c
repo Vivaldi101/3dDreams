@@ -481,6 +481,9 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
       vertex_offset += vertex_count;
    }
 
+   context->mesh_instances.arena = context->storage;
+   array_resize(context->mesh_instances, vk_mesh_instance, data->nodes_count);
+
    vk_geometry gm = meshlet_build(context->storage, vertices.count, indices.data, indices.count);
 
    context->meshlet_count = (u32)gm.meshlets.count;
@@ -502,8 +505,6 @@ static bool gltf_load(vk_context* context, arena scratch, s8 gltf_path)
    vk_mesh_upload(context, vertices.data, vb_size, indices.data, ib_size, gm.meshlets.data, mb_size, scratch_buffer);
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 
-   context->mesh_instances.arena = context->storage;
-   array_resize(context->mesh_instances, vk_mesh_instance, data->nodes_count);
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = &data->nodes[i];

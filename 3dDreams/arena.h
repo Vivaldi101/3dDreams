@@ -81,6 +81,7 @@ static arena arena_new(arena* base, size cap)
    }
 
    result.beg = VirtualAlloc(base->end, cap, MEM_COMMIT, PAGE_READWRITE);
+   assert(result.beg);
    result.end = (byte*)result.beg + cap;
 
    assert(result.beg < result.end);
@@ -97,7 +98,7 @@ static void arena_expand(arena* a, size new_cap)
    assert(new_arena.beg == a->end);
    assert(new_arena.end > a->end);
 
-   a->end = (byte*)new_arena.beg + new_cap;
+   a->end = (byte*)new_arena.end;
 
    assert(a->end == (byte*)new_arena.beg + new_cap);
 }
