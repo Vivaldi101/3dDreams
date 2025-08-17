@@ -6,3 +6,4 @@ Vulkan renderer written in C23
 
 <img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/b28ccd4f-dd75-49d1-97bc-13abd2d1ae7b" />
 
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/11199cdd-0e1c-46b7-b499-c240a0a7118a" />
