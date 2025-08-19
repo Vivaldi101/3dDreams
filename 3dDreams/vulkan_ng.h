@@ -150,10 +150,7 @@ align_struct
    bool rtx_supported;
 } vk_context;
 
-// TODO: make vulkan_ng a shared lib
-// init => uninit
-// make init also narrow
-bool vk_initialize(struct hw* hw);
+void vk_initialize(struct hw* hw);
 void vk_uninitialize(struct hw* hw);
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);

@@ -44,7 +44,7 @@ static bool s8_is_substr(s8 str, s8 sub)
 #define inv(p)
 #endif
 
-#define fault  hw_message_box("Fault")
+#define fault(p)  hw_message_box(p);
 
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))

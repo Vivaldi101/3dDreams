@@ -120,11 +120,7 @@ void app_start(int argc, const char** argv, hw* hw)
    hw->state.gltf_file = s8("glamvelvetsofa.gltf");
 
    // TODO: narrower init
-   if(!vk_initialize(hw))
-   {
-      hw_window_close(hw);
-      hw_message_box("Could not initialize Vulkan");
-   }
+   vk_initialize(hw);
 
    hw_event_loop_start(hw, app_frame, app_input_handle);
 	vk_uninitialize(hw);

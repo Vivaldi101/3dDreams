@@ -1495,13 +1495,13 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
-bool vk_initialize(hw* hw)
+void vk_initialize(hw* hw)
 {
-   if(!hw->renderer.window.handle)
-      return false;
+   assert(hw->renderer.window.handle);
 
-   if(!vk_valid(volkInitialize()))
-      return false;
+   VkResult volk_result = volkInitialize();
+   if(!vk_valid(volk_result))
+      fault(!vk_valid(volk_result));
 
    vk_context* context = push(&hw->vk_storage, vk_context);
 
@@ -1514,12 +1514,10 @@ bool vk_initialize(hw* hw)
    context->storage = &hw->vk_storage;
 
    VkInstance instance = vk_instance_create(*context->storage);
-
    if(!instance)
-      return false;
+      fault(!instance);
 
    volkLoadInstance(instance);
-
    context->instance = instance;
 
 #ifdef _DEBUG
@@ -1538,8 +1536,9 @@ bool vk_initialize(hw* hw)
 
       VkDebugUtilsMessengerEXT messenger;
 
-      if(!vk_valid(vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger)))
-         return false;
+      VkResult debug_result = vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger);
+      if(!vk_valid(volk_result))
+         fault(!vk_valid(volk_result));
    }
 #endif
 
@@ -1591,8 +1590,6 @@ bool vk_initialize(hw* hw)
    context->rtx_pipeline_layout = rtx_layout;
 
    vk_assets_load(context, hw->state.gltf_file);
-
-   return true;
 }
 
 void vk_uninitialize(hw* hw)
