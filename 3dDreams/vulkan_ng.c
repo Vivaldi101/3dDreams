@@ -1590,9 +1590,7 @@ bool vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_assets_load(context, s8("bistro.gltf"));
-   //vk_assets_load(context, s8("glamvelvetsofa.gltf"));
-   //vk_assets_load(context, s8("damagedhelmet.gltf"));
+   vk_assets_load(context, hw->state.gltf_file);
 
    return true;
 }

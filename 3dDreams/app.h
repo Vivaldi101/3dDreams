@@ -55,6 +55,7 @@ align_struct app_state
    mat4 view;
    app_input input;
    app_camera camera;
+   s8 gltf_file;  // TODO: for testing
    bool rtx_enabled;
    bool is_fullscreen;
 } app_state;

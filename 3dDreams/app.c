@@ -117,6 +117,8 @@ void app_start(int argc, const char** argv, hw* hw)
 
    hw_window_open(hw, "Vulkan App", x, y, w, h);
 
+   hw->state.gltf_file = s8("glamvelvetsofa.gltf");
+
    // TODO: narrower init
    if(!vk_initialize(hw))
    {
