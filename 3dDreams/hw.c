@@ -89,11 +89,11 @@ static void hw_frame_sync2(hw* hw)
 static void hw_frame_sync(hw* hw)
 {
 	int num_frames_to_run = 0;
-   for (;;) 
+   for (;;)
    {
       const int current_frame_time = hw->timer.time();
       static int last_frame_time = 0;
-      if (last_frame_time == 0) 
+      if (last_frame_time == 0)
          last_frame_time = current_frame_time;
 
       int delta_milli_seconds = current_frame_time - last_frame_time;
@@ -101,7 +101,7 @@ static void hw_frame_sync(hw* hw)
 
       global_game_time_residual += delta_milli_seconds;
 
-      for (;;) 
+      for (;;)
       {
          // how much to wait before running the next frame
          if (global_game_time_residual < MSEC_PER_SIM)
@@ -157,7 +157,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    for (;;)
    {
-      if (!hw->platform_loop()) 
+      if (!hw->platform_loop())
          break;
 
       hw->state.camera.viewplane_width = hw->renderer.window.width;
@@ -167,8 +167,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       app_frame_function(hw->vk_storage, &hw->state);
 
       // TODO: Use perf counters for better granularity
-      hw_frame_sync(hw);
       hw_frame_render(hw);
+      hw_frame_sync(hw);
    }
 }
 
