@@ -42,9 +42,12 @@ align_struct app_camera
 {
    vec3 pos;
    vec3 dir;
-   f32 azimuth;
-   f32 altitude;
-   f32 radius;
+   f32 target_azimuth;
+   f32 target_altitude;
+   f32 smoothed_azimuth;
+   f32 smoothed_altitude;
+   f32 target_radius;
+   f32 smoothed_radius;
    u32 viewplane_width;
    u32 viewplane_height;
 } app_camera;
@@ -56,6 +59,7 @@ align_struct app_state
    app_input input;
    app_camera camera;
    s8 gltf_file;  // TODO: for testing
+   f32 frame_delta_in_seconds;
    bool rtx_enabled;
    bool is_fullscreen;
 } app_state;

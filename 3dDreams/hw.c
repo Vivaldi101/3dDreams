@@ -143,9 +143,9 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
-   f32 radius = hw->state.camera.radius = 2.0f;
+   f32 radius = 2.0f;
    vec3 origin = {0.f, 0.f, 0.f};
-   f32 azimuth = hw->state.camera.azimuth = (PI / 2.f); // 1/4 turn to align camera in -z
+   f32 azimuth = (PI / 2.f); // 1/4 turn to align camera in -z
    f32 altitude = 0.f;
    f32 x = radius * cosf(altitude) * cosf(azimuth);
    f32 z = radius * cosf(altitude) * sinf(azimuth);
@@ -154,7 +154,12 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    hw->state.camera.pos = eye;
    hw->state.camera.dir = vec3_sub(&eye, &origin);
+   hw->state.camera.smoothed_radius = radius;
+   hw->state.camera.target_radius = radius;
+   hw->state.camera.smoothed_azimuth = azimuth;
+   hw->state.camera.target_azimuth = azimuth;
 
+   u32 begin = hw->timer.time();
    for (;;)
    {
       if (!hw->platform_loop())
@@ -168,7 +173,14 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
       // TODO: Use perf counters for better granularity
       hw_frame_render(hw);
+      // Sync to defined frame rate
+      // TODO: Pass the frame rate to sync to
       hw_frame_sync(hw);
+
+      u32 end = hw->timer.time();
+      hw->state.frame_delta_in_seconds = (end - begin) / 1000.0f;
+
+      begin = end;
    }
 }
 

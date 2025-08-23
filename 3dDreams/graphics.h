@@ -17,8 +17,10 @@ enum { G_PLANE_FRONT, G_PLANE_BACK, G_PLANE_ON, G_PLANE_SPLIT };
 
 #define M_PI       3.14159265358979323846f   // pi
 
-#define DEG2RAD(a) (((a) * M_PI) / 180.0F)
-#define RAD2DEG(a) (((a) * 180.0f) / M_PI)
+#define deg2rad(a) (((a) * M_PI) / 180.0F)
+#define rad2deg(a) (((a) * 180.0f) / M_PI)
+
+#define lerp(a, b, t) (a)*(1.f-t) + (b)*(t)
 
 align_union
 { 
@@ -226,7 +228,7 @@ static inline mat4 mat4_view(vec3 origin, vec3 dir)
 static inline mat4 mat4_perspective(f32 ar, f32 fov_y, f32 n, f32 f)
 {
    f32 fov_half_y = fov_y/2.0f;
-   f32 tan = tanf(DEG2RAD(fov_half_y));
+   f32 tan = tanf(deg2rad(fov_half_y));
 
    f32 t = n*tan;
    f32 r = t * ar;
@@ -318,7 +320,7 @@ static void g_plane_create(g_plane* plane, const vec3* a, const vec3* b, const v
 static void g_frustum_create(g_frustum* frustum, f32 w, f32 h, f32 hfov)
 {
    f32 xr, xl, yb, yt;
-   f32 z = w / (2.0f*tanf(DEG2RAD(hfov/2.0f)));
+   f32 z = w / (2.0f*tanf(deg2rad(hfov/2.0f)));
    const vec3 origin = {0.0f, 0.0f, 0.0f};
    vec3 vlb, vlt, vrb, vrt, vtl, vtr, vbl, vbr;
 
@@ -380,7 +382,7 @@ static bool g_plane_intersect_segment(g_plane* plane, f32 v0[3], f32 v1[3], f32 
 
 static mat4 mat4_rotation_x(f32 rotx)
 {
-   rotx = DEG2RAD(rotx);
+   rotx = deg2rad(rotx);
    mat4 result = 
    {
       1.0f, 0.0f,       0.0f,       0.0f,
@@ -394,7 +396,7 @@ static mat4 mat4_rotation_x(f32 rotx)
 
 static mat4 mat4_rotation_y(f32 roty)
 {
-   roty = DEG2RAD(roty);
+   roty = deg2rad(roty);
    mat4 result = 
    {
       cosf(roty), 0.0f, -sinf(roty), 0.0f,
@@ -408,7 +410,7 @@ static mat4 mat4_rotation_y(f32 roty)
 
 static mat4 mat4_rotation_z(f32 rotz)
 {
-   rotz = DEG2RAD(rotz);
+   rotz = deg2rad(rotz);
    mat4 result = 
    {
       cosf(rotz), sinf(rotz), 0.0f,      0.0f,     // column 1

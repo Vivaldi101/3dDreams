@@ -1083,13 +1083,14 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       return;
 
    // wait until all queue ops are done
-   // essentialy run gpu and cpu in sync
+   // essentialy run gpu and cpu in sync (60 FPS usually)
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->logical_device));
 
    u64 query_results[2];
    vk_assert(vkGetQueryPoolResults(context->logical_device, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 
+#if 1
    f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
    f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
 
@@ -1115,6 +1116,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
 
    begin = end;
+#endif
 }
 
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
