@@ -22,6 +22,9 @@ enum { G_PLANE_FRONT, G_PLANE_BACK, G_PLANE_ON, G_PLANE_SPLIT };
 
 #define lerp(a, b, t) (a)*(1.f-t) + (b)*(t)
 
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+
 align_union
 { 
 #if defined(USE_SIMD)

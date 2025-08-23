@@ -152,7 +152,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    f32 y = radius * sinf(altitude);
    vec3 eye = {x, y, z};
 
-   hw->state.camera.pos = eye;
+   hw->state.camera.eye = eye;
    hw->state.camera.dir = vec3_sub(&eye, &origin);
    hw->state.camera.smoothed_radius = radius;
    hw->state.camera.target_radius = radius;

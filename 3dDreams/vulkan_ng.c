@@ -876,7 +876,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    assert(mvp.ar != 0.0f);
 
    // world space origin
-   vec3 eye = state->camera.pos;
+   vec3 eye = state->camera.eye;
    vec3 dir = state->camera.dir;
    vec3_normalize(dir);
 
