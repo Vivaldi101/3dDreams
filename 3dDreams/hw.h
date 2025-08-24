@@ -44,7 +44,7 @@ align_struct hw_renderer
    hw_window window;
 
    // should be inside app.c
-   mvp_transform mvp;
+   app_mvp_transform mvp;
    // should be inside app.c
 
    u32 renderer_index;
@@ -61,7 +61,7 @@ align_struct hw
    hw_renderer renderer;
    arena vk_storage;
    hw_timer timer;
-   app_state state;
+   app_state app;
    void (*window_title)(struct hw* hw, s8 message, ...);
    void (*log)(s8 message, ...);
    bool(*platform_loop)();

@@ -128,9 +128,9 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
       {
          i32 delta = GET_WHEEL_DELTA_WPARAM(wparam);
          if(delta > 0)
-            win32_hw->state.input.mouse_wheel_state = MOUSE_WHEEL_STATE_UP;
+            win32_hw->app.input.mouse_wheel_state = MOUSE_WHEEL_STATE_UP;
          else if(delta < 0)
-            win32_hw->state.input.mouse_wheel_state = MOUSE_WHEEL_STATE_DOWN;
+            win32_hw->app.input.mouse_wheel_state = MOUSE_WHEEL_STATE_DOWN;
       }
       break;
 
@@ -140,33 +140,33 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          GetCursorPos(&pt);
          ScreenToClient(hwnd, &pt);
 
-         win32_hw->state.input.mouse_pos[0] = pt.x;
-         win32_hw->state.input.mouse_pos[1] = pt.y;
+         win32_hw->app.input.mouse_pos[0] = pt.x;
+         win32_hw->app.input.mouse_pos[1] = pt.y;
       }
       break;
 
       case WM_LBUTTONDOWN:
-         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_LEFT;
+         win32_hw->app.input.mouse_buttons |= MOUSE_BUTTON_STATE_LEFT;
          break;
 
       case WM_LBUTTONUP:
-         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_LEFT;
+         win32_hw->app.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_LEFT;
          break;
 
       case WM_RBUTTONDOWN:
-         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_RIGHT;
+         win32_hw->app.input.mouse_buttons |= MOUSE_BUTTON_STATE_RIGHT;
          break;
 
       case WM_RBUTTONUP:
-         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_RIGHT;
+         win32_hw->app.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_RIGHT;
          break;
 
       case WM_MBUTTONDOWN:
-         win32_hw->state.input.mouse_buttons |= MOUSE_BUTTON_STATE_MIDDLE;
+         win32_hw->app.input.mouse_buttons |= MOUSE_BUTTON_STATE_MIDDLE;
          break;
 
       case WM_MBUTTONUP:
-         win32_hw->state.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_MIDDLE;
+         win32_hw->app.input.mouse_buttons &= ~MOUSE_BUTTON_STATE_MIDDLE;
          break;
 
       // TODO: hash table for keys
@@ -175,8 +175,8 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          u32 vkcode = (u32)wparam;
          bool is_repeat = (lparam & (1 << 30)) != 0;
 
-         win32_hw->state.input.key = vkcode;
-         win32_hw->state.input.key_state = is_repeat ? KEY_STATE_REPEATING : KEY_STATE_DOWN;
+         win32_hw->app.input.key = vkcode;
+         win32_hw->app.input.key_state = is_repeat ? KEY_STATE_REPEATING : KEY_STATE_DOWN;
 
          return 0;
       }
@@ -184,8 +184,8 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
       {
          u32 vkcode = (u32)wparam;
 
-         win32_hw->state.input.key = vkcode;
-         win32_hw->state.input.key_state = KEY_STATE_UP;
+         win32_hw->app.input.key = vkcode;
+         win32_hw->app.input.key_state = KEY_STATE_UP;
 
          return 0;
       }

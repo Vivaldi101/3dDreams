@@ -73,6 +73,8 @@ typedef vec4 quat;
 
 #define vec3_dot(a, b) ((a).x*(b).x + (a).y*(b).y + (a).z*(b).z)
 
+// TOOD: Dont pass these by pointers
+
 static vec3 vec3_scale(const vec3* a, f32 s) 
 {
    vec3 v = {a->x*s, a->y*s, a->z*s};
@@ -99,8 +101,12 @@ static vec3 vec3_add(const vec3* a, const vec3* b)
 
 #define vec3_len2(a) vec3_dot((a), (a))
 #define vec3_len(a) sqrtf(vec3_len2((a)))
-
 #define vec3_normalize(a) { f32 l = vec3_len((a)); (a).x /= l; (a).y /= l; (a).z /= l;}
+
+static bool vec3_is_zero(vec3 a) 
+{
+   return a.x == 0.f && a.y == 0.f && a.z == 0.f;
+}
 
 #pragma pack(push, 1)
 typedef union
@@ -115,7 +121,7 @@ typedef union
 
 static inline mat4 mat4_identity()
 {
-   mat4 result = {};
+   mat4 result = {0};
 
 #if defined(USE_SIMD)
    result.rows[0].data.m128_f32[0] = 1.0f;
@@ -128,6 +134,35 @@ static inline mat4 mat4_identity()
    result.data[10] = 1.0f;
    result.data[15] = 1.0f;
 #endif
+
+   return result;
+}
+
+static inline mat4 mat4_inverse(mat4 m)
+{
+   mat4 result;
+
+   // Transpose the upper-left 3x3 (inverse of rotation matrix)
+   result.data[0] = m.data[0];
+   result.data[1] = m.data[4];
+   result.data[2] = m.data[8];
+   result.data[3] = 0.0f;
+
+   result.data[4] = m.data[1];
+   result.data[5] = m.data[5];
+   result.data[6] = m.data[9];
+   result.data[7] = 0.0f;
+
+   result.data[8] = m.data[2];
+   result.data[9] = m.data[6];
+   result.data[10] = m.data[10];
+   result.data[11] = 0.0f;
+
+   // Compute inverse translation: -R^T * T
+   result.data[12] = -(m.data[0] * m.data[12] + m.data[1] * m.data[13] + m.data[2] * m.data[14]);
+   result.data[13] = -(m.data[4] * m.data[12] + m.data[5] * m.data[13] + m.data[6] * m.data[14]);
+   result.data[14] = -(m.data[8] * m.data[12] + m.data[9] * m.data[13] + m.data[10] * m.data[14]);
+   result.data[15] = 1.0f;
 
    return result;
 }
@@ -424,20 +459,6 @@ static mat4 mat4_rotation_z(f32 rotz)
 
    return result;
 }
-
-#pragma pack(push, 1)
-// TODO: #include in shaders
-typedef struct mvp_transform
-{
-    mat4 projection;
-    mat4 view;
-    mat4 model;
-    f32 n;
-    f32 f;
-    f32 ar;
-    u32 meshlet_offset;
-} mvp_transform;
-#pragma pack(pop)
 
 static void quaternion_to_matrix(const float q[4], float out_matrix[16])
 {
