@@ -13,9 +13,18 @@ static void app_frame(arena scratch, app_state* state)
    // ...
 }
 
-// TODO: cartesian_to_spherical transformation from gltf camera pos and view dir
-static void app_camera_update(app_state* state, vec2 delta_pos)
+static void app_camera_update(app_state* state)
 {
+   const f32 smoothing_factor = 1.0f - powf(0.08f, state->frame_delta_in_seconds);
+
+   // half turn across view plane extents (in azimuth)
+   f32 rotation_speed_x = PI / state->camera.viewplane_width;
+   f32 rotation_speed_y = PI / state->camera.viewplane_height;
+
+   // delta in pixels
+   f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
+   f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
+
    f32 movement_speed = 0.5f;
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
@@ -35,26 +44,15 @@ static void app_camera_update(app_state* state, vec2 delta_pos)
    // Rotating input affects target azimuth and altitude
    if(state->input.mouse_buttons & (MOUSE_BUTTON_STATE_LEFT | MOUSE_BUTTON_STATE_RIGHT))
    {
-      const f32 epsilon = 1e-5f;
-      if(fabs(delta_pos.x) > epsilon || fabs(delta_pos.y) > epsilon)
-      {
-         // half turn across view plane extents (in azimuth)
-         f32 rotation_speed_x = PI / state->camera.viewplane_width;
-         f32 rotation_speed_y = PI / state->camera.viewplane_height;
-
-         state->camera.target_azimuth += rotation_speed_x * delta_pos.x;
-         state->camera.target_altitude += rotation_speed_y * delta_pos.y;
-      }
+      state->camera.target_azimuth += rotation_speed_x * delta_x;
+      state->camera.target_altitude += rotation_speed_y * delta_y;
 
       const f32 max_altitude = PI / 2.0f - 0.01f;
-      if(state->camera.target_altitude > max_altitude)
-         state->camera.target_altitude = max_altitude;
-      if(state->camera.target_altitude < -max_altitude)
-         state->camera.target_altitude = -max_altitude;
+      if(state->camera.target_altitude > max_altitude) state->camera.target_altitude = max_altitude;
+      if(state->camera.target_altitude < -max_altitude) state->camera.target_altitude = -max_altitude;
    }
 
    // Smooth damping
-   const f32 smoothing_factor = 1.0f - powf(0.08f, state->frame_delta_in_seconds);
    state->camera.smoothed_azimuth += (state->camera.target_azimuth - state->camera.smoothed_azimuth) * smoothing_factor;
    state->camera.smoothed_altitude += (state->camera.target_altitude - state->camera.smoothed_altitude) * smoothing_factor;
    state->camera.smoothed_radius += (state->camera.target_radius - state->camera.smoothed_radius) * smoothing_factor;
@@ -68,8 +66,8 @@ static void app_camera_update(app_state* state, vec2 delta_pos)
    f32 z = radius * cosf(altitude) * sinf(azimuth);
    f32 y = radius * sinf(altitude);
 
-   vec3 eye = state->camera.eye;
-   vec3 origin = vec3_add(&eye, &state->camera.dir);
+   vec3 eye = {x, y, z};
+   vec3 origin = {0.f, 0.f, 0.f};
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
@@ -98,10 +96,7 @@ static void app_camera_update(app_state* state, vec2 delta_pos)
 
 static void app_input_handle(app_state* state)
 {
-   f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
-   f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
-
-   app_camera_update(state, (vec2) { delta_x, delta_y });
+   app_camera_update(state);
 
    if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
@@ -124,7 +119,7 @@ void app_start(int argc, const char** argv, hw* hw)
 
    hw_window_open(hw, "Vulkan App", x, y, w, h);
 
-   hw->app.gltf_file = s8("bistro.gltf");
+   hw->state.gltf_file = s8("bistro.gltf");
 
    // TODO: narrower init
    vk_initialize(hw);

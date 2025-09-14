@@ -42,7 +42,6 @@ align_struct app_camera
 {
    vec3 eye;
    vec3 dir;
-   // TODO: Compress these
    f32 target_azimuth;
    f32 target_altitude;
    f32 smoothed_azimuth;
@@ -64,17 +63,6 @@ align_struct app_state
    bool rtx_enabled;
    bool is_fullscreen;
 } app_state;
-
-typedef struct app_mvp_transform
-{
-    mat4 projection;
-    mat4 view; // Use quaternion and pos
-    mat4 model;
-    f32 n;
-    f32 f;
-    f32 ar;
-    u32 meshlet_offset;
-} app_mvp_transform;
 
 void app_start(int argc, const char** argv, struct hw* hw);
 

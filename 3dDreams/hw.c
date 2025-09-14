@@ -129,7 +129,7 @@ static void hw_frame_render(hw* hw)
       return;
 
    pre(renderer_index < RENDERER_COUNT);
-   hw->renderer.frame_present(hw, renderers[renderer_index], &hw->app);
+   hw->renderer.frame_present(hw, renderers[renderer_index], &hw->state);
 }
 
 static void hw_log(hw* hw, s8 message, ...)
@@ -141,6 +141,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 {
    // start the timer
    u32 t = hw->timer.time();
+   u32 s = hw->timer.time();
 
    f32 radius = 2.0f;
    vec3 origin = {0.f, 0.f, 0.f};
@@ -151,16 +152,12 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    f32 y = radius * sinf(altitude);
    vec3 eye = {x, y, z};
 
-   if(vec3_is_zero(hw->app.camera.eye))
-   {
-      hw->app.camera.eye = eye;
-      hw->app.camera.dir = vec3_sub(&eye, &origin);
-   }
-
-   hw->app.camera.smoothed_radius = radius;
-   hw->app.camera.target_radius = radius;
-   hw->app.camera.smoothed_azimuth = azimuth;
-   hw->app.camera.target_azimuth = azimuth;
+   hw->state.camera.eye = eye;
+   hw->state.camera.dir = vec3_sub(&eye, &origin);
+   hw->state.camera.smoothed_radius = radius;
+   hw->state.camera.target_radius = radius;
+   hw->state.camera.smoothed_azimuth = azimuth;
+   hw->state.camera.target_azimuth = azimuth;
 
    u32 begin = hw->timer.time();
    for (;;)
@@ -168,11 +165,11 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       if (!hw->platform_loop())
          break;
 
-      hw->app.camera.viewplane_width = hw->renderer.window.width;
-      hw->app.camera.viewplane_height = hw->renderer.window.height;
+      hw->state.camera.viewplane_width = hw->renderer.window.width;
+      hw->state.camera.viewplane_height = hw->renderer.window.height;
 
-      app_input_function(&hw->app);
-      app_frame_function(hw->vk_storage, &hw->app);
+      app_input_function(&hw->state);
+      app_frame_function(hw->vk_storage, &hw->state);
 
       // TODO: Use perf counters for better granularity
       hw_frame_render(hw);
@@ -181,7 +178,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       hw_frame_sync(hw);
 
       u32 end = hw->timer.time();
-      hw->app.frame_delta_in_seconds = (end - begin) / 1000.0f;
+      hw->state.frame_delta_in_seconds = (end - begin) / 1000.0f;
 
       begin = end;
    }

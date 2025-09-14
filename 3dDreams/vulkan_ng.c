@@ -49,7 +49,7 @@ static void obj_file_read(vk_context* context, void *user_context, s8 filename)
    tinyobj_attrib_free(&attrib);
 }
 
-static void gltf_file_read(vk_context* context, app_camera* camera, void *user_context, s8 filename)
+static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
    char file_path[MAX_PATH] = {};
 
@@ -64,7 +64,7 @@ static void gltf_file_read(vk_context* context, app_camera* camera, void *user_c
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_load(context, camera, gltf_file_path))
+   if(!gltf_load(context, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -214,7 +214,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    vk_assert(vkDeviceWaitIdle(device));
 }
 
-static void vk_assets_load(vk_context* context, app_camera* camera, s8 asset_file)
+static void vk_assets_load(vk_context* context, s8 asset_file)
 {
    if(s8_is_substr(asset_file, s8(".obj")))
    {
@@ -228,7 +228,7 @@ static void vk_assets_load(vk_context* context, app_camera* camera, s8 asset_fil
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
-      gltf_file_read(context, camera, &user_data, asset_file);
+      gltf_file_read(context, &user_data, asset_file);
    }
    else
       hw_message_box("Unsupported asset format");
@@ -808,7 +808,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
 
    vk_context* context = hw->renderer.backends[renderer_index];
 
-   app_mvp_transform mvp = {};
+   mvp_transform mvp = {};
    const f32 ar = (f32)width / height;
 
    mvp.n = 0.01f;
@@ -871,7 +871,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
 
-   app_mvp_transform mvp = hw->renderer.mvp;
+   mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
 
@@ -972,7 +972,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       {
          vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-                            offsetof(app_mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+                            offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
                             &base);
 
          vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
@@ -981,7 +981,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-                         offsetof(app_mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+                         offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
                          &base);
 
       // draw rest of the meshlets
@@ -1006,7 +1006,26 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
          vk_mesh_instance mi = context->mesh_instances.data[i];
+#if 0
+         f32 s = mi.scale;
+         vec4 r = mi.orientation;
+         vec3 t = mi.pos;
+
+         quaternion_to_matrix(&r, mvp.model.data);
+
+         assert(s > .0f);
+
+         // TODO: negative scales?
+         mvp.model.data[0] *= s;
+         mvp.model.data[5] *= s;
+         mvp.model.data[10] *= s;
+
+         mvp.model.data[12] = t.x;
+         mvp.model.data[13] = t.y;
+         mvp.model.data[14] = t.z;
+#else
          mvp.model = mi.model;
+#endif
 
          vkCmdPushConstants(command_buffer, context->pipeline_layout,
                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
@@ -1087,7 +1106,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       // TODO: this should really be in app.c
       if(hw->timer.time() - timer > 100)
       {
-         if(hw->app.rtx_enabled)
+         if(hw->state.rtx_enabled)
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
@@ -1165,7 +1184,7 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, bool 
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
    push_constants.offset = 0;
-   push_constants.size = sizeof(app_mvp_transform);
+   push_constants.size = sizeof(mvp_transform);
 
    info.pushConstantRangeCount = 1;
    info.pPushConstantRanges = &push_constants;
@@ -1572,7 +1591,7 @@ void vk_initialize(hw* hw)
    context->pipeline_layout = layout;
    context->rtx_pipeline_layout = rtx_layout;
 
-   vk_assets_load(context, &hw->app.camera, hw->app.gltf_file);
+   vk_assets_load(context, hw->state.gltf_file);
 }
 
 void vk_uninitialize(hw* hw)

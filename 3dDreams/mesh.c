@@ -376,7 +376,7 @@ static void geometry_load(vk_context* context, arena scratch, size vertex_count,
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 }
 
-static bool gltf_load(vk_context* context, app_camera* camera, s8 gltf_path)
+static bool gltf_load(vk_context* context, s8 gltf_path)
 {
    cgltf_options options = {0};
    cgltf_data* data = 0;
@@ -513,22 +513,7 @@ static bool gltf_load(vk_context* context, app_camera* camera, s8 gltf_path)
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = &data->nodes[i];
-      // TODO: Get camera
-      if(node->camera)
-      {
-         //(node->camera->data.perspective); // TODO: Get the fov, z etc. data from here
-
-         // assume just a single camera
-         mat4 camera_world_matrix = {0};
-         cgltf_node_transform_world(node, camera_world_matrix.data);
-         vec3 eye = { camera_world_matrix.data[12], camera_world_matrix.data[13], camera_world_matrix.data[14] };
-         camera->eye = eye;
-
-         // extract forward direction (-z axis)
-         vec3 cam_dir = { -camera_world_matrix.data[8], -camera_world_matrix.data[9], -camera_world_matrix.data[10] };
-         camera->dir = cam_dir;
-      }
-      else if(node->mesh)
+      if(node->mesh)
       {
          mat4 wm = {0};
          cgltf_node_transform_world(node, wm.data);
@@ -539,7 +524,19 @@ static bool gltf_load(vk_context* context, app_camera* camera, s8 gltf_path)
 
          // index into the mesh to draw
          mi.mesh_index = mesh_index;
+#if 0
+
+         f32 s[3], r[4], t[3];
+         transform_decompose(t, r, s, wm);
+
+         // mesh instance geometry
+         mi.orientation = (vec4){r[0], r[1], r[2], r[3]};
+         mi.pos = (vec3){t[0], t[1], t[2]};
+         // TODO: no uniform scaling
+         mi.scale = max(max(s[0], s[1]), s[2]);
+#else
          mi.model = wm;
+#endif
 
          array_add(context->mesh_instances, mi);
       }
