@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <assert.h>
 
 typedef uint8_t         u8;
 typedef uint16_t        u16;
@@ -17,8 +18,9 @@ typedef unsigned char   byte;
 typedef ptrdiff_t       size;
 typedef size_t          usize;
 
-#define s8(s) (s8){(u8 *)s, lengthof(s)}
+#define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
+
 typedef struct
 {
    u8* data;
@@ -32,6 +34,18 @@ static bool s8_is_substr(s8 str, s8 sub)
          return true;
 
    return false;
+}
+
+static s8 s8_slice(s8 str, size beg, size end)
+{
+   if(end - beg > str.len)
+      return str;
+   if(beg == 0 && end == 0)
+      return str;
+
+   assert(end - beg <= str.len);
+
+   return (s8){str.data + beg, end - beg};
 }
 
 #ifdef _DEBUG

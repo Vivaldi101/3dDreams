@@ -544,6 +544,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
+   // TODO: Cleanup this
    for(usize i = 0; i < data->textures_count; ++i)
    {
       cgltf_texture* cgltf_tex = data->textures + i;
@@ -554,6 +555,21 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
       vk_texture tex = {}; // TODO: Fill
       array_add(context->textures, tex);
+
+      s8 ipath = gltf_path;
+
+      cgltf_decode_uri(img->uri);
+
+      u8* tex_path = gltf_path.data + gltf_path.len;
+      size tex_path_start = gltf_path.len;
+
+      while(*tex_path-- != '\\')
+         tex_path_start--;
+
+      s8 slice_path = s8_slice(gltf_path, 0, tex_path_start);
+
+      slice_path.data[slice_path.len+1] = 0;
+      printf("Texture path: %s\\%s\n", slice_path.data, img->uri);
    }
 
    cgltf_free(data);

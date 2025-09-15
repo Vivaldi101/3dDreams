@@ -27,6 +27,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    return result;
 }
 
+// TODO: extract the path search here
 static arena vk_project_directory(arena* storage)
 {
    arena result = {};

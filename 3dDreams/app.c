@@ -123,6 +123,7 @@ void app_start(int argc, const char** argv, hw* hw)
 
    //hw->state.gltf_file = s8("damagedhelmet.gltf");
    hw->state.gltf_file = s8("bistro.gltf");
+   //hw->state.gltf_file = s8("DragonAttenuation.gltf");
 
    vk_initialize(hw);
 

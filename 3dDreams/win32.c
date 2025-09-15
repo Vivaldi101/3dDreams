@@ -325,10 +325,8 @@ static void arena_free(arena* a)
    hw_virtual_memory_release(a->beg, arena_left(a));
 }
 
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
+int main(int argc, char** argv)
 {
-   const char** argv = 0;
-   int argc = 0;
    hw hw = {0};
 
    hw_virtual_memory_init();
@@ -369,4 +367,3 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
    return 0;
 }
-
