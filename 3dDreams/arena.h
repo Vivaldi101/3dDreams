@@ -29,7 +29,7 @@ do { \
 #define array_push(a)          (a).count++; *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 // Adds to preallocated storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
-#define array_resize(a, t, s)  (a).data = alloc(a.arena, sizeof(t), __alignof(t), (s), FIXED_ARRAY_PUSH_FLAG);
+#define array_resize(a, s)  (a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), FIXED_ARRAY_PUSH_FLAG);
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)

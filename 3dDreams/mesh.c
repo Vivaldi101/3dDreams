@@ -185,7 +185,7 @@ static void obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attri
 {
    context->mesh_draws.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_draws, vk_mesh_draw, 1);
+   array_resize(context->mesh_draws, 1);
 
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -406,18 +406,18 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    array(u32) indices = {.arena = context->storage};
 
    // preallocate indices
-   array_resize(indices, u32, gltf_index_count(data));
+   array_resize(indices, gltf_index_count(data));
 
    // preallocate meshes
    context->mesh_draws.arena = context->storage;
-   array_resize(context->mesh_draws, vk_mesh_draw, data->meshes_count);
+   array_resize(context->mesh_draws, data->meshes_count);
 
    // preallocate instances
    context->mesh_instances.arena = context->storage;
-   array_resize(context->mesh_instances, vk_mesh_instance, data->nodes_count);
+   array_resize(context->mesh_instances, data->nodes_count);
 
    context->textures.arena = context->storage;
-   array_resize(context->textures, vk_texture, data->textures_count);
+   array_resize(context->textures, data->textures_count);
 
    for(usize i = 0; i < data->meshes_count; ++i)
    {
