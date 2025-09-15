@@ -1,5 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS 1
-
 #include <Windows.h>
 
 #include "common.h"
@@ -335,6 +333,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, 
 
    hw_virtual_memory_init();
 
+   // max virtual limit
    size arena_size = 1ull << 46;
    void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);

@@ -482,9 +482,10 @@ static VkQueue vk_graphics_queue_create(VkDevice logical_device, u32 queue_famil
    assert(vk_valid_handle(logical_device));
 
    VkQueue graphics_queue = 0;
+   u32 queue_index = 0;
 
    // TODO: Get the queue index
-   vkGetDeviceQueue(logical_device, queue_family_index, 0, &graphics_queue);
+   vkGetDeviceQueue(logical_device, queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }

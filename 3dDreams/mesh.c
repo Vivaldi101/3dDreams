@@ -416,12 +416,15 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    context->mesh_instances.arena = context->storage;
    array_resize(context->mesh_instances, vk_mesh_instance, data->nodes_count);
 
+   context->textures.arena = context->storage;
+   array_resize(context->textures, vk_texture, data->textures_count);
+
    for(usize i = 0; i < data->meshes_count; ++i)
    {
-      cgltf_mesh* gltf_mesh = &data->meshes[i];
+      cgltf_mesh* gltf_mesh = data->meshes + i;
       assert(gltf_mesh->primitives_count == 1);
 
-      cgltf_primitive* prim = &gltf_mesh->primitives[0];
+      cgltf_primitive* prim = gltf_mesh->primitives + 0;
       assert(prim->type == cgltf_primitive_type_triangles);
 
       usize vertex_count = 0;
@@ -432,7 +435,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       // parse attribute types
       for(usize j = 0; j < prim->attributes_count; ++j)
       {
-         cgltf_attribute* attr = &prim->attributes[j];
+         cgltf_attribute* attr = prim->attributes + j;
 
          cgltf_attribute_type attr_type;
          i32 attr_index;
@@ -512,7 +515,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    for(usize i = 0; i < data->nodes_count; ++i)
    {
-      cgltf_node* node = &data->nodes[i];
+      cgltf_node* node = data->nodes + i;
       if(node->mesh)
       {
          mat4 wm = {0};
@@ -541,6 +544,18 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
+   for(usize i = 0; i < data->textures_count; ++i)
+   {
+      cgltf_texture* cgltf_tex = data->textures + i;
+      assert(cgltf_tex->image);
+
+      cgltf_image* img = cgltf_tex->image;
+      assert(img->uri);
+
+      vk_texture tex = {}; // TODO: Fill
+      array_add(context->textures, tex);
+   }
+
    cgltf_free(data);
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);

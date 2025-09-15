@@ -4,7 +4,7 @@
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#define hw_message_box(p) { MessageBoxA(0, #p, "Assertion", MB_OK); __debugbreak(); }
+#define hw_message_box(p) { MessageBoxA(0, #p, "Assertion", MB_OK); }
 #pragma comment(lib,	"winmm.lib") // timers etc.
 #elif
 // other plats like linux, osx and ios

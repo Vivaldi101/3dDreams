@@ -10,7 +10,7 @@
 
 static void app_frame(arena scratch, app_state* state)
 {
-   // ...
+   // per app frame drawing
 }
 
 static void app_camera_update(app_state* state)
@@ -105,6 +105,7 @@ static void app_input_handle(app_state* state)
    }
    if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
    {
+      // TODO: Raymond chen like fullscreen toggle
       state->input.key_state = 0;
       state->is_fullscreen = !state->is_fullscreen;
    }
@@ -112,16 +113,17 @@ static void app_input_handle(app_state* state)
 
 void app_start(int argc, const char** argv, hw* hw)
 {
-   pre(implies(argc > 0, argv[argc - 1]));
+   assert(implies(argc > 0, argv[argc - 1]));
+   assert(hw);
 
 	int w = 800, h = 600;
 	int x = 100, y = 100;
 
    hw_window_open(hw, "Vulkan App", x, y, w, h);
 
-   hw->state.gltf_file = s8("bistro.gltf");
+   hw->state.gltf_file = s8("damagedhelmet.gltf");
+   //hw->state.gltf_file = s8("bistro.gltf");
 
-   // TODO: narrower init
    vk_initialize(hw);
 
    hw_event_loop_start(hw, app_frame, app_input_handle);
