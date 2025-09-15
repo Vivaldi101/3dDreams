@@ -544,7 +544,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
-   // TODO: Cleanup this
+   // TODO: cleanup this texture parsing
    for(usize i = 0; i < data->textures_count; ++i)
    {
       cgltf_texture* cgltf_tex = data->textures + i;
@@ -561,18 +561,18 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       while(*gltf_end-- != '/')
          tex_path_start--;
 
-      s8 slice_path = s8_slice(gltf_path, 0, tex_path_start+1);
+      s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start+1);
 
-      slice_path.data[slice_path.len] = 0;
+      tex_dir.data[tex_dir.len] = 0;
 
       char tex_path[MAX_PATH] = {};
 
       size img_uri_len = strlen(img->uri);
-      size tex_len = img_uri_len + slice_path.len;
+      size tex_len = img_uri_len + tex_dir.len;
 
       assert(tex_len <= MAX_PATH);
-      memcpy(tex_path, slice_path.data, slice_path.len);
-      memcpy(tex_path + slice_path.len, img->uri, img_uri_len);
+      memcpy(tex_path, tex_dir.data, tex_dir.len);
+      memcpy(tex_path + tex_dir.len, img->uri, img_uri_len);
 
       vk_texture tex = {};
       tex.path.arena = context->storage;
@@ -588,7 +588,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
 
    for(size i = 0; i < context->textures.count; i++)
-      printf("Texture path: %s\n", context->textures.data[i].path.data);
+      printf("Texture loaded: %s\n", context->textures.data[i].path.data);
 
    return true;
 }
