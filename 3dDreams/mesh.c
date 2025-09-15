@@ -560,16 +560,23 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
       cgltf_decode_uri(img->uri);
 
-      u8* tex_path = gltf_path.data + gltf_path.len;
+      u8* gltf_end = gltf_path.data + gltf_path.len;
       size tex_path_start = gltf_path.len;
 
-      while(*tex_path-- != '\\')
+      while(*gltf_end-- != '/')
          tex_path_start--;
 
-      s8 slice_path = s8_slice(gltf_path, 0, tex_path_start);
+      s8 slice_path = s8_slice(gltf_path, 0, tex_path_start+1);
 
-      slice_path.data[slice_path.len+1] = 0;
-      printf("Texture path: %s\\%s\n", slice_path.data, img->uri);
+      slice_path.data[slice_path.len] = 0;
+
+      char tex_path[MAX_PATH] = {};
+
+      assert(slice_path.len + strlen(img->uri) <= MAX_PATH);
+      memcpy(tex_path, slice_path.data, slice_path.len);
+      memcpy(tex_path + slice_path.len, img->uri, strlen(img->uri));
+
+      printf("Texture path: %s\n", tex_path);
    }
 
    cgltf_free(data);
