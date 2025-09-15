@@ -101,8 +101,7 @@ align_struct
 
 align_struct
 {
-   char path[MAX_PATH];
-   //array(char) path; // TODO: Fix the old limit here with arenas
+   array(char) path;
 } vk_texture;
 
 align_struct

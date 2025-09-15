@@ -553,8 +553,6 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       cgltf_image* img = cgltf_tex->image;
       assert(img->uri);
 
-      s8 ipath = gltf_path;
-
       cgltf_decode_uri(img->uri);
 
       u8* gltf_end = gltf_path.data + gltf_path.len;
@@ -569,15 +567,21 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
       char tex_path[MAX_PATH] = {};
 
-      assert(slice_path.len + strlen(img->uri) <= MAX_PATH);
+      size img_uri_len = strlen(img->uri);
+      size tex_len = img_uri_len + slice_path.len;
+
+      assert(tex_len <= MAX_PATH);
       memcpy(tex_path, slice_path.data, slice_path.len);
-      memcpy(tex_path + slice_path.len, img->uri, strlen(img->uri));
+      memcpy(tex_path + slice_path.len, img->uri, img_uri_len);
 
       vk_texture tex = {};
-      memcpy(tex.path, tex_path, strlen(tex_path));
+      tex.path.arena = context->storage;
+      array_resize(tex.path, tex_len);
+
+      memcpy(tex.path.data, tex_path, tex_len);
       array_add(context->textures, tex);
 
-      printf("Texture path: %s\n", tex.path);
+      printf("Texture path: %s\n", tex.path.data);
    }
 
    cgltf_free(data);
