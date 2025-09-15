@@ -576,17 +576,19 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
       vk_texture tex = {};
       tex.path.arena = context->storage;
-      array_resize(tex.path, tex_len);
+      array_resize(tex.path, tex_len+1); // null terminate
 
       memcpy(tex.path.data, tex_path, tex_len);
+      tex.path.data[tex_len] = 0;
       array_add(context->textures, tex);
-
-      printf("Texture path: %s\n", tex.path.data);
    }
 
    cgltf_free(data);
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
+
+   for(size i = 0; i < context->textures.count; i++)
+      printf("Texture path: %s\n", context->textures.data[i].path.data);
 
    return true;
 }
