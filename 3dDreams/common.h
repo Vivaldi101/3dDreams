@@ -21,6 +21,7 @@ typedef size_t          usize;
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
 
+// string view
 typedef struct
 {
    u8* data;
