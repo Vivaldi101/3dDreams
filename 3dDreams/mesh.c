@@ -544,7 +544,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
-   // TODO: cleanup this texture parsing
+   // TODO: semcompress this texture parsing
    for(usize i = 0; i < data->textures_count; ++i)
    {
       cgltf_texture* cgltf_tex = data->textures + i;
@@ -563,23 +563,17 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
       s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start+1);
 
-      tex_dir.data[tex_dir.len] = 0;
-
-      char tex_path[MAX_PATH] = {};
-
       size img_uri_len = strlen(img->uri);
       size tex_len = img_uri_len + tex_dir.len;
 
-      assert(tex_len <= MAX_PATH);
-      memcpy(tex_path, tex_dir.data, tex_dir.len);
-      memcpy(tex_path + tex_dir.len, img->uri, img_uri_len);
-
       vk_texture tex = {};
       tex.path.arena = context->storage;
-      array_resize(tex.path, tex_len+1); // null terminate
+      array_resize(tex.path, tex_len+1); // for null terminate
 
-      memcpy(tex.path.data, tex_path, tex_len);
-      tex.path.data[tex_len] = 0;
+      memcpy(tex.path.data, tex_dir.data, tex_dir.len);
+      memcpy(tex.path.data + tex_dir.len, img->uri, img_uri_len);
+
+      tex.path.data[tex_len] = 0;        // null terminate
       array_add(context->textures, tex);
    }
 
