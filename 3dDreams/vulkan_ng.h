@@ -109,6 +109,7 @@ align_struct
 align_struct
 {
    array(char) path;
+   vk_image image;
 } vk_texture;
 
 align_struct

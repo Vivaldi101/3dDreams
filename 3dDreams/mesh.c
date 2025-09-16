@@ -581,8 +581,16 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
 
+   array(vk_image) images = {.arena = context->storage};
+   array_resize(images, context->textures.count);
+
    for(size i = 0; i < context->textures.count; i++)
+   {
+      vk_image image = {};
       printf("Texture loaded: %s\n", context->textures.data[i].path.data);
+
+      context->textures.data[i].image = image;
+   }
 
    return true;
 }
