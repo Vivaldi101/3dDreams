@@ -8,6 +8,7 @@
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
 #include "mesh.c"
+#include "textures.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
@@ -589,7 +590,7 @@ static VkCommandPool vk_command_pool_create(VkDevice logical_device, u32 queue_f
    return pool;
 }
 
-static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent)
+static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
 {
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(physical_device));
@@ -606,8 +607,8 @@ static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice p
    image_info.format = format;
    image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-   image_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+   image_info.usage = usage;
+   image_info.samples = VK_SAMPLE_COUNT_1_BIT;  // TODO: pass
    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
@@ -647,8 +648,13 @@ static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice p
       return VK_NULL_HANDLE;
 
    return result;
+
 }
 
+static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent)
+{
+   return vk_image_create(logical_device, physical_device, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
 
 static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color_format, VkFormat depth_format)
 {

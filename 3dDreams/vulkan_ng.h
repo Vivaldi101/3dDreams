@@ -169,4 +169,8 @@ void vk_uninitialize(struct hw* hw);
 
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
 
+typedef struct vertex vertex;
+static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
+static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+
 #endif

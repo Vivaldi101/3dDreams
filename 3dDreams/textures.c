@@ -44,7 +44,7 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
 
       assert(tex_pixels);
       assert(tex_width > 0 && tex_height > 0);
-
+      assert(tex_channels == 3);
 
       // ... create the vulkan tex objects
 

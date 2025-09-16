@@ -9,11 +9,8 @@
 
 #include "vulkan_ng.h"
 
-#include "textures.c"
-
-typedef struct vertex vertex;
-static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+static void vk_textures_log(vk_context* context);
+static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path);
 
 // TODO: remove .obj path
 typedef struct 
