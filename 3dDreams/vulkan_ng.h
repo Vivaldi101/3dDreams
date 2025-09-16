@@ -73,6 +73,13 @@ align_struct
    u32 count;
 } vk_meshlet;
 
+align_struct
+{
+   VkImage image;
+   VkImageView view;
+   VkDeviceMemory memory;
+} vk_image;
+
 typedef struct meshlet meshlet;
 align_struct
 {
@@ -93,7 +100,7 @@ align_struct
 
 align_struct
 {
-   // TODO: u32 sizes
+   // TODO: u32 sizes?
    size index_offset;
    size index_count;
    size vertex_offset;
