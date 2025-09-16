@@ -75,7 +75,7 @@ align_struct
 
 align_struct
 {
-   VkImage image;
+   VkImage handle;
    VkImageView view;
    VkDeviceMemory memory;
 } vk_image;

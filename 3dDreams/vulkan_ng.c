@@ -5,6 +5,7 @@
 
 // TODO: extract win32 shit out
 #include "win32_file_io.c"
+
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
 #include "mesh.c"
@@ -590,71 +591,6 @@ static VkCommandPool vk_command_pool_create(VkDevice logical_device, u32 queue_f
    return pool;
 }
 
-static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
-{
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_handle(physical_device));
-   assert(vk_valid_format(format));
-
-   VkImage result = 0;
-
-   VkImageCreateInfo image_info = {};
-   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-   image_info.imageType = VK_IMAGE_TYPE_2D; 
-   image_info.extent = extent;
-   image_info.mipLevels = 1;
-   image_info.arrayLayers = 1;
-   image_info.format = format;
-   image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-   image_info.usage = usage;
-   image_info.samples = VK_SAMPLE_COUNT_1_BIT;  // TODO: pass
-   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-   image_info.queueFamilyIndexCount = 0;
-   image_info.pQueueFamilyIndices = 0;
-
-   if(vkCreateImage(logical_device, &image_info, 0, &result) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
-
-   VkMemoryRequirements memory_requirements;
-   vkGetImageMemoryRequirements(logical_device, result, &memory_requirements);
-
-   VkMemoryAllocateInfo alloc_info = {};
-   alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-   alloc_info.allocationSize = memory_requirements.size;
-
-   VkPhysicalDeviceMemoryProperties memory_properties;
-   vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-   uint32_t memory_type_index = VK_MAX_MEMORY_TYPES;
-   for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
-      if((memory_requirements.memoryTypeBits & (1 << i)) &&
-          (memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      {
-         memory_type_index = i;
-         break;
-      }
-
-   if(memory_type_index == VK_MAX_MEMORY_TYPES)
-      return VK_NULL_HANDLE;
-
-   alloc_info.memoryTypeIndex = memory_type_index;
-
-   VkDeviceMemory memory;
-   if(vkAllocateMemory(logical_device, &alloc_info, 0, &memory) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
-
-   if(vkBindImageMemory(logical_device, result, memory, 0) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
-
-   return result;
-
-}
-
-static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent)
-{
-   return vk_image_create(logical_device, physical_device, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-}
 
 static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color_format, VkFormat depth_format)
 {
@@ -726,27 +662,6 @@ static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass
    vk_assert(vkCreateFramebuffer(logical_device, &framebuffer_info, 0, &framebuffer));
 
    return framebuffer;
-}
-
-static VkImageView vk_image_view_create(VkDevice logical_device, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
-{
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_format(format));
-   assert(vk_valid_handle(image));
-
-   VkImageView image_view = 0;
-
-   VkImageViewCreateInfo view_info = {vk_info(IMAGE_VIEW)};
-   view_info.image = image;
-   view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-   view_info.format = format;
-   view_info.subresourceRange.aspectMask = aspect_mask;
-   view_info.subresourceRange.layerCount = 1;
-   view_info.subresourceRange.levelCount = 1;
-
-   vk_assert(vkCreateImageView(logical_device, &view_info, 0, &image_view));
-
-   return image_view;
 }
 
 VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspect,
@@ -1551,10 +1466,10 @@ void vk_initialize(hw* hw)
    }
 #endif
 
-   // TODO:
    VkAllocationCallbacks allocator = {};
    context->allocator = allocator;
 
+   // TODO: pass the context only and its components since we are not allowing any other vulkan objects than the ones inside the context
    context->physical_device = vk_physical_device_select(hw, context, *context->storage, instance);
    context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context->physical_device, context->surface, *context->storage);

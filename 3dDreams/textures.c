@@ -5,6 +5,93 @@
 
 #include "../extern/stb_image.h"
 
+static VkImageView vk_image_view_create(VkDevice logical_device, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
+{
+   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_format(format));
+   assert(vk_valid_handle(image));
+
+   VkImageView image_view = 0;
+
+   VkImageViewCreateInfo view_info = {vk_info(IMAGE_VIEW)};
+   view_info.image = image;
+   view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+   view_info.format = format;
+   view_info.subresourceRange.aspectMask = aspect_mask;
+   view_info.subresourceRange.layerCount = 1;
+   view_info.subresourceRange.levelCount = 1;
+
+   if(!vk_valid(vkCreateImageView(logical_device, &view_info, 0, &image_view)))
+      return VK_NULL_HANDLE;
+
+   return image_view;
+}
+
+static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+{
+   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(physical_device));
+   assert(vk_valid_format(format));
+
+   VkImage result = 0;
+
+   VkImageCreateInfo image_info = {};
+   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+   image_info.imageType = VK_IMAGE_TYPE_2D; 
+   image_info.extent = extent;
+   image_info.mipLevels = 1;
+   image_info.arrayLayers = 1;
+   image_info.format = format;
+   image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+   image_info.usage = usage;
+   image_info.samples = VK_SAMPLE_COUNT_1_BIT;  // TODO: pass
+   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+   image_info.queueFamilyIndexCount = 0;
+   image_info.pQueueFamilyIndices = 0;
+
+   if(vkCreateImage(logical_device, &image_info, 0, &result) != VK_SUCCESS)
+      return VK_NULL_HANDLE;
+
+   VkMemoryRequirements memory_requirements;
+   vkGetImageMemoryRequirements(logical_device, result, &memory_requirements);
+
+   VkMemoryAllocateInfo alloc_info = {};
+   alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+   alloc_info.allocationSize = memory_requirements.size;
+
+   VkPhysicalDeviceMemoryProperties memory_properties;
+   vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+   uint32_t memory_type_index = VK_MAX_MEMORY_TYPES;
+   for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
+      if((memory_requirements.memoryTypeBits & (1 << i)) &&
+          (memory_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      {
+         memory_type_index = i;
+         break;
+      }
+
+   if(memory_type_index == VK_MAX_MEMORY_TYPES)
+      return VK_NULL_HANDLE;
+
+   alloc_info.memoryTypeIndex = memory_type_index;
+
+   VkDeviceMemory memory;
+   if(vkAllocateMemory(logical_device, &alloc_info, 0, &memory) != VK_SUCCESS)
+      return VK_NULL_HANDLE;
+
+   if(vkBindImageMemory(logical_device, result, memory, 0) != VK_SUCCESS)
+      return VK_NULL_HANDLE;
+
+   return result;
+}
+
+static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent)
+{
+   return vk_image_create(logical_device, physical_device, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
 static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
    // TODO: semcompress this texture parsing
@@ -42,7 +129,6 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
       memcpy(tex.path.data + tex_dir.len, img->uri, img_uri_len);
 
       tex.path.data[tex_len] = 0;        // null terminate
-      array_add(context->textures, tex);
 
       i32 tex_width, tex_height, tex_channels;
       stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
@@ -50,7 +136,19 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
       assert(tex_pixels);
       assert(tex_width > 0 && tex_height > 0);
 
-      // ... create the vulkan tex objects
+      VkExtent3D extents = { .width = tex_width, .height = tex_height, .depth = 1 };
+      VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+      VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+      VkImage image = vk_image_create(context->logical_device, context->physical_device, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
+      VkImageView image_view = vk_image_view_create(context->logical_device, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+      assert(vk_valid_handle(image));
+      assert(vk_valid_handle(image_view));
+
+      tex.image.handle = image;
+      tex.image.view = image_view;
+
+      array_add(context->textures, tex);
 
       stbi_image_free(tex_pixels);
    }
