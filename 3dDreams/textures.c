@@ -21,8 +21,13 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
       u8* gltf_end = gltf_path.data + gltf_path.len;
       size tex_path_start = gltf_path.len;
 
-      while(*gltf_end-- != '/')
+      while(*gltf_end != '/' && tex_path_start != 0)
+      {
          tex_path_start--;
+         gltf_end--;
+      }
+
+      assert(*gltf_end == '/' && tex_path_start != 0);
 
       s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start+1);
 
@@ -44,7 +49,6 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
 
       assert(tex_pixels);
       assert(tex_width > 0 && tex_height > 0);
-      assert(tex_channels == 3);
 
       // ... create the vulkan tex objects
 
