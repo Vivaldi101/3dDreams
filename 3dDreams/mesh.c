@@ -9,6 +9,8 @@
 
 #include "vulkan_ng.h"
 
+#include "textures.c"
+
 typedef struct vertex vertex;
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
@@ -544,38 +546,9 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
          array_add(context->mesh_instances, mi);
       }
    }
-   // TODO: semcompress this texture parsing
-   for(usize i = 0; i < data->textures_count; ++i)
-   {
-      cgltf_texture* cgltf_tex = data->textures + i;
-      assert(cgltf_tex->image);
 
-      cgltf_image* img = cgltf_tex->image;
-      assert(img->uri);
-
-      cgltf_decode_uri(img->uri);
-
-      u8* gltf_end = gltf_path.data + gltf_path.len;
-      size tex_path_start = gltf_path.len;
-
-      while(*gltf_end-- != '/')
-         tex_path_start--;
-
-      s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start+1);
-
-      size img_uri_len = strlen(img->uri);
-      size tex_len = img_uri_len + tex_dir.len;
-
-      vk_texture tex = {};
-      tex.path.arena = context->storage;
-      array_resize(tex.path, tex_len+1); // for null terminate
-
-      memcpy(tex.path.data, tex_dir.data, tex_dir.len);
-      memcpy(tex.path.data + tex_dir.len, img->uri, img_uri_len);
-
-      tex.path.data[tex_len] = 0;        // null terminate
-      array_add(context->textures, tex);
-   }
+   vk_textures_parse(context, data, gltf_path);
+   vk_textures_log(context);
 
    cgltf_free(data);
 
@@ -583,14 +556,6 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    array(vk_image) images = {.arena = context->storage};
    array_resize(images, context->textures.count);
-
-   for(size i = 0; i < context->textures.count; i++)
-   {
-      vk_image image = {};
-      printf("Texture loaded: %s\n", context->textures.data[i].path.data);
-
-      context->textures.data[i].image = image;
-   }
 
    return true;
 }
