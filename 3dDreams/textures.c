@@ -5,9 +5,8 @@
 
 #include "../extern/stb_image.h"
 
-static VkImageView vk_image_view_create(VkDevice logical_device, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
+static VkImageView vk_image_view_create(vk_context* context, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
 {
-   assert(vk_valid_handle(logical_device));
    assert(vk_valid_format(format));
    assert(vk_valid_handle(image));
 
@@ -21,16 +20,14 @@ static VkImageView vk_image_view_create(VkDevice logical_device, VkFormat format
    view_info.subresourceRange.layerCount = 1;
    view_info.subresourceRange.levelCount = 1;
 
-   if(!vk_valid(vkCreateImageView(logical_device, &view_info, 0, &image_view)))
+   if(!vk_valid(vkCreateImageView(context->logical_device, &view_info, 0, &image_view)))
       return VK_NULL_HANDLE;
 
    return image_view;
 }
 
-static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
 {
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_handle(physical_device));
    assert(vk_valid_format(format));
 
    VkImage result = 0;
@@ -50,18 +47,18 @@ static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physica
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
 
-   if(vkCreateImage(logical_device, &image_info, 0, &result) != VK_SUCCESS)
+   if(vkCreateImage(context->logical_device, &image_info, 0, &result) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
    VkMemoryRequirements memory_requirements;
-   vkGetImageMemoryRequirements(logical_device, result, &memory_requirements);
+   vkGetImageMemoryRequirements(context->logical_device, result, &memory_requirements);
 
    VkMemoryAllocateInfo alloc_info = {};
    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
    alloc_info.allocationSize = memory_requirements.size;
 
    VkPhysicalDeviceMemoryProperties memory_properties;
-   vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_properties);
 
    uint32_t memory_type_index = VK_MAX_MEMORY_TYPES;
    for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
@@ -78,23 +75,22 @@ static VkImage vk_image_create(VkDevice logical_device, VkPhysicalDevice physica
    alloc_info.memoryTypeIndex = memory_type_index;
 
    VkDeviceMemory memory;
-   if(vkAllocateMemory(logical_device, &alloc_info, 0, &memory) != VK_SUCCESS)
+   if(vkAllocateMemory(context->logical_device, &alloc_info, 0, &memory) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
-   if(vkBindImageMemory(logical_device, result, memory, 0) != VK_SUCCESS)
+   if(vkBindImageMemory(context->logical_device, result, memory, 0) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
    return result;
 }
 
-static VkImage vk_depth_image_create(VkDevice logical_device, VkPhysicalDevice physical_device, VkFormat format, VkExtent3D extent)
+static VkImage vk_depth_image_create(vk_context* context, VkFormat format, VkExtent3D extent)
 {
-   return vk_image_create(logical_device, physical_device, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+   return vk_image_create(context, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
 static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
-   // TODO: semcompress this texture parsing
    for(usize i = 0; i < data->textures_count; ++i)
    {
       cgltf_texture* cgltf_tex = data->textures + i;
@@ -139,8 +135,10 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
       VkExtent3D extents = { .width = tex_width, .height = tex_height, .depth = 1 };
       VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
       VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-      VkImage image = vk_image_create(context->logical_device, context->physical_device, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
-      VkImageView image_view = vk_image_view_create(context->logical_device, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+      // TODO: think composite contracts for non-narrow functions
+      VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
+      VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
 
       assert(vk_valid_handle(image));
       assert(vk_valid_handle(image_view));

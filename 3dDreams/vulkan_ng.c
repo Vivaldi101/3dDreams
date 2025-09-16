@@ -709,10 +709,10 @@ static void vk_swapchain_update(vk_context* context)
 
    for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
    {
-      context->swapchain_info.depths[i] = vk_depth_image_create(context->logical_device, context->physical_device, VK_FORMAT_D32_SFLOAT, depth_extent);
+      context->swapchain_info.depths[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
 
-      context->swapchain_info.image_views[i] = vk_image_view_create(context->logical_device, context->swapchain_info.format, context->swapchain_info.images[i], VK_IMAGE_ASPECT_COLOR_BIT);
-      context->swapchain_info.depth_views[i] = vk_image_view_create(context->logical_device, VK_FORMAT_D32_SFLOAT, context->swapchain_info.depths[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+      context->swapchain_info.image_views[i] = vk_image_view_create(context, context->swapchain_info.format, context->swapchain_info.images[i], VK_IMAGE_ASPECT_COLOR_BIT);
+      context->swapchain_info.depth_views[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_info.depths[i], VK_IMAGE_ASPECT_DEPTH_BIT);
 
       VkImageView attachments[2] = {context->swapchain_info.image_views[i], context->swapchain_info.depth_views[i]};
 
