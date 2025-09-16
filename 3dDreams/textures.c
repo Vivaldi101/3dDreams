@@ -1,5 +1,10 @@
 #include "vulkan_ng.h"
 
+#define STBI_NO_SIMD
+#define STB_IMAGE_IMPLEMENTATION
+
+#include "../extern/stb_image.h"
+
 static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
    // TODO: semcompress this texture parsing
@@ -33,16 +38,17 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
 
       tex.path.data[tex_len] = 0;        // null terminate
       array_add(context->textures, tex);
+
+      i32 tex_width, tex_height, tex_channels;
+      stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+
+      assert(tex_pixels);
+      assert(tex_width > 0 && tex_height > 0);
    }
 }
 
 static void vk_textures_log(vk_context* context)
 {
    for(size i = 0; i < context->textures.count; i++)
-   {
-      vk_image image = {};
       printf("Texture loaded: %s\n", context->textures.data[i].path.data);
-
-      context->textures.data[i].image = image;
-   }
 }
