@@ -276,23 +276,23 @@ static VkFormat vk_swapchain_format(VkPhysicalDevice physical_device, VkSurfaceK
    return formats[0].format;
 }
 
-static swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
 
-   swapchain_surface_info result = {};
+   vk_swapchain_surface_info result = {};
 
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps)))
-      return (swapchain_surface_info){0};
+      return (vk_swapchain_surface_info){0};
 
    // triple buffering
    if(surface_caps.minImageCount < 2)
-      return (swapchain_surface_info){0};
+      return (vk_swapchain_surface_info){0};
 
    if(!implies(surface_caps.maxImageCount != 0, surface_caps.maxImageCount >= surface_caps.minImageCount + 1))
-      return (swapchain_surface_info){0};
+      return (vk_swapchain_surface_info){0};
 
    u32 image_count = surface_caps.minImageCount + 1;
 
@@ -502,7 +502,7 @@ static VkSemaphore vk_semaphore_create(VkDevice logical_device)
    return sema;
 }
 
-static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, swapchain_surface_info* surface_info, u32 queue_family_index)
+static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_surface_info* surface_info, u32 queue_family_index)
 {
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(surface_info->surface));
@@ -532,13 +532,13 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, swapchain_sur
    return swapchain;
 }
 
-static swapchain_surface_info vk_swapchain_info_create(vk_context* context, u32 swapchain_width, u32 swapchain_height, u32 queue_family_index)
+static vk_swapchain_surface_info vk_swapchain_info_create(vk_context* context, u32 swapchain_width, u32 swapchain_height, u32 queue_family_index)
 {
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
-      return (swapchain_surface_info) {};
+      return (vk_swapchain_surface_info) {};
 
-   swapchain_surface_info swapchain_info = vk_window_swapchain_surface_info(context->physical_device, swapchain_width, swapchain_height, context->surface);
+   vk_swapchain_surface_info swapchain_info = vk_window_swapchain_surface_info(context->physical_device, swapchain_width, swapchain_height, context->surface);
 
    VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
 
@@ -702,7 +702,7 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color
    return renderpass;
 }
 
-static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, swapchain_surface_info* surface_info, VkImageView* attachments, u32 attachment_count)
+static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, vk_swapchain_surface_info* surface_info, VkImageView* attachments, u32 attachment_count)
 {
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(renderpass));

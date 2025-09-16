@@ -43,7 +43,7 @@
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 typedef enum file_format { FILE_FORMAT_OBJ = 0, FILE_FORMAT_GLTF = 1 } file_format;
 
-align_struct swapchain_surface_info
+align_struct vk_swapchain_surface_info
 {
    u32 image_width;
    u32 image_height;
@@ -57,7 +57,7 @@ align_struct swapchain_surface_info
    VkImage depths[MAX_VULKAN_OBJECT_COUNT];
    VkImageView image_views[MAX_VULKAN_OBJECT_COUNT];
    VkImageView depth_views[MAX_VULKAN_OBJECT_COUNT];
-} swapchain_surface_info;
+} vk_swapchain_surface_info;
 
 align_struct
 {
@@ -144,7 +144,7 @@ align_struct
    // TODO: array(meshlet)
    u32 meshlet_count;
 
-   swapchain_surface_info swapchain_info;
+   vk_swapchain_surface_info swapchain_info;
 
    arena* storage;
 
