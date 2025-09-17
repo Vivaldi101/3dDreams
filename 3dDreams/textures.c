@@ -152,6 +152,10 @@ static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
    //size tex_size = vk_texture_size(tex_width, tex_height, 0);
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
+   vk_buffer tex_scratch = {};
+   vk_buffer tex_buffer = {};
+   //vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, tex_buffer, tex_scratch, tex_pixels, tex_size); 
+
    array_add(context->textures, tex);
 
    stbi_image_free(tex_pixels);

@@ -556,6 +556,8 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       cgltf_decode_uri(img->uri);
 
       vk_texture_parse(context, img->uri, gltf_path);
+
+      assert(context->textures.data[i].image.handle);
    }
 
    vk_textures_log(context);
