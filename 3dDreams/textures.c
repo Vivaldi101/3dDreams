@@ -101,71 +101,60 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
    return vk_texture_size_blocked(w, h, levels, 0);
 }
 
-static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path)
+static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
 {
-   for(usize i = 0; i < data->textures_count; ++i)
+   u8* gltf_end = gltf_path.data + gltf_path.len;
+   size tex_path_start = gltf_path.len;
+
+   while(*gltf_end != '/' && tex_path_start != 0)
    {
-      cgltf_texture* cgltf_tex = data->textures + i;
-      assert(cgltf_tex->image);
-
-      cgltf_image* img = cgltf_tex->image;
-      assert(img->uri);
-
-      cgltf_decode_uri(img->uri);
-
-      u8* gltf_end = gltf_path.data + gltf_path.len;
-      size tex_path_start = gltf_path.len;
-
-      while(*gltf_end != '/' && tex_path_start != 0)
-      {
-         tex_path_start--;
-         gltf_end--;
-      }
-
-      assert(*gltf_end == '/' && tex_path_start != 0);
-
-      s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start+1);
-
-      size img_uri_len = strlen(img->uri);
-      size tex_len = img_uri_len + tex_dir.len;
-
-      vk_texture tex = {};
-      tex.path.arena = context->storage;
-      array_resize(tex.path, tex_len+1); // for null terminate
-
-      memcpy(tex.path.data, tex_dir.data, tex_dir.len);
-      memcpy(tex.path.data + tex_dir.len, img->uri, img_uri_len);
-
-      tex.path.data[tex_len] = 0;        // null terminate
-
-      i32 tex_width, tex_height, tex_channels;
-      stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
-
-      assert(tex_pixels);
-      assert(tex_width > 0 && tex_height > 0);
-
-      VkExtent3D extents = { .width = tex_width, .height = tex_height, .depth = 1 };
-      VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-      VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-
-      // TODO: think composite contracts for non-narrow functions
-      VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
-      VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-      assert(vk_valid_handle(image));
-      assert(vk_valid_handle(image_view));
-
-      tex.image.handle = image;
-      tex.image.view = image_view;
-
-      // TODO: enable for mip textures
-      //size tex_size = vk_texture_size(tex_width, tex_height, 0);
-      size tex_size = tex_width * tex_height * STBI_rgb_alpha;
-
-      array_add(context->textures, tex);
-
-      stbi_image_free(tex_pixels);
+      tex_path_start--;
+      gltf_end--;
    }
+
+   assert(*gltf_end == '/' && tex_path_start != 0);
+
+   s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start + 1);
+
+   size img_uri_len = strlen(img_uri);
+   size tex_len = img_uri_len + tex_dir.len;
+
+   vk_texture tex = {};
+   tex.path.arena = context->storage;
+   array_resize(tex.path, tex_len + 1); // for null terminate
+
+   memcpy(tex.path.data, tex_dir.data, tex_dir.len);
+   memcpy(tex.path.data + tex_dir.len, img_uri, img_uri_len);
+
+   tex.path.data[tex_len] = 0;        // null terminate
+
+   i32 tex_width, tex_height, tex_channels;
+   stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+
+   assert(tex_pixels);
+   assert(tex_width > 0 && tex_height > 0);
+
+   VkExtent3D extents = {.width = tex_width, .height = tex_height, .depth = 1};
+   VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+   VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+
+   // TODO: think composite contracts for non-narrow functions
+   VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
+   VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
+
+   assert(vk_valid_handle(image));
+   assert(vk_valid_handle(image_view));
+
+   tex.image.handle = image;
+   tex.image.view = image_view;
+
+   // TODO: enable for mip textures
+   //size tex_size = vk_texture_size(tex_width, tex_height, 0);
+   size tex_size = tex_width * tex_height * STBI_rgb_alpha;
+
+   array_add(context->textures, tex);
+
+   stbi_image_free(tex_pixels);
 }
 
 static void vk_textures_log(vk_context* context)

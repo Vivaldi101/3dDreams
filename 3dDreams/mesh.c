@@ -10,7 +10,7 @@
 #include "vulkan_ng.h"
 
 static void vk_textures_log(vk_context* context);
-static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path);
+static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path);
 
 // TODO: remove .obj path
 typedef struct 
@@ -415,6 +415,7 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    context->mesh_instances.arena = context->storage;
    array_resize(context->mesh_instances, data->nodes_count);
 
+   // preallocate textures
    context->textures.arena = context->storage;
    array_resize(context->textures, data->textures_count);
 
@@ -544,15 +545,24 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
       }
    }
 
-   vk_textures_parse(context, data, gltf_path);
+   for(usize i = 0; i < data->textures_count; ++i)
+   {
+      cgltf_texture* cgltf_tex = data->textures + i;
+      assert(cgltf_tex->image);
+
+      cgltf_image* img = cgltf_tex->image;
+      assert(img->uri);
+
+      cgltf_decode_uri(img->uri);
+
+      vk_texture_parse(context, img->uri, gltf_path);
+   }
+
    vk_textures_log(context);
 
    cgltf_free(data);
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
-
-   array(vk_image) images = {.arena = context->storage};
-   array_resize(images, context->textures.count);
 
    return true;
 }
