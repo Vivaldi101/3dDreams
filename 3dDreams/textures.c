@@ -89,6 +89,18 @@ static VkImage vk_depth_image_create(vk_context* context, VkFormat format, VkExt
    return vk_image_create(context, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
+static size vk_texture_size_blocked(u32 w, u32 h, u32 levels, u32 block_size)
+{
+   size result = 0;
+
+   return result;
+}
+
+static size vk_texture_size(u32 w, u32 h, u32 levels)
+{
+   return vk_texture_size_blocked(w, h, levels, 0);
+}
+
 static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
    for(usize i = 0; i < data->textures_count; ++i)
@@ -145,6 +157,10 @@ static void vk_textures_parse(vk_context* context, cgltf_data* data, s8 gltf_pat
 
       tex.image.handle = image;
       tex.image.view = image_view;
+
+      // TODO: enable for mip textures
+      //size tex_size = vk_texture_size(tex_width, tex_height, 0);
+      size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
       array_add(context->textures, tex);
 

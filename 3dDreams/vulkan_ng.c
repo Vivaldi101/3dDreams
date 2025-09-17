@@ -3,7 +3,7 @@
 #include "graphics.h"
 #include "vulkan_ng.h"
 
-// TODO: extract win32 shit out
+// TODO: extract out win32 shit out to platform layer
 #include "win32_file_io.c"
 
 #include "vulkan_spirv_loader.c"
@@ -213,6 +213,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 
    vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
+   // TODO: bad for perf
    vk_assert(vkDeviceWaitIdle(device));
 }
 
