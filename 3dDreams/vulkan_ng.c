@@ -177,6 +177,111 @@ static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
    vkDestroyBuffer(device, buffer->handle, 0);
 }
 
+static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size)
+{
+   assert(data);
+   assert(scratch.data && scratch.size >= size);
+
+   memcpy(scratch.data, data, size);
+
+   vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
+
+   VkCommandBufferBeginInfo begin_info = {};
+   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+   begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   vk_assert(vkBeginCommandBuffer(context->command_buffer, &begin_info));
+
+   // Image layout transition: UNDEFINED -> TRANSFER_DST_OPTIMAL
+   VkImageMemoryBarrier img_barrier_to_transfer = {};
+   img_barrier_to_transfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+   img_barrier_to_transfer.srcAccessMask = 0;
+   img_barrier_to_transfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+   img_barrier_to_transfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+   img_barrier_to_transfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+   img_barrier_to_transfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   img_barrier_to_transfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   img_barrier_to_transfer.image = image;
+   img_barrier_to_transfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   img_barrier_to_transfer.subresourceRange.baseMipLevel = 0;
+   img_barrier_to_transfer.subresourceRange.levelCount = 1;
+   img_barrier_to_transfer.subresourceRange.baseArrayLayer = 0;
+   img_barrier_to_transfer.subresourceRange.layerCount = 1;
+
+   vkCmdPipelineBarrier(
+      context->command_buffer,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      0,
+      0, NULL,
+      0, NULL,
+      1, &img_barrier_to_transfer
+   );
+
+   // BufferImageCopy region setup
+   VkBufferImageCopy region = {};
+   region.bufferOffset = 0;
+   region.bufferRowLength = 0;
+   region.bufferImageHeight = 0;
+   region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   region.imageSubresource.mipLevel = 0;
+   region.imageSubresource.baseArrayLayer = 0;
+   region.imageSubresource.layerCount = 1;
+   region.imageOffset.x = 0;
+   region.imageOffset.y = 0;
+   region.imageOffset.z = 0;
+   region.imageExtent = image_extent;
+
+   vkCmdCopyBufferToImage(
+      context->command_buffer,
+      scratch.handle,
+      image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      1,
+      &region
+   );
+
+   // Image layout transition: TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
+   VkImageMemoryBarrier img_barrier_to_shader = {};
+   img_barrier_to_shader.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+   img_barrier_to_shader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+   img_barrier_to_shader.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+   img_barrier_to_shader.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+   img_barrier_to_shader.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   img_barrier_to_shader.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   img_barrier_to_shader.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   img_barrier_to_shader.image = image;
+   img_barrier_to_shader.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   img_barrier_to_shader.subresourceRange.baseMipLevel = 0;
+   img_barrier_to_shader.subresourceRange.levelCount = 1;
+   img_barrier_to_shader.subresourceRange.baseArrayLayer = 0;
+   img_barrier_to_shader.subresourceRange.layerCount = 1;
+
+   vkCmdPipelineBarrier(
+      context->command_buffer,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+      0,
+      0, NULL,
+      0, NULL,
+      1, &img_barrier_to_shader
+   );
+
+   vk_assert(vkEndCommandBuffer(context->command_buffer));
+
+   VkSubmitInfo submit_info = {};
+   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+   submit_info.waitSemaphoreCount = 0;
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.signalSemaphoreCount = 0;
+
+   vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
+   // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
+   // TODO: bad for perf
+   vk_assert(vkDeviceWaitIdle(context->logical_device));
+}
+
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
 {
    assert(data);

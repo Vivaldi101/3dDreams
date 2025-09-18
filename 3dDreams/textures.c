@@ -7,9 +7,6 @@
 
 static VkImageView vk_image_view_create(vk_context* context, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
 {
-   assert(vk_valid_format(format));
-   assert(vk_valid_handle(image));
-
    VkImageView image_view = 0;
 
    VkImageViewCreateInfo view_info = {vk_info(IMAGE_VIEW)};
@@ -28,8 +25,6 @@ static VkImageView vk_image_view_create(vk_context* context, VkFormat format, Vk
 
 static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
 {
-   assert(vk_valid_format(format));
-
    VkImage result = 0;
 
    VkImageCreateInfo image_info = {};
@@ -138,23 +133,21 @@ static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
-   // TODO: think composite contracts for non-narrow functions
    VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
    VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
-
-   assert(vk_valid_handle(image));
-   assert(vk_valid_handle(image_view));
 
    tex.image.handle = image;
    tex.image.view = image_view;
 
    // TODO: enable for mip textures
-   //size tex_size = vk_texture_size(tex_width, tex_height, 0);
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
-   vk_buffer tex_scratch = {};
-   vk_buffer tex_buffer = {};
-   //vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, tex_buffer, tex_scratch, tex_pixels, tex_size); 
+   VkPhysicalDeviceMemoryProperties memory_props;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, tex_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer tex_buffer = vk_buffer_create(context->logical_device, tex_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   vk_buffer_to_image_upload(context, scratch_buffer, tex.image.handle, extents, tex_pixels, tex_size);
 
    array_add(context->textures, tex);
 

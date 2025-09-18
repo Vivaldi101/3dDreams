@@ -167,7 +167,9 @@ align_struct
 void vk_initialize(struct hw* hw);
 void vk_uninitialize(struct hw* hw);
 
+// TODO: place these in buffer.h
 static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size);
+static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 
 typedef struct vertex vertex;
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
