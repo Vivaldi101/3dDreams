@@ -25,6 +25,7 @@ layout(set = 0, binding = 0) readonly buffer Verts
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec3 out_world_frag_pos;
 layout(location = 2) out vec2 out_frag_uv;
+layout(location = 3) flat out uint textureID;  // pass to fragment shader
 
 void main()
 {

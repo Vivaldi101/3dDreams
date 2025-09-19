@@ -23,6 +23,7 @@
 
 #define vk_error(s) printf("Vulkan error:" #s)
 
+// most vk used types
 #define vk_info(i) VK_STRUCTURE_TYPE_##i##_CREATE_INFO
 #define vk_info_allocate(i) VK_STRUCTURE_TYPE_##i##_ALLOCATE_INFO
 #define vk_info_khr(i) VK_STRUCTURE_TYPE_##i##_CREATE_INFO_KHR
@@ -31,6 +32,7 @@
 #define vk_info_begin(i) VK_STRUCTURE_TYPE_##i##_BEGIN_INFO
 #define vk_info_end(i) VK_STRUCTURE_TYPE_##i##_END_INFO
 
+// currently we just assert for lot of the commands - we should expand the contract to return null handle on failure and just use this to assert invariants on vulkan state?
 #ifdef _DEBUG
 #define vk_assert(v) \
         do { \
@@ -126,6 +128,9 @@ align_struct
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
    VkSurfaceKHR surface;
+   u32 descriptor_count;
+   VkDescriptorSet descriptor_set[2]; // TODO: array(VkDescriptorSetLayout)
+   VkDescriptorSetLayout descriptor_set_layouts[2]; // TODO: array(VkDescriptorSetLayout)
    VkAllocationCallbacks allocator;
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;

@@ -560,6 +560,121 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    cgltf_free(data);
 
+#if 1
+   // TODO: semcompress these descriptor sets out
+   u32 descriptor_count = 1 << 16;
+
+   VkDescriptorPoolSize pool_size = {
+      .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = descriptor_count
+   };
+
+   VkDescriptorPoolCreateInfo pool_info = {
+       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+       .maxSets = 1,
+       .poolSizeCount = 1,
+       .pPoolSizes = &pool_size
+   };
+
+   VkDescriptorPool descriptor_pool;
+
+   vk_assert(vkCreateDescriptorPool(context->logical_device, &pool_info, 0, &descriptor_pool));
+
+   VkSamplerCreateInfo sampler_info = {
+       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+       .magFilter = VK_FILTER_LINEAR,
+       .minFilter = VK_FILTER_LINEAR,
+       .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+       .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+       .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+       .anisotropyEnable = VK_TRUE,
+       .maxAnisotropy = 16,
+       .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+       .unnormalizedCoordinates = VK_FALSE,
+       .compareEnable = VK_FALSE,
+       .compareOp = VK_COMPARE_OP_ALWAYS,
+       .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+       .mipLodBias = 0.0f,
+       .minLod = 0.0f,
+       .maxLod = VK_LOD_CLAMP_NONE,
+   };
+
+   VkSampler immutable_sampler;
+   vk_assert(vkCreateSampler(context->logical_device, &sampler_info, 0, &immutable_sampler));
+
+   VkDescriptorSetLayoutBinding binding = {
+       .binding = 0,
+       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+       .descriptorCount = descriptor_count,
+       .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+       .pImmutableSamplers = 0
+   };
+
+   VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+   VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info = {
+       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+       .bindingCount = 1,
+       .pBindingFlags = &binding_flags
+   };
+
+   VkDescriptorSetLayoutCreateInfo layout_info = {
+       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+       .pNext = &binding_flags_info,
+       .bindingCount = 1,
+       .pBindings = &binding,
+   };
+
+   VkDescriptorSetLayout descriptor_set_layout = 0;
+   vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &layout_info, 0, &descriptor_set_layout));
+
+   VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info = {
+       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+       .descriptorSetCount = 1,
+       .pDescriptorCounts = &context->textures.count,
+   };
+
+   VkDescriptorSetAllocateInfo alloc_info = {
+       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+       .pNext = &variable_count_info,
+       .descriptorPool = descriptor_pool,
+       .descriptorSetCount = 1,
+       .pSetLayouts = &descriptor_set_layout,
+   };
+
+   VkDescriptorSet descriptor_set;
+   vk_assert(vkAllocateDescriptorSets(context->logical_device, &alloc_info, &descriptor_set));
+
+   context->descriptor_set[1] = descriptor_set;
+   context->descriptor_set_layouts[1] = descriptor_set_layout;
+   context->descriptor_count = descriptor_count;
+
+   // TODO: Fix malloc to use scratch arena
+   VkDescriptorImageInfo* image_infos = malloc(sizeof(VkDescriptorImageInfo) * context->textures.count);
+   assert(image_infos);
+
+   for(uint32_t i = 0; i < context->textures.count; ++i) {
+      image_infos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      image_infos[i].imageView = context->textures.data[i].image.view;
+      image_infos[i].sampler = immutable_sampler;
+   }
+
+   VkWriteDescriptorSet write = {
+       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+       .dstSet = descriptor_set,
+       .dstBinding = 0,
+       .dstArrayElement = 0,
+       .descriptorCount = (u32)context->textures.count,
+       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+       .pImageInfo = image_infos,
+   };
+
+   vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
+
+   // TODO: Fix malloc to use scratch arena
+   free(image_infos);
+#endif
+
    vk_textures_log(context);
 
    geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);

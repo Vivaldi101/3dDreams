@@ -153,6 +153,7 @@ static void vk_texture_load(vk_context* context, char* img_uri, s8 gltf_path)
    stbi_image_free(tex_pixels);
 }
 
+
 static void vk_textures_log(vk_context* context)
 {
    for(size i = 0; i < context->textures.count; i++)

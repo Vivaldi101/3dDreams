@@ -968,6 +968,17 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
    {
+#if 0
+      vkCmdBindDescriptorSets(
+         command_buffer,
+         VK_PIPELINE_BIND_POINT_GRAPHICS,
+         context->rtx_pipeline_layout,
+         0,                  // firstSet = 0, the set index
+         1,                  // descriptorSetCount
+         &context->descriptor_set,
+         0, NULL             // dynamic offsets count and array
+      );
+#endif
       vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                    sizeof(mvp), &mvp);
@@ -1023,6 +1034,16 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    else
    {
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
+
+      vkCmdBindDescriptorSets(
+         command_buffer,
+         VK_PIPELINE_BIND_POINT_GRAPHICS,
+         context->pipeline_layout,
+         1,
+         1,
+         &context->descriptor_set[1],
+         0, 0             // dynamic offsets count and array
+      );
 
       // TODO: descriptor templates
       VkWriteDescriptorSet descriptors[1] = {};
@@ -1177,7 +1198,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout);
+      vk_assert(vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout));
    }
    else
    {
@@ -1193,22 +1214,18 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout);
+      vk_assert(vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout));
    }
 
    return set_layout;
 }
 
-static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, bool rtx_supported)
+// TODO: pass all the layouts 
+static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* layouts, u32 layout_count, bool rtx_supported)
 {
-   assert(vk_valid_handle(logical_device));
    VkPipelineLayout layout = 0;
 
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
-
-   VkDescriptorSetLayout set_layout = vk_pipeline_set_layout_create(logical_device, rtx_supported);
-   if(!vk_valid_handle(set_layout))
-      return VK_NULL_HANDLE;
 
    VkPushConstantRange push_constants = {};
    if(rtx_supported)
@@ -1221,8 +1238,9 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, bool 
 
    info.pushConstantRangeCount = 1;
    info.pPushConstantRanges = &push_constants;
-   info.setLayoutCount = 1;
-   info.pSetLayouts = &set_layout;
+
+   info.setLayoutCount = layout_count;
+   info.pSetLayouts = layouts;
 
    vk_assert(vkCreatePipelineLayout(logical_device, &info, 0, &layout));
 
@@ -1609,12 +1627,17 @@ void vk_initialize(hw* hw)
 
    spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
+   vk_assets_load(context, hw->state.gltf_file);
+
    VkPipelineCache cache = 0; // TODO: enable
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, false);
-   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, true);
+
+   // NO rtx for now
+   context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
+   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->descriptor_set_layouts, array_count(context->descriptor_set_layouts), false);
+   //VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, true);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
-   context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
+   //context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
 
    vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
    context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
@@ -1623,9 +1646,7 @@ void vk_initialize(hw* hw)
    context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
 
    context->pipeline_layout = layout;
-   context->rtx_pipeline_layout = rtx_layout;
-
-   vk_assets_load(context, hw->state.gltf_file);
+   //context->rtx_pipeline_layout = rtx_layout;
 }
 
 void vk_uninitialize(hw* hw)
