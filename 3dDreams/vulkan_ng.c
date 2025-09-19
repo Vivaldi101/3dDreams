@@ -177,12 +177,15 @@ static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
    vkDestroyBuffer(device, buffer->handle, 0);
 }
 
-static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size)
+static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize dev_size)
 {
    assert(data);
-   assert(scratch.data && scratch.size >= size);
+   assert(dev_size > 0);
+   assert(scratch.data && scratch.size >= (size)dev_size);
+   assert(image_extent.width && image_extent.height && image_extent.depth);
+   assert(vk_valid_handle(image));
 
-   memcpy(scratch.data, data, size);
+   memcpy(scratch.data, data, dev_size);
 
    vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
 
@@ -282,11 +285,12 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    vk_assert(vkDeviceWaitIdle(context->logical_device));
 }
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize size)
+static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size)
 {
    assert(data);
-   assert(scratch.data && scratch.size >= size);
-   memcpy(scratch.data, data, size);
+   assert(dev_size > 0);
+   assert(scratch.data && scratch.size >= (size)dev_size);
+   memcpy(scratch.data, data, dev_size);
 
    vk_assert(vkResetCommandPool(device, cmd_pool, 0));
 
@@ -295,7 +299,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
 
    vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
 
-   VkBufferCopy buffer_region = {0, 0, size};
+   VkBufferCopy buffer_region = {0, 0, dev_size};
    vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
 
    VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
@@ -304,7 +308,7 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
    copy_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
    copy_barrier.buffer = buffer.handle;
-   copy_barrier.size = size;
+   copy_barrier.size = dev_size;
    copy_barrier.offset = 0;
 
    vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
@@ -519,7 +523,6 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-   array_push(extensions) = s8(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
    if(rtx_supported)
@@ -528,41 +531,43 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
 
-   VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
-   VkPhysicalDeviceVulkan12Features vk12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
-   vk12.storageBuffer8BitAccess = true;
-   vk12.uniformAndStorageBuffer8BitAccess = true;
-   vk12.storagePushConstant8 = true;
+   VkPhysicalDeviceFeatures2 features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
-   VkPhysicalDeviceFragmentShadingRateFeaturesKHR frag_shading_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
-   frag_shading_features.primitiveFragmentShadingRate = true;
+   VkPhysicalDeviceVulkan12Features features12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+   features12.storageBuffer8BitAccess = true;
+   features12.uniformAndStorageBuffer8BitAccess = true;
+   features12.storagePushConstant8 = true;
+   features12.shaderSampledImageArrayNonUniformIndexing = true;
+   features12.descriptorBindingSampledImageUpdateAfterBind = true;
+   features12.descriptorBindingUpdateUnusedWhilePending = true;
+   features12.descriptorBindingPartiallyBound = true;
 
-   // TODO: Dont expose if no rtx was supported
-   VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+   VkPhysicalDeviceMultiviewFeatures features_multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
+   features_multiview.multiview = true;
+
+   VkPhysicalDeviceFragmentShadingRateFeaturesKHR features_frag_shading = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
+   features_frag_shading.primitiveFragmentShadingRate = true;
+
+   features.pNext = &features12;
+   features12.pNext = &features_multiview;
+   features_multiview.pNext = &features_frag_shading;
 
    if(rtx_supported)
    {
-      mesh_shader_features.meshShader = true;
-      mesh_shader_features.taskShader = true;
-      mesh_shader_features.multiviewMeshShader = true;
-      mesh_shader_features.pNext = &frag_shading_features;
+      VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+
+      features_frag_shading.pNext = &features_mesh_shader;
+      features_mesh_shader.meshShader = true;
+      features_mesh_shader.taskShader = true;
+      features_mesh_shader.multiviewMeshShader = true;
    }
 
-   VkPhysicalDeviceMultiviewFeatures multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
-   multiview.multiview = true;
+   vkGetPhysicalDeviceFeatures2(physical_device, &features);
 
-   if(rtx_supported)
-      multiview.pNext = &mesh_shader_features;
-
-   vk12.pNext = &multiview;
-   features2.pNext = &vk12;
-
-   vkGetPhysicalDeviceFeatures2(physical_device, &features2);
-
-   features2.features.depthBounds = true;
-   features2.features.wideLines = true;
-   features2.features.fillModeNonSolid = true;
-   features2.features.sampleRateShading = true;
+   features.features.depthBounds = true;
+   features.features.wideLines = true;
+   features.features.fillModeNonSolid = true;
+   features.features.sampleRateShading = true;
 
    const char** extension_names = push(&scratch, char*, extensions.count);
 
@@ -570,14 +575,14 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    {
       extension_names[i] = (const char*)extensions.data[i].data;
 
-      hw->log(s8("Using Vulkan device extension: \t\t%s\n"), extension_names[i]);
+      printf("Using Vulkan device extension[%u]: %s\n", i, extension_names[i]);
    }
 
    ldev_info.queueCreateInfoCount = 1;
    ldev_info.pQueueCreateInfos = &queue_info;
    ldev_info.enabledExtensionCount = (u32)extensions.count;
    ldev_info.ppEnabledExtensionNames = extension_names;
-   ldev_info.pNext = &features2;
+   ldev_info.pNext = &features;
 
    VkDevice logical_device;
    vk_assert(vkCreateDevice(physical_device, &ldev_info, 0, &logical_device));
@@ -1525,6 +1530,7 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
+// TODO: think about the contracts here
 void vk_initialize(hw* hw)
 {
    assert(hw->renderer.window.handle);

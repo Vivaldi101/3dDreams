@@ -21,6 +21,8 @@
 
 #define vk_valid(v) ((v) == VK_SUCCESS)
 
+#define vk_error(s) printf("Vulkan error:" #s)
+
 #define vk_info(i) VK_STRUCTURE_TYPE_##i##_CREATE_INFO
 #define vk_info_allocate(i) VK_STRUCTURE_TYPE_##i##_ALLOCATE_INFO
 #define vk_info_khr(i) VK_STRUCTURE_TYPE_##i##_CREATE_INFO_KHR
@@ -64,7 +66,7 @@ align_struct
    VkBuffer handle;
    VkDeviceMemory memory;
    void* data; // host or local memory
-   usize size;
+   size size;
 } vk_buffer;
 
 align_struct

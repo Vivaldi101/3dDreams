@@ -96,7 +96,7 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
    return vk_texture_size_blocked(w, h, levels, 0);
 }
 
-static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
+static void vk_texture_load(vk_context* context, char* img_uri, s8 gltf_path)
 {
    u8* gltf_end = gltf_path.data + gltf_path.len;
    size tex_path_start = gltf_path.len;
@@ -126,9 +126,6 @@ static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
    i32 tex_width, tex_height, tex_channels;
    stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 
-   assert(tex_pixels);
-   assert(tex_width > 0 && tex_height > 0);
-
    VkExtent3D extents = {.width = tex_width, .height = tex_height, .depth = 1};
    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -136,20 +133,22 @@ static void vk_texture_parse(vk_context* context, char* img_uri, s8 gltf_path)
    VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
    VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
 
-   tex.image.handle = image;
-   tex.image.view = image_view;
-
    // TODO: enable for mip textures
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, tex_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-   vk_buffer tex_buffer = vk_buffer_create(context->logical_device, tex_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-   vk_buffer_to_image_upload(context, scratch_buffer, tex.image.handle, extents, tex_pixels, tex_size);
+   if((scratch_buffer.size >= tex_size) && vk_valid_handle(image))
+   {
+      vk_buffer_to_image_upload(context, scratch_buffer, image, extents, tex_pixels, tex_size);
 
-   array_add(context->textures, tex);
+      tex.image.handle = image;
+      tex.image.view = image_view;
+
+      array_add(context->textures, tex);
+   }
 
    stbi_image_free(tex_pixels);
 }
