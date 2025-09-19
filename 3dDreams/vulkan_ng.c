@@ -451,7 +451,7 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
 
          for(u32 j = 0; j < extension_count; ++j)
          {
-            hw->log(s8("Available Vulkan device extension: \t%s\n"), extensions[j].extensionName);
+            printf("Available Vulkan device extension[%u]: %s\n", j, extensions[j].extensionName);
             if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
             {
                context->rtx_supported = true;
@@ -857,7 +857,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    context->swapchain_info = vk_swapchain_info_create(context, width, height, context->queue_family_index);
    vk_swapchain_update(context);
 
-   hw->log(s8("Viewport resized: [%u %u]\n"), width, height);
+   printf("Viewport resized: [%u %u]\n", width, height);
 }
 
 static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
