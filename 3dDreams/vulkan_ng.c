@@ -552,10 +552,10 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    features12.pNext = &features_multiview;
    features_multiview.pNext = &features_frag_shading;
 
+   VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+
    if(rtx_supported)
    {
-      VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
-
       features_frag_shading.pNext = &features_mesh_shader;
       features_mesh_shader.meshShader = true;
       features_mesh_shader.taskShader = true;
