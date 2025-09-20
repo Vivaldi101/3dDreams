@@ -6,7 +6,7 @@ layout(location = 0) out vec4 out_color;
 
 layout(location = 0) in vec3 in_normal;
 layout(location = 1) in vec3 in_world_frag_pos;
-layout(location = 2) in vec2 in_frag_uv;
+layout(location = 2) in vec2 in_uv;
 layout(location = 3) flat in uint textureID;
 
 layout(set = 1, binding = 0)
@@ -34,6 +34,5 @@ vec3 hsv_to_rgb(vec3 c)
 void main()
 {
    float ndot = dot(in_normal, normalize(vec3(-1.0, 1.0, 1.0)));
-   //out_color = vec4(vec3(ndot/4.f, ndot/1.f, ndot/2.f), 1.0);
-   out_color = texture(textures[0], in_frag_uv);
+   out_color = texture(textures[0], in_uv);
 }

@@ -24,12 +24,12 @@ layout(set = 0, binding = 0) readonly buffer Verts
 
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec3 out_world_frag_pos;
-layout(location = 2) out vec2 out_frag_uv;
+layout(location = 2) out vec2 out_uv;
 layout(location = 3) flat out uint textureID;  // pass to fragment shader
 
 void main()
 {
-   vertex v = verts[gl_VertexIndex];
+    vertex v = verts[gl_VertexIndex];
 
     vec3 local_pos = vec3(v.vx, v.vy, v.vz);
     vec4 world_pos = push_constants.model * vec4(local_pos, 1.0);
@@ -39,8 +39,9 @@ void main()
     vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
     mat3 normal_matrix = transpose(inverse(mat3(push_constants.model)));
     vec3 world_normal = normalize(normal_matrix * normal);
+    vec2 texcoord = vec2(v.tu, v.tv);
 
     out_normal = world_normal;
     out_world_frag_pos = world_pos.xyz;
-    out_frag_uv = world_pos.xy * 0.5 + 0.5;
+    out_uv = texcoord;
 }

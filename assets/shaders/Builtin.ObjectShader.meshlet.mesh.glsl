@@ -39,7 +39,7 @@ layout(set = 0, binding = 0) readonly buffer Verts
 };
 
 layout(location = 0) out vec4 out_color[];
-layout(location = 1) out vec2 out_frag_uv[];
+layout(location = 1) out vec2 out_uv[];
 
 vec3 renormalize_normal(vec3 n)
 {
@@ -96,7 +96,8 @@ void main()
 #else
       out_color[i] = vec4(vec3(normal), 1.0);
 #endif
-      out_frag_uv[i] = vec2(0, 0);  // fix the uvs
+      vec2 texcoord = vec2(v.tu, v.tv);
+      out_uv[i] = texcoord;
     }
 
     for(uint i = ti; i < triangle_count; i += 64)

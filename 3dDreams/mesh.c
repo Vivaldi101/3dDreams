@@ -560,7 +560,6 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    cgltf_free(data);
 
-#if 1
    // TODO: semcompress these descriptor sets out
    u32 descriptor_count = 1 << 16;
 
@@ -673,7 +672,6 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
 
    // TODO: Fix malloc to use scratch arena
    free(image_infos);
-#endif
 
    vk_textures_log(context);
 
