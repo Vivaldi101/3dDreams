@@ -1631,13 +1631,13 @@ void vk_initialize(hw* hw)
 
    VkPipelineCache cache = 0; // TODO: enable
 
-   // NO rtx for now
    context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
    VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->descriptor_set_layouts, array_count(context->descriptor_set_layouts), false);
-   //VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, true);
+   context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, true);
+   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, context->descriptor_set_layouts, array_count(context->descriptor_set_layouts), true);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
-   //context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
+   context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
 
    vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
    context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
@@ -1646,7 +1646,7 @@ void vk_initialize(hw* hw)
    context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
 
    context->pipeline_layout = layout;
-   //context->rtx_pipeline_layout = rtx_layout;
+   context->rtx_pipeline_layout = rtx_layout;
 }
 
 void vk_uninitialize(hw* hw)
