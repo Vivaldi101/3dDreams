@@ -648,14 +648,14 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
    context->descriptor_set_layouts[1] = descriptor_set_layout;
    context->descriptor_count = descriptor_count;
 
-   // TODO: Fix malloc to use scratch arena
-   VkDescriptorImageInfo* image_infos = malloc(sizeof(VkDescriptorImageInfo) * context->textures.count);
-   assert(image_infos);
+   array(VkDescriptorImageInfo) image_infos = { context->storage };
+   array_resize(image_infos, context->textures.count);
 
-   for(uint32_t i = 0; i < context->textures.count; ++i) {
-      image_infos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      image_infos[i].imageView = context->textures.data[i].image.view;
-      image_infos[i].sampler = immutable_sampler;
+   for(uint32_t i = 0; i < context->textures.count; ++i)
+   {
+      image_infos.data[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      image_infos.data[i].imageView = context->textures.data[i].image.view;
+      image_infos.data[i].sampler = immutable_sampler;
    }
 
    VkWriteDescriptorSet write = {
@@ -665,13 +665,10 @@ static bool gltf_load(vk_context* context, s8 gltf_path)
        .dstArrayElement = 0,
        .descriptorCount = (u32)context->textures.count,
        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-       .pImageInfo = image_infos,
+       .pImageInfo = image_infos.data,
    };
 
    vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
-
-   // TODO: Fix malloc to use scratch arena
-   free(image_infos);
 
    vk_textures_log(context);
 
