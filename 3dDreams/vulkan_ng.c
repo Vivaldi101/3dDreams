@@ -968,17 +968,17 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
    {
-#if 0
       vkCmdBindDescriptorSets(
          command_buffer,
          VK_PIPELINE_BIND_POINT_GRAPHICS,
          context->rtx_pipeline_layout,
-         0,                  // firstSet = 0, the set index
-         1,                  // descriptorSetCount
-         &context->descriptor_set,
-         0, NULL             // dynamic offsets count and array
+         1,
+         1,
+         &context->descriptor_set[1],
+         0,
+         0
       );
-#endif
+
       vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
                    sizeof(mvp), &mvp);
@@ -990,21 +990,20 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       mb_info.offset = 0;
       mb_info.range = context->mb.size;
 
-      // TODO: descriptor templates
-      VkWriteDescriptorSet descriptors[2] = {};
-      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[0].dstBinding = 0;
-      descriptors[0].descriptorCount = 1;
-      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[0].pBufferInfo = &vb_info;
+      VkWriteDescriptorSet storage_buffer[2] = {};
+      storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      storage_buffer[0].dstBinding = 0;
+      storage_buffer[0].descriptorCount = 1;
+      storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      storage_buffer[0].pBufferInfo = &vb_info;
 
-      descriptors[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[1].dstBinding = 1;
-      descriptors[1].descriptorCount = 1;
-      descriptors[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[1].pBufferInfo = &mb_info;
+      storage_buffer[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      storage_buffer[1].dstBinding = 1;
+      storage_buffer[1].descriptorCount = 1;
+      storage_buffer[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      storage_buffer[1].pBufferInfo = &mb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(descriptors), descriptors);
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
       u32 meshlet_limit = 0xffff;
       u32 draw_calls = context->meshlet_count / meshlet_limit;
@@ -1042,18 +1041,18 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          1,
          1,
          &context->descriptor_set[1],
-         0, 0             // dynamic offsets count and array
+         0,
+         0
       );
 
-      // TODO: descriptor templates
-      VkWriteDescriptorSet descriptors[1] = {};
-      descriptors[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptors[0].dstBinding = 0;
-      descriptors[0].descriptorCount = 1;
-      descriptors[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      descriptors[0].pBufferInfo = &vb_info;
+      VkWriteDescriptorSet storage_buffer[1] = {};
+      storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      storage_buffer[0].dstBinding = 0;
+      storage_buffer[0].descriptorCount = 1;
+      storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      storage_buffer[0].pBufferInfo = &vb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(descriptors), descriptors);
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
