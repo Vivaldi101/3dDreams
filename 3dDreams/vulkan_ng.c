@@ -1563,10 +1563,10 @@ void vk_initialize(hw* hw)
    vk_context* context = push(&hw->vk_storage, vk_context);
 
    // app callbacks
-   hw->renderer.backends[VK_RENDERER_INDEX] = context;
+   hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
    hw->renderer.frame_present = vk_present;
    hw->renderer.frame_resize = vk_resize;
-   hw->renderer.renderer_index = VK_RENDERER_INDEX;
+   hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
    context->storage = &hw->vk_storage;
 
@@ -1599,6 +1599,7 @@ void vk_initialize(hw* hw)
    }
 #endif
 
+   // TODO: allocator
    VkAllocationCallbacks allocator = {};
    context->allocator = allocator;
 
@@ -1654,7 +1655,7 @@ void vk_initialize(hw* hw)
 
 void vk_uninitialize(hw* hw)
 {
-   vk_context* context = hw->renderer.backends[VK_RENDERER_INDEX];
+   vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
    vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
    vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");

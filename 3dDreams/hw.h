@@ -20,7 +20,7 @@
 // TODO: Move this to general renderer.h
 enum
 {
-   VK_RENDERER_INDEX,
+   VULKAN_RENDERER_INDEX,
    D3D12_RENDERER_INDEX,
    SOFT_RENDERER_INDEX,
    RENDERER_COUNT
