@@ -33,6 +33,13 @@ vec3 hsv_to_rgb(vec3 c)
 
 void main()
 {
-   float ndot = dot(in_normal, normalize(vec3(-1.0, 1.0, 1.0)));
+   //float ndot = dot(in_normal, normalize(vec3(-1.0, 1.0, 1.0)));
    out_color = texture(textures[0], in_uv);
+
+   //vec4 texSample = texture(textures[0], in_uv);
+   //vec4 result = mod(vec4(ndot), texSample);  // modulate ndot across RGBA
+   //out_color = result;
+   //vec4 texcolor = texture(textures[0], in_uv);
+   //float alpha = 0.1; // 50% translucent
+   //out_color = vec4(texcolor.rgb, alpha);
 }

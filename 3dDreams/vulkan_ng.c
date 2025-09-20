@@ -29,7 +29,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 }
 
 // TODO: clean up these top-level read apis
-static void obj_file_read(vk_context* context, void *user_context, s8 filename)
+static void vk_obj_file_read(vk_context* context, void *user_context, s8 filename)
 {
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
@@ -51,8 +51,9 @@ static void obj_file_read(vk_context* context, void *user_context, s8 filename)
    tinyobj_attrib_free(&attrib);
 }
 
-static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
+static void vk_gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
+   // TODO: NO max_paths!!
    char file_path[MAX_PATH] = {};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O and use our scratch arenas
@@ -66,7 +67,7 @@ static void gltf_file_read(vk_context* context, void *user_context, s8 filename)
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!gltf_load(context, gltf_file_path))
+   if(!vk_gltf_load(context, gltf_file_path))
       hw_message_box("Could not load .gltf file");
 }
 
@@ -333,14 +334,14 @@ static void vk_assets_load(vk_context* context, s8 asset_file)
       obj_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
-      obj_file_read(context, &user_data, asset_file);
+      vk_obj_file_read(context, &user_data, asset_file);
    }
    else if(s8_is_substr(asset_file, s8(".gltf")))
    {
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
-      gltf_file_read(context, &user_data, asset_file);
+      vk_gltf_file_read(context, &user_data, asset_file);
    }
    else
       hw_message_box("Unsupported asset format");
