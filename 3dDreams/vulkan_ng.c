@@ -968,6 +968,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
    {
+      // bind bindless textures
       vkCmdBindDescriptorSets(
          command_buffer,
          VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -990,6 +991,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       mb_info.offset = 0;
       mb_info.range = context->mb.size;
 
+      // update the vertex and meshlet storage buffers
       VkWriteDescriptorSet storage_buffer[2] = {};
       storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[0].dstBinding = 0;
@@ -1034,6 +1036,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    {
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
+      // bind bindless textures
       vkCmdBindDescriptorSets(
          command_buffer,
          VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1045,6 +1048,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          0
       );
 
+      // update the vertex storage buffer
       VkWriteDescriptorSet storage_buffer[1] = {};
       storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[0].dstBinding = 0;
