@@ -672,11 +672,7 @@ static bool vk_gltf_load(vk_context* context, s8 gltf_path)
    }
 
    cgltf_free(data);
-
-   vk_descriptors_load(context, *context->storage);
    vk_geometry_load(context, *context->storage, vertices.count, vertices.data, indices.count, indices.data);
-
-   vk_textures_log(context);
 
    return true;
 }

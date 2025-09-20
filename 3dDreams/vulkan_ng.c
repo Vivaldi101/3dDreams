@@ -1634,6 +1634,9 @@ void vk_initialize(hw* hw)
 
    vk_assets_load(context, hw->state.gltf_file);
 
+   vk_descriptors_load(context, *context->storage);
+   vk_textures_log(context);
+
    VkPipelineCache cache = 0; // TODO: enable
 
    context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
