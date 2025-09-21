@@ -380,23 +380,25 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
    // TODO: semcompress these descriptor sets out
    u32 descriptor_count = 1 << 16;
 
-   VkDescriptorPoolSize pool_size = {
+   VkDescriptorPoolSize pool_size =
+   {
       .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
       .descriptorCount = descriptor_count
    };
 
-   VkDescriptorPoolCreateInfo pool_info = {
+   VkDescriptorPoolCreateInfo pool_info =
+   {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
        .maxSets = 1,
        .poolSizeCount = 1,
        .pPoolSizes = &pool_size
    };
 
-   VkDescriptorPool descriptor_pool;
-
+   VkDescriptorPool descriptor_pool = 0;
    vk_assert(vkCreateDescriptorPool(context->logical_device, &pool_info, 0, &descriptor_pool));
 
-   VkSamplerCreateInfo sampler_info = {
+   VkSamplerCreateInfo sampler_info =
+   {
        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
        .magFilter = VK_FILTER_LINEAR,
        .minFilter = VK_FILTER_LINEAR,
@@ -418,7 +420,8 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
    VkSampler immutable_sampler;
    vk_assert(vkCreateSampler(context->logical_device, &sampler_info, 0, &immutable_sampler));
 
-   VkDescriptorSetLayoutBinding binding = {
+   VkDescriptorSetLayoutBinding binding =
+   {
        .binding = 0,
        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
        .descriptorCount = descriptor_count,
@@ -428,13 +431,15 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
 
    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
-   VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info = {
+   VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info =
+   {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
        .bindingCount = 1,
        .pBindingFlags = &binding_flags
    };
 
-   VkDescriptorSetLayoutCreateInfo layout_info = {
+   VkDescriptorSetLayoutCreateInfo layout_info =
+   {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
        .pNext = &binding_flags_info,
        .bindingCount = 1,
@@ -444,7 +449,8 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
    VkDescriptorSetLayout descriptor_set_layout = 0;
    vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &layout_info, 0, &descriptor_set_layout));
 
-   VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info = {
+   VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info =
+   {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
        .descriptorSetCount = 1,
        .pDescriptorCounts = &context->textures.count,
@@ -475,7 +481,8 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
       image_infos.data[i].sampler = immutable_sampler;
    }
 
-   VkWriteDescriptorSet write = {
+   VkWriteDescriptorSet write =
+   {
        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
        .dstSet = descriptor_set,
        .dstBinding = 0,

@@ -3,10 +3,11 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+#extension GL_ARB_shader_draw_parameters : require
 
 #include "mesh.h"
 
-layout(push_constant) uniform push_constants_uniform
+layout(push_constant) uniform block
 {
     mat4 projection;
     mat4 view;
@@ -15,9 +16,9 @@ layout(push_constant) uniform push_constants_uniform
    float far;
    float ar;
    uint meshlet_offset;
-} push_constants;
+} globals;
 
-layout(set = 0, binding = 0) readonly buffer Verts
+layout(binding = 0) readonly buffer Verts
 {
    vertex verts[];
 };
@@ -29,15 +30,16 @@ layout(location = 3) flat out uint textureID;  // pass to fragment shader
 
 void main()
 {
+    int i = gl_DrawIDARB;
     vertex v = verts[gl_VertexIndex];
 
     vec3 local_pos = vec3(v.vx, v.vy, v.vz);
-    vec4 world_pos = push_constants.model * vec4(local_pos, 1.0);
-    gl_Position = push_constants.projection * push_constants.view * world_pos;
+    vec4 world_pos = globals.model * vec4(local_pos, 1.0);
+    gl_Position = globals.projection * globals.view * world_pos;
 
     // Decode normal and transform to world space using inverse transpose
     vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
-    mat3 normal_matrix = transpose(inverse(mat3(push_constants.model)));
+    mat3 normal_matrix = transpose(inverse(mat3(globals.model)));
     vec3 world_normal = normalize(normal_matrix * normal);
     vec2 texcoord = vec2(v.tu, v.tv);
 

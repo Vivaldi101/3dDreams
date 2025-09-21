@@ -119,7 +119,7 @@ align_struct
 align_struct
 {
    // TODO: array(VkFramebuffer) framebuffers
-   VkFramebuffer framebuffers[MAX_VULKAN_OBJECT_COUNT];
+   array(VkFramebuffer) framebuffers;
    array(vk_mesh_draw) mesh_draws;
    array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;

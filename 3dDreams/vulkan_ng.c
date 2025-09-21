@@ -805,14 +805,16 @@ static void vk_swapchain_destroy(vk_context* context)
    vkDeviceWaitIdle(context->logical_device);
    for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
    {
-      vkDestroyFramebuffer(context->logical_device, context->framebuffers[i], 0);
       vkDestroyImageView(context->logical_device, context->swapchain_info.image_views[i], 0);
       vkDestroyImageView(context->logical_device, context->swapchain_info.depth_views[i], 0);
    }
+   for(u32 i = 0; i < context->framebuffers.count; ++i)
+      vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
 
    vkDestroySwapchainKHR(context->logical_device, context->swapchain_info.swapchain, 0);
 }
 
+// TODO: Break into separate routines
 static void vk_swapchain_update(vk_context* context)
 {
    vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_info.swapchain, &context->swapchain_info.image_count, context->swapchain_info.images));
@@ -828,7 +830,8 @@ static void vk_swapchain_update(vk_context* context)
 
       VkImageView attachments[2] = {context->swapchain_info.image_views[i], context->swapchain_info.depth_views[i]};
 
-      context->framebuffers[i] = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_info, attachments, array_count(attachments));
+      VkFramebuffer fb = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_info, attachments, array_count(attachments));
+      context->framebuffers.data[i] = fb;
    }
 }
 
@@ -892,7 +895,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    VkRenderPassBeginInfo renderpass_info = {vk_info_begin(RENDER_PASS)};
    renderpass_info.renderPass = context->renderpass;
-   renderpass_info.framebuffer = context->framebuffers[image_index];
+   renderpass_info.framebuffer = context->framebuffers.data[image_index];
    renderpass_info.renderArea.extent = (VkExtent2D)
    {context->swapchain_info.image_width, context->swapchain_info.image_height};
 
@@ -1619,9 +1622,13 @@ void vk_initialize(hw* hw)
    context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
    context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_info.format, VK_FORMAT_D32_SFLOAT);
 
-   hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
+   context->framebuffers.arena = context->storage;
+   array_resize(context->framebuffers, context->swapchain_info.image_count);
 
-   vk_swapchain_update(context);
+   for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
+      array_add(context->framebuffers, VK_NULL_HANDLE);
+
+   hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, "bin\\assets\\shaders");

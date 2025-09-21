@@ -10,7 +10,7 @@
 
 #include "mesh.h"
 
-layout(push_constant) uniform push_constants_uniform
+layout(push_constant) uniform block
 {
     mat4 projection;
     mat4 view;
@@ -19,7 +19,7 @@ layout(push_constant) uniform push_constants_uniform
    float far;
    float ar;
    uint meshlet_offset;
-} push_constants;
+} globals;
 
 // number of threads inside the work group
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
@@ -64,7 +64,7 @@ uint32_t hash_index(uint32_t a)
 
 void main()
 {
-    uint mi = gl_WorkGroupID.x + push_constants.meshlet_offset;
+    uint mi = gl_WorkGroupID.x + globals.meshlet_offset;
     uint ti = gl_LocalInvocationID.x;
 
     uint vertex_count = meshlets[mi].vertex_count;
@@ -84,7 +84,7 @@ void main()
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
       vertex v = verts[vi];
-      vec4 vo = push_constants.projection * push_constants.view * push_constants.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * globals.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 
