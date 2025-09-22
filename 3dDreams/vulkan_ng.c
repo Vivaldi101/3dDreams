@@ -805,8 +805,8 @@ static void vk_swapchain_destroy(vk_context* context)
    vkDeviceWaitIdle(context->logical_device);
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views[i], 0);
-      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views[i], 0);
+      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views.data[i], 0);
+      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views.data[i], 0);
    }
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
@@ -823,12 +823,12 @@ static void vk_swapchain_update(vk_context* context)
 
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      context->swapchain_images.depths[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
+      context->swapchain_images.depths.data[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
 
-      context->swapchain_images.image_views[i] = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i], VK_IMAGE_ASPECT_COLOR_BIT);
-      context->swapchain_images.depth_views[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+      context->swapchain_images.image_views.data[i] = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i], VK_IMAGE_ASPECT_COLOR_BIT);
+      context->swapchain_images.depth_views.data[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths.data[i], VK_IMAGE_ASPECT_DEPTH_BIT);
 
-      VkImageView attachments[2] = {context->swapchain_images.image_views[i], context->swapchain_images.depth_views[i]};
+      VkImageView attachments[2] = {context->swapchain_images.image_views.data[i], context->swapchain_images.depth_views.data[i]};
 
       VkFramebuffer fb = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
       context->framebuffers.data[i] = fb;
@@ -935,7 +935,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-   VkImage depth_image = context->swapchain_images.depths[image_index];
+   VkImage depth_image = context->swapchain_images.depths.data[image_index];
    VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
@@ -1622,15 +1622,33 @@ void vk_initialize(hw* hw)
    context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
    context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_surface.format, VK_FORMAT_D32_SFLOAT);
 
+   // framebuffers
    context->framebuffers.arena = context->storage;
    array_resize(context->framebuffers, context->swapchain_surface.image_count);
-   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
-      array_add(context->framebuffers, VK_NULL_HANDLE);
 
+   // images
    context->swapchain_images.images.arena = context->storage;
    array_resize(context->swapchain_images.images, context->swapchain_surface.image_count);
+
+   context->swapchain_images.depths.arena = context->storage;
+   array_resize(context->swapchain_images.depths, context->swapchain_surface.image_count);
+
+   // views
+   context->swapchain_images.image_views.arena = context->storage;
+   array_resize(context->swapchain_images.image_views, context->swapchain_surface.image_count);
+
+   context->swapchain_images.depth_views.arena = context->storage;
+   array_resize(context->swapchain_images.depth_views, context->swapchain_surface.image_count);
+
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
+   {
+      array_add(context->framebuffers, VK_NULL_HANDLE);
       array_add(context->swapchain_images.images, VK_NULL_HANDLE);
+      array_add(context->swapchain_images.depths, VK_NULL_HANDLE);
+
+      array_add(context->swapchain_images.image_views, VK_NULL_HANDLE);
+      array_add(context->swapchain_images.depth_views, VK_NULL_HANDLE);
+   }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 

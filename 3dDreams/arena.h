@@ -46,7 +46,7 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
-#define array(T) struct array##T { arena* arena; size count; T* data; }
+#define array(T) struct { arena* arena; size count; T* data; }
 
 typedef struct array
 {

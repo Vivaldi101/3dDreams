@@ -60,9 +60,9 @@ align_struct vk_swapchain_surface
 align_struct vk_swapchain_images
 {
    array(VkImage) images;
-   VkImage depths[MAX_VULKAN_OBJECT_COUNT];
-   VkImageView image_views[MAX_VULKAN_OBJECT_COUNT];
-   VkImageView depth_views[MAX_VULKAN_OBJECT_COUNT];
+   array(VkImage) depths;
+   array(VkImageView) image_views;
+   array(VkImageView) depth_views;
 } vk_swapchain_images;
 
 align_struct
