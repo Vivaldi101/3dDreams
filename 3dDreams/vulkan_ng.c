@@ -652,9 +652,6 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
       return (vk_swapchain_surface) {};
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_width, swapchain_height, context->surface);
-
-   // TODO: this is not used???
    VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
 
    if(surface_caps.currentExtent.width != UINT32_MAX)
@@ -667,6 +664,8 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.width = clamp(swapchain_extent.width, min_extent.width, max_extent.width);
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
+
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_extent.width, swapchain_extent.height, context->surface);
 
    swapchain_info.swapchain = vk_swapchain_create(context->logical_device, &swapchain_info, queue_family_index);
 
