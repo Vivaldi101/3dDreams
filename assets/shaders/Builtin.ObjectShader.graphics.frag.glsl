@@ -31,16 +31,77 @@ vec3 hsv_to_rgb(vec3 c)
 }
 #endif
 
+float G1(float NdotX, float k)
+{
+   return NdotX / (NdotX * (1.0 - k) + k);
+}
+
+#if 0
+// Utility to unpack normal from normal map
+vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
+{
+    vec3 tangentNormal = texture(normal, uv).xyz * 2.0 - 1.0;
+
+    mat3 TBN = mat3(tangent, bitangent, normal);
+    return normalize(TBN * tangentNormal);
+}
+#endif
+
 void main()
 {
-   float ndot = dot(in_normal, normalize(vec3(-1.0, 1.0, 1.0)));
-   out_color = vec4(ndot/4.f, ndot/2.f, ndot/1.f, 1.f);
+    vec3 albedo = pow(texture(textures[0], in_uv).rgb, vec3(2.2)); // sRGB to linear
+    vec3 mr      = texture(textures[1], in_uv).rgb;
+    float roughness = mr.g;
+    float metallic  = mr.b;
+    vec3 emissive   = texture(textures[2], in_uv).rgb;  // apply factor if needed
+    float ao        = texture(textures[3], in_uv).r;
 
-   out_color = texture(textures[0], in_uv);
+    vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z
+    vec3 lightPos  = vec3(0.0, 1.0, 1.0);      // point light
+    vec3 lightColor = vec3(1.0, 1.0, 1.0);     // white
 
-   //vec4 texSample = texture(textures[0], in_uv);
-   //out_color = result;
-   //vec4 texcolor = texture(textures[0], in_uv);
-   //float alpha = 0.1; // 50% translucent
-   //out_color = vec4(texcolor.rgb, alpha);
+    // --- Normals ---
+    vec3 N = normalize(in_normal); // if you have tangents, use getNormalFromMap
+    vec3 V = normalize(cameraPos - in_world_frag_pos);
+    vec3 L = normalize(lightPos - in_world_frag_pos);
+    vec3 H = normalize(V + L);
+
+    // --- PBR Lighting ---
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+
+    // Fresnel-Schlick
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+    vec3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+
+    // Normal Distribution (GGX)
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
+    float D = a2 / (3.141592 * denom * denom);
+
+    float k = (roughness + 1.0);
+    k = (k * k) / 8.0;
+    float G = G1(NdotV, k) * G1(NdotL, k);
+
+    // Cook-Torrance BRDF
+    vec3 numerator = D * G * F;
+    float denominator = 4.0 * NdotV * NdotL + 0.001;
+    vec3 specular = numerator / denominator;
+
+    // Energy conservation
+    vec3 kS = F;
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+
+    // Final lighting
+    vec3 diffuse = kD * albedo / 3.141592;
+    vec3 radiance = lightColor;
+
+    vec3 color = (diffuse + specular) * radiance * NdotL;
+    color = color * ao; // apply AO
+    color += emissive;  // add emissive
+
+    // gamma correction back to sRGB
+    out_color = vec4(pow(color, vec3(1.0/2.2)), 1.0);
 }
