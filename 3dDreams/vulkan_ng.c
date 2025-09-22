@@ -389,23 +389,23 @@ static VkFormat vk_swapchain_format(VkPhysicalDevice physical_device, VkSurfaceK
    return formats[0].format;
 }
 
-static vk_swapchain_surface_info vk_window_swapchain_surface_info(VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
 
-   vk_swapchain_surface_info result = {};
+   vk_swapchain_surface result = {};
 
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps)))
-      return (vk_swapchain_surface_info){0};
+      return (vk_swapchain_surface){0};
 
    // triple buffering
    if(surface_caps.minImageCount < 2)
-      return (vk_swapchain_surface_info){0};
+      return (vk_swapchain_surface){0};
 
    if(!implies(surface_caps.maxImageCount != 0, surface_caps.maxImageCount >= surface_caps.minImageCount + 1))
-      return (vk_swapchain_surface_info){0};
+      return (vk_swapchain_surface){0};
 
    u32 image_count = surface_caps.minImageCount + 1;
 
@@ -616,7 +616,7 @@ static VkSemaphore vk_semaphore_create(VkDevice logical_device)
    return sema;
 }
 
-static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_surface_info* surface_info, u32 queue_family_index)
+static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_surface* surface_info, u32 queue_family_index)
 {
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(surface_info->surface));
@@ -646,14 +646,15 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_
    return swapchain;
 }
 
-static vk_swapchain_surface_info vk_swapchain_info_create(vk_context* context, u32 swapchain_width, u32 swapchain_height, u32 queue_family_index)
+static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height, u32 queue_family_index)
 {
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
-      return (vk_swapchain_surface_info) {};
+      return (vk_swapchain_surface) {};
 
-   vk_swapchain_surface_info swapchain_info = vk_window_swapchain_surface_info(context->physical_device, swapchain_width, swapchain_height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_width, swapchain_height, context->surface);
 
+   // TODO: this is not used???
    VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
 
    if(surface_caps.currentExtent.width != UINT32_MAX)
@@ -756,7 +757,7 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color
    return renderpass;
 }
 
-static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, vk_swapchain_surface_info* surface_info, VkImageView* attachments, u32 attachment_count)
+static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, vk_swapchain_surface* surface_info, VkImageView* attachments, u32 attachment_count)
 {
    assert(vk_valid_handle(logical_device));
    assert(vk_valid_handle(renderpass));
@@ -803,34 +804,34 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
 static void vk_swapchain_destroy(vk_context* context)
 {
    vkDeviceWaitIdle(context->logical_device);
-   for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
+   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      vkDestroyImageView(context->logical_device, context->swapchain_info.image_views[i], 0);
-      vkDestroyImageView(context->logical_device, context->swapchain_info.depth_views[i], 0);
+      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views[i], 0);
+      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views[i], 0);
    }
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_info.swapchain, 0);
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.swapchain, 0);
 }
 
 // TODO: Break into separate routines
 static void vk_swapchain_update(vk_context* context)
 {
-   vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_info.swapchain, &context->swapchain_info.image_count, context->swapchain_info.images));
+   vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_surface.swapchain, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
 
-   VkExtent3D depth_extent = {context->swapchain_info.image_width, context->swapchain_info.image_height, 1};
+   VkExtent3D depth_extent = {context->swapchain_surface.image_width, context->swapchain_surface.image_height, 1};
 
-   for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
+   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      context->swapchain_info.depths[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
+      context->swapchain_images.depths[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
 
-      context->swapchain_info.image_views[i] = vk_image_view_create(context, context->swapchain_info.format, context->swapchain_info.images[i], VK_IMAGE_ASPECT_COLOR_BIT);
-      context->swapchain_info.depth_views[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_info.depths[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+      context->swapchain_images.image_views[i] = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i], VK_IMAGE_ASPECT_COLOR_BIT);
+      context->swapchain_images.depth_views[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths[i], VK_IMAGE_ASPECT_DEPTH_BIT);
 
-      VkImageView attachments[2] = {context->swapchain_info.image_views[i], context->swapchain_info.depth_views[i]};
+      VkImageView attachments[2] = {context->swapchain_images.image_views[i], context->swapchain_images.depth_views[i]};
 
-      VkFramebuffer fb = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_info, attachments, array_count(attachments));
+      VkFramebuffer fb = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
       context->framebuffers.data[i] = fb;
    }
 }
@@ -858,7 +859,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    vkDeviceWaitIdle(context->logical_device);
 
    vk_swapchain_destroy(context);
-   context->swapchain_info = vk_swapchain_info_create(context, width, height, context->queue_family_index);
+   context->swapchain_surface = vk_swapchain_surface_create(context, width, height, context->queue_family_index);
    vk_swapchain_update(context);
 
    printf("Viewport resized: [%u %u]\n", width, height);
@@ -880,10 +881,10 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
-   VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_info.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
+   VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_surface.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain_info.image_width, context->swapchain_info.image_height);
+      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
 
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
@@ -897,7 +898,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    renderpass_info.renderPass = context->renderpass;
    renderpass_info.framebuffer = context->framebuffers.data[image_index];
    renderpass_info.renderArea.extent = (VkExtent2D)
-   {context->swapchain_info.image_width, context->swapchain_info.image_height};
+   {context->swapchain_surface.image_width, context->swapchain_surface.image_height};
 
    VkCommandBuffer command_buffer = context->command_buffer;
 
@@ -906,7 +907,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
    vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
-   const f32 ar = (f32)context->swapchain_info.image_width / context->swapchain_info.image_height;
+   const f32 ar = (f32)context->swapchain_surface.image_width / context->swapchain_surface.image_height;
 
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
@@ -930,12 +931,12 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    renderpass_info.clearValueCount = 2;
    renderpass_info.pClearValues = clear;
 
-   VkImage color_image = context->swapchain_info.images[image_index];
+   VkImage color_image = context->swapchain_images.images.data[image_index];
    VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-   VkImage depth_image = context->swapchain_info.depths[image_index];
+   VkImage depth_image = context->swapchain_images.depths[image_index];
    VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
@@ -947,9 +948,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    // y-is-up
    viewport.x = 0.0f;
-   viewport.y = (f32)context->swapchain_info.image_height;
-   viewport.width = (f32)context->swapchain_info.image_width;
-   viewport.height = -(f32)context->swapchain_info.image_height;
+   viewport.y = (f32)context->swapchain_surface.image_height;
+   viewport.width = (f32)context->swapchain_surface.image_width;
+   viewport.height = -(f32)context->swapchain_surface.image_height;
 
    viewport.minDepth = 0.0f;
    viewport.maxDepth = 1.0f;
@@ -957,8 +958,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    VkRect2D scissor = {};
    scissor.offset.x = 0;
    scissor.offset.y = 0;
-   scissor.extent.width = (u32)context->swapchain_info.image_width;
-   scissor.extent.height = (u32)context->swapchain_info.image_height;
+   scissor.extent.width = (u32)context->swapchain_surface.image_width;
+   scissor.extent.height = (u32)context->swapchain_surface.image_height;
 
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
@@ -1128,7 +1129,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
-   present_info.pSwapchains = &context->swapchain_info.swapchain;
+   present_info.pSwapchains = &context->swapchain_surface.swapchain;
 
    present_info.pImageIndices = &image_index;
 
@@ -1138,7 +1139,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain_info.image_width, context->swapchain_info.image_height);
+      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
 
    if(present_result != VK_SUCCESS)
       return;
@@ -1619,14 +1620,18 @@ void vk_initialize(hw* hw)
    context->query_pool = vk_query_pool_create(context->logical_device, context->query_pool_size);
    context->command_pool = vk_command_pool_create(context->logical_device, context->queue_family_index);
    context->command_buffer = vk_command_buffer_create(context->logical_device, context->command_pool);
-   context->swapchain_info = vk_swapchain_info_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
-   context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_info.format, VK_FORMAT_D32_SFLOAT);
+   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
+   context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_surface.format, VK_FORMAT_D32_SFLOAT);
 
    context->framebuffers.arena = context->storage;
-   array_resize(context->framebuffers, context->swapchain_info.image_count);
-
-   for(u32 i = 0; i < context->swapchain_info.image_count; ++i)
+   array_resize(context->framebuffers, context->swapchain_surface.image_count);
+   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
       array_add(context->framebuffers, VK_NULL_HANDLE);
+
+   context->swapchain_images.images.arena = context->storage;
+   array_resize(context->swapchain_images.images, context->swapchain_surface.image_count);
+   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
+      array_add(context->swapchain_images.images, VK_NULL_HANDLE);
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
@@ -1684,7 +1689,7 @@ void vk_uninitialize(hw* hw)
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_info.swapchain, 0);
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.swapchain, 0);
    vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);

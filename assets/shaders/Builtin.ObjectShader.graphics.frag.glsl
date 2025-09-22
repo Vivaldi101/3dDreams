@@ -49,19 +49,21 @@ vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 
 void main()
 {
+    // TODO: just for testing!!!
     vec3 albedo = pow(texture(textures[0], in_uv).rgb, vec3(2.2)); // sRGB to linear
     vec3 mr      = texture(textures[1], in_uv).rgb;
     float roughness = mr.g;
     float metallic  = mr.b;
     vec3 emissive   = texture(textures[2], in_uv).rgb;  // apply factor if needed
     float ao        = texture(textures[3], in_uv).r;
+    vec3 normal     = texture(textures[4], in_uv).rgb;
 
     vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z
     vec3 lightPos  = vec3(0.0, 1.0, 1.0);      // point light
     vec3 lightColor = vec3(1.0, 1.0, 1.0);     // white
 
     // --- Normals ---
-    vec3 N = normalize(in_normal); // if you have tangents, use getNormalFromMap
+    vec3 N = normalize(normal); // if you have tangents, use getNormalFromMap
     vec3 V = normalize(cameraPos - in_world_frag_pos);
     vec3 L = normalize(lightPos - in_world_frag_pos);
     vec3 H = normalize(V + L);

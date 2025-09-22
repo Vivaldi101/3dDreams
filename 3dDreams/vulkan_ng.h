@@ -47,21 +47,23 @@
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 typedef enum file_format { FILE_FORMAT_OBJ = 0, FILE_FORMAT_GLTF = 1 } file_format;
 
-align_struct vk_swapchain_surface_info
+align_struct vk_swapchain_surface
 {
    u32 image_width;
    u32 image_height;
    u32 image_count;
-
-   VkSurfaceKHR surface;
-   VkSwapchainKHR swapchain;
-
    VkFormat format;
-   VkImage images[MAX_VULKAN_OBJECT_COUNT];
+   VkSurfaceKHR surface;   // rename to handle
+   VkSwapchainKHR swapchain; // this should be elsewhere
+} vk_swapchain_surface;
+
+align_struct vk_swapchain_images
+{
+   array(VkImage) images;
    VkImage depths[MAX_VULKAN_OBJECT_COUNT];
    VkImageView image_views[MAX_VULKAN_OBJECT_COUNT];
    VkImageView depth_views[MAX_VULKAN_OBJECT_COUNT];
-} vk_swapchain_surface_info;
+} vk_swapchain_images;
 
 align_struct
 {
@@ -118,7 +120,6 @@ align_struct
 
 align_struct
 {
-   // TODO: array(VkFramebuffer) framebuffers
    array(VkFramebuffer) framebuffers;
    array(vk_mesh_draw) mesh_draws;
    array(vk_mesh_instance) mesh_instances;
@@ -127,7 +128,7 @@ align_struct
    VkInstance instance;
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
-   VkSurfaceKHR surface;
+   VkSurfaceKHR surface;   // TODO: this should be in vk_swapchain_surface
    u32 descriptor_count;
    VkDescriptorSet descriptor_set[2]; // TODO: array(VkDescriptorSetLayout)
    VkDescriptorSetLayout descriptor_set_layouts[2]; // TODO: array(VkDescriptorSetLayout)
@@ -156,10 +157,10 @@ align_struct
 
    u32 max_meshlet_count;
 
-   // TODO: array(meshlet)
    u32 meshlet_count;
 
-   vk_swapchain_surface_info swapchain_info;
+   vk_swapchain_surface swapchain_surface;
+   vk_swapchain_images swapchain_images;
 
    arena* storage;
 
