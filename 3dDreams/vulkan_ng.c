@@ -19,7 +19,6 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 
    arena project_dir = vk_project_directory(&user_data->scratch);
 
-   wsprintf(file_path, project_dir.beg, array_count(file_path));
    wsprintf(file_path, "%s\\assets\\objs\\%s", (const char*)project_dir.beg, filename);
 
    arena file_read = win32_file_read(&user_data->scratch, file_path);
@@ -53,26 +52,16 @@ static void vk_obj_file_read(vk_context* context, void *user_context, s8 filenam
 
 static void vk_gltf_file_read(vk_context* context, void *user_context, s8 filename)
 {
-   // TODO: NO max_paths!!
-   char file_path[MAX_PATH] = {};
-
-   // TODO: pass our own file IO callbacks in the options instead of the default I/O and use our scratch arenas
+   array(char) file_path = {.arena = context->storage};
    gltf_user_ctx* user_data = (gltf_user_ctx*)user_context;
 
    arena project_dir = vk_project_directory(&user_data->scratch);
+   file_path.count = filename.len + ((char*)project_dir.end - project_dir.beg);
 
-   wsprintf(file_path, project_dir.beg, array_count(file_path));
-   wsprintf(file_path, "%s\\assets\\gltf\\%s", (const char*)project_dir.beg, filename.data);
+   array_resize(file_path, file_path.count);
+   wsprintf(file_path.data, "%s\\assets\\gltf\\%s", (const char*)project_dir.beg, filename.data);
 
-   s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
-
-   // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   vk_bos bos = vk_gltf_load(context, gltf_file_path);
-
-   if(!bos.ib.memory || !bos.vb.memory || !bos.mb.memory)
-      hw_message_box("Could not load .gltf file");
-
-   context->bos = bos;
+   context->bos = vk_gltf_load(context, (s8){.data = (u8*)file_path.data,.len = file_path.count});
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
@@ -970,6 +959,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vb_info.offset = 0;
    vb_info.range = context->bos.vb.size;
 
+   assert(vb_info.buffer);
+   assert(vb_info.range > 0);
+
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
@@ -996,6 +988,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       mb_info.buffer = context->bos.mb.handle;
       mb_info.offset = 0;
       mb_info.range = context->bos.mb.size;
+
+      assert(mb_info.buffer);
+      assert(mb_info.range > 0);
 
       // update the vertex and meshlet storage buffers
       VkWriteDescriptorSet storage_buffer[2] = {};
@@ -1064,6 +1059,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
+      assert(context->bos.ib.handle);
       vkCmdBindIndexBuffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
 #if 1

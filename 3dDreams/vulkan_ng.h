@@ -164,7 +164,7 @@ align_struct
 
    spv_hash_table shader_modules;
 
-   vk_bos bos;
+   vk_bos bos; // buffer objects
 
    u32 meshlet_count;
 
