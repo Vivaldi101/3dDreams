@@ -50,8 +50,10 @@ static void vk_obj_file_read(vk_context* context, void *user_context, s8 filenam
    tinyobj_attrib_free(&attrib);
 }
 
-static void vk_gltf_file_read(vk_context* context, void *user_context, s8 filename)
+static vk_buffer_objects vk_gltf_read(vk_context* context, void *user_context, s8 filename)
 {
+   vk_buffer_objects result = {};
+
    array(char) file_path = {.arena = context->storage};
    gltf_user_ctx* user_data = (gltf_user_ctx*)user_context;
 
@@ -61,7 +63,9 @@ static void vk_gltf_file_read(vk_context* context, void *user_context, s8 filena
    array_resize(file_path, file_path.count);
    wsprintf(file_path.data, "%s\\assets\\gltf\\%s", (const char*)project_dir.beg, filename.data);
 
-   context->bos = vk_gltf_load(context, (s8){.data = (u8*)file_path.data,.len = file_path.count});
+   result = vk_gltf_load(context, (s8){.data = (u8*)file_path.data,.len = file_path.count});
+
+   return result;
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
@@ -320,24 +324,20 @@ static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer sc
    vk_assert(vkDeviceWaitIdle(context->logical_device));
 }
 
-static void vk_assets_load(vk_context* context, s8 asset_file)
+static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_file)
 {
-   if(s8_is_substr(asset_file, s8(".obj")))
-   {
-      obj_user_ctx user_data = {};
-      user_data.scratch = *context->storage;
+   vk_buffer_objects result = {};
 
-      vk_obj_file_read(context, &user_data, asset_file);
-   }
-   else if(s8_is_substr(asset_file, s8(".gltf")))
+   if(s8_is_substr(asset_file, s8(".gltf")))
    {
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
-      vk_gltf_file_read(context, &user_data, asset_file);
+      result = vk_gltf_read(context, &user_data, asset_file);
    }
-   else
-      hw_message_box("Unsupported asset format");
+   else hw_message_box("Unsupported asset format");
+
+   return result;
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
@@ -973,7 +973,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          context->rtx_pipeline_layout,
          1,
          1,
-         &context->descriptor_set[1],
+         &context->descriptors.set[1],
          0,
          0
       );
@@ -1044,7 +1044,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          context->pipeline_layout,
          1,
          1,
-         &context->descriptor_set[1],
+         &context->descriptors.set[1],
          0,
          0
       );
@@ -1687,17 +1687,17 @@ void vk_initialize(hw* hw)
 
    spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
-   vk_assets_load(context, hw->state.gltf_file);
+   context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
+   context->descriptors = vk_descriptors_create(context, *context->storage);
 
-   vk_descriptors_load(context, *context->storage);
    vk_textures_log(context);
 
    VkPipelineCache cache = 0; // TODO: enable
 
-   context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->descriptor_set_layouts, array_count(context->descriptor_set_layouts), false);
-   context->descriptor_set_layouts[0] = vk_pipeline_set_layout_create(context->logical_device, true);
-   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, context->descriptor_set_layouts, array_count(context->descriptor_set_layouts), true);
+   context->descriptors.layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
+   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->descriptors.layouts, array_count(context->descriptors.layouts), false);
+   context->descriptors.layouts[0] = vk_pipeline_set_layout_create(context->logical_device, true);
+   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, context->descriptors.layouts, array_count(context->descriptors.layouts), true);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
    context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);

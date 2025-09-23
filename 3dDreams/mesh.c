@@ -167,9 +167,9 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
 }
 
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
-static vk_bos obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
+static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
-   vk_bos result = {};
+   vk_buffer_objects result = {};
 
    context->mesh_draws.arena = context->storage;
    // single .obj mesh
@@ -300,8 +300,10 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static void vk_descriptors_load(vk_context* context, arena scratch)
+static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
 {
+   vk_descriptors result = {};
+
    // TODO: semcompress these descriptor sets out
    u32 descriptor_count = 1 << 16;
 
@@ -381,7 +383,8 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
        .pDescriptorCounts = &context->textures.count,
    };
 
-   VkDescriptorSetAllocateInfo alloc_info = {
+   VkDescriptorSetAllocateInfo alloc_info =
+   {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
        .pNext = &variable_count_info,
        .descriptorPool = descriptor_pool,
@@ -392,9 +395,9 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
    VkDescriptorSet descriptor_set;
    vk_assert(vkAllocateDescriptorSets(context->logical_device, &alloc_info, &descriptor_set));
 
-   context->descriptor_set[1] = descriptor_set;
-   context->descriptor_set_layouts[1] = descriptor_set_layout;
-   context->descriptor_count = descriptor_count;
+   result.set[1] = descriptor_set;
+   result.layouts[1] = descriptor_set_layout;
+   result.count = descriptor_count;
 
    array(VkDescriptorImageInfo) image_infos = { &scratch };
    array_resize(image_infos, context->textures.count);
@@ -418,31 +421,33 @@ static void vk_descriptors_load(vk_context* context, arena scratch)
    };
 
    vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
+
+   return result;
 }
 
-static vk_bos vk_gltf_load(vk_context* context, s8 gltf_path)
+static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
 {
-   vk_bos result = {};
+   vk_buffer_objects result = {};
 
    cgltf_options options = {0};
    cgltf_data* data = 0;
    cgltf_result gltf_result = cgltf_parse_file(&options, s8_data(gltf_path), &data);
 
    if(gltf_result != cgltf_result_success)
-      return (vk_bos){};
+      return (vk_buffer_objects){};
 
    gltf_result = cgltf_load_buffers(&options, data, s8_data(gltf_path));
    if(gltf_result != cgltf_result_success)
    {
       cgltf_free(data);
-      return (vk_bos){};
+      return (vk_buffer_objects){};
    }
 
    gltf_result = cgltf_validate(data);
    if(gltf_result != cgltf_result_success)
    {
       cgltf_free(data);
-      return (vk_bos){};
+      return (vk_buffer_objects){};
    }
 
    size index_offset = 0;
@@ -623,11 +628,11 @@ static vk_bos vk_gltf_load(vk_context* context, s8 gltf_path)
    result.mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    result.ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-   // upload vertex data
+   // vertex data
    vk_buffer_upload(context, result.vb, scratch_buffer, vertices.data, vb_size);
-   // upload index data
+   // index data
    vk_buffer_upload(context, result.ib, scratch_buffer, indices.data, ib_size);
-   // upload meshlet data
+   // meshlet data
    vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, mb_size);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);

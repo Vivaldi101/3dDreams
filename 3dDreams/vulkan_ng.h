@@ -78,7 +78,7 @@ align_struct
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
    vk_buffer mb;        // mesh buffer
-} vk_bos;
+} vk_buffer_objects;
 
 align_struct
 {
@@ -127,6 +127,13 @@ align_struct
 
 align_struct
 {
+   VkDescriptorSet set[2];             // TODO: array(VkDescriptorSetLayout)
+   VkDescriptorSetLayout layouts[2];   // TODO: array(VkDescriptorSetLayout)
+   u32 count;
+} vk_descriptors;
+
+align_struct
+{
    array(VkFramebuffer) framebuffers;
    array(vk_mesh_draw) mesh_draws;
    array(vk_mesh_instance) mesh_instances;
@@ -137,13 +144,11 @@ align_struct
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
    VkSurfaceKHR surface;
-   u32 descriptor_count;
    u32 query_pool_size;
 
-   VkDescriptorSet descriptor_set[2]; // TODO: array(VkDescriptorSetLayout)
-   VkDescriptorSetLayout descriptor_set_layouts[2]; // TODO: array(VkDescriptorSetLayout)
-
    VkAllocationCallbacks allocator;
+
+   vk_descriptors descriptors;
 
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;
@@ -164,7 +169,7 @@ align_struct
 
    spv_hash_table shader_modules;
 
-   vk_bos bos; // buffer objects
+   vk_buffer_objects bos; // buffer objects
 
    u32 meshlet_count;
 
@@ -179,14 +184,13 @@ align_struct
    bool rtx_supported;
 } vk_context;
 
-void vk_initialize(struct hw* hw);
-void vk_uninitialize(struct hw* hw);
-
-// TODO: place these in buffer.h
-static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size);
-static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
+void vk_initialize(hw* hw);
+void vk_uninitialize(hw* hw);
 
 typedef struct vertex vertex;
+// TODO: these in buffer.h
+static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size);
+static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
 static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
