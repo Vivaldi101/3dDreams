@@ -53,8 +53,7 @@ align_struct
    u32 image_height;
    u32 image_count;
    VkFormat format;
-   VkSurfaceKHR surface;   // rename to handle
-   VkSwapchainKHR swapchain; // this should be elsewhere
+   VkSwapchainKHR handle;
 } vk_swapchain_surface;
 
 align_struct
@@ -129,17 +128,21 @@ align_struct
    VkInstance instance;
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
-   VkSurfaceKHR surface;   // TODO: this should be in vk_swapchain_surface
+   VkSurfaceKHR surface;
    u32 descriptor_count;
+   u32 query_pool_size;
+
    VkDescriptorSet descriptor_set[2]; // TODO: array(VkDescriptorSetLayout)
    VkDescriptorSetLayout descriptor_set_layouts[2]; // TODO: array(VkDescriptorSetLayout)
+
    VkAllocationCallbacks allocator;
+
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;
+
    VkQueue graphics_queue;
    VkCommandPool command_pool;
    VkQueryPool query_pool;
-   u32 query_pool_size;
    VkCommandBuffer command_buffer;
    VkRenderPass renderpass;
 
@@ -150,13 +153,12 @@ align_struct
 
    VkPipelineLayout pipeline_layout;
    VkPipelineLayout rtx_pipeline_layout;
+
    spv_hash_table shader_modules;
 
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
    vk_buffer mb;        // mesh buffer
-
-   u32 max_meshlet_count;
 
    u32 meshlet_count;
 
@@ -167,8 +169,6 @@ align_struct
 
    u32 queue_family_index;
    f32 time_period;
-
-   size geometry_buffer_size;
 
    bool rtx_supported;
 } vk_context;

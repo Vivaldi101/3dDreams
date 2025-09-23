@@ -413,7 +413,6 @@ static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physica
    result.image_height = height;
    result.image_count = image_count;
    result.format = vk_swapchain_format(physical_device, surface);
-   result.surface = surface;
 
    return result;
 }
@@ -616,16 +615,15 @@ static VkSemaphore vk_semaphore_create(VkDevice logical_device)
    return sema;
 }
 
-static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_surface* surface_info, u32 queue_family_index)
+static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR surface, vk_swapchain_surface* surface_info, u32 queue_family_index)
 {
    assert(vk_valid_handle(logical_device));
-   assert(vk_valid_handle(surface_info->surface));
    assert(vk_valid_format(surface_info->format));
 
    VkSwapchainKHR swapchain = 0;
 
    VkSwapchainCreateInfoKHR swapchain_info = {vk_info_khr(SWAPCHAIN)};
-   swapchain_info.surface = surface_info->surface;
+   swapchain_info.surface = surface;
    swapchain_info.minImageCount = surface_info->image_count;
    swapchain_info.imageFormat = surface_info->format;
    swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
@@ -639,7 +637,7 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, vk_swapchain_
    swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
    swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
    swapchain_info.clipped = true;
-   swapchain_info.oldSwapchain = surface_info->swapchain;
+   swapchain_info.oldSwapchain = surface_info->handle;
 
    vk_assert(vkCreateSwapchainKHR(logical_device, &swapchain_info, 0, &swapchain));
 
@@ -667,7 +665,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
 
    vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_extent.width, swapchain_extent.height, context->surface);
 
-   swapchain_info.swapchain = vk_swapchain_create(context->logical_device, &swapchain_info, queue_family_index);
+   swapchain_info.handle = vk_swapchain_create(context->logical_device, context->surface, &swapchain_info, queue_family_index);
 
    return swapchain_info;
 }
@@ -811,13 +809,13 @@ static void vk_swapchain_destroy(vk_context* context)
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.swapchain, 0);
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
 }
 
 // TODO: Break into separate routines
 static void vk_swapchain_update(vk_context* context)
 {
-   vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_surface.swapchain, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
+   vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_surface.handle, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
 
    VkExtent3D depth_extent = {context->swapchain_surface.image_width, context->swapchain_surface.image_height, 1};
 
@@ -880,7 +878,7 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
-   VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_surface.swapchain, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
+   VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_surface.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
       vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
@@ -1156,7 +1154,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
-   present_info.pSwapchains = &context->swapchain_surface.swapchain;
+   present_info.pSwapchains = &context->swapchain_surface.handle;
 
    present_info.pImageIndices = &image_index;
 
@@ -1734,7 +1732,7 @@ void vk_uninitialize(hw* hw)
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.swapchain, 0);
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
    vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
