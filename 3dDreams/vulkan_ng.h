@@ -72,6 +72,14 @@ align_struct
    size size;
 } vk_buffer;
 
+// TODO: use this in context
+align_struct
+{
+   vk_buffer vb;        // vertex buffer
+   vk_buffer ib;        // index buffer
+   vk_buffer mb;        // mesh buffer
+} vk_bos;
+
 align_struct
 {
    vk_buffer buffer;
@@ -156,9 +164,7 @@ align_struct
 
    spv_hash_table shader_modules;
 
-   vk_buffer vb;        // vertex buffer
-   vk_buffer ib;        // index buffer
-   vk_buffer mb;        // mesh buffer
+   vk_bos bos;
 
    u32 meshlet_count;
 

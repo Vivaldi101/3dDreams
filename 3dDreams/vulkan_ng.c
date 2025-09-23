@@ -67,8 +67,12 @@ static void vk_gltf_file_read(vk_context* context, void *user_context, s8 filena
    s8 gltf_file_path = {.data = (u8*)file_path, .len = strlen(file_path)};
 
    // TODO: pass our own file IO callbacks in the options instead of the default I/O
-   if(!vk_gltf_load(context, gltf_file_path))
+   vk_bos bos = vk_gltf_load(context, gltf_file_path);
+
+   if(!bos.ib.memory || !bos.vb.memory || !bos.mb.memory)
       hw_message_box("Could not load .gltf file");
+
+   context->bos = bos;
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
@@ -962,9 +966,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
    VkDescriptorBufferInfo vb_info = {};
-   vb_info.buffer = context->vb.handle;
+   vb_info.buffer = context->bos.vb.handle;
    vb_info.offset = 0;
-   vb_info.range = context->vb.size;
+   vb_info.range = context->bos.vb.size;
 
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
@@ -989,9 +993,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline);
 
       VkDescriptorBufferInfo mb_info = {};
-      mb_info.buffer = context->mb.handle;
+      mb_info.buffer = context->bos.mb.handle;
       mb_info.offset = 0;
-      mb_info.range = context->mb.size;
+      mb_info.range = context->bos.mb.size;
 
       // update the vertex and meshlet storage buffers
       VkWriteDescriptorSet storage_buffer[2] = {};
@@ -1060,7 +1064,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
-      vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
+      vkCmdBindIndexBuffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
 #if 1
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
@@ -1737,9 +1741,9 @@ void vk_uninitialize(hw* hw)
    vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
 
-   vkDestroyBuffer(context->logical_device, context->ib.handle, 0);
-   vkDestroyBuffer(context->logical_device, context->vb.handle, 0);
-   vkDestroyBuffer(context->logical_device, context->mb.handle, 0);
+   vkDestroyBuffer(context->logical_device, context->bos.ib.handle, 0);
+   vkDestroyBuffer(context->logical_device, context->bos.vb.handle, 0);
+   vkDestroyBuffer(context->logical_device, context->bos.mb.handle, 0);
 
    vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
    vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
