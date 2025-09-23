@@ -169,14 +169,11 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
 static void vk_mesh_upload(vk_context* context, vertex* vertices, size vb_size, u32* indices, size ib_size, meshlet* meshlets, size mb_size, vk_buffer scratch_buffer)
 {
    // upload vertex data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->vb,
-      scratch_buffer, vertices, vb_size);
+   vk_buffer_upload(context, context->vb, scratch_buffer, vertices, vb_size);
    // upload index data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->ib,
-      scratch_buffer, indices, ib_size);
+   vk_buffer_upload(context, context->ib, scratch_buffer, indices, ib_size);
    // upload meshlet data
-   vk_buffer_upload(context->logical_device, context->graphics_queue, context->command_buffer, context->command_pool, context->mb,
-      scratch_buffer, meshlets, mb_size);
+   vk_buffer_upload(context, context->mb, scratch_buffer, meshlets, mb_size);
 };
 
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication

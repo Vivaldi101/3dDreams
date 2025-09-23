@@ -286,22 +286,22 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    vk_assert(vkDeviceWaitIdle(context->logical_device));
 }
 
-static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd_buffer, VkCommandPool cmd_pool, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size)
+static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size)
 {
    assert(data);
    assert(dev_size > 0);
    assert(scratch.data && scratch.size >= (size)dev_size);
    memcpy(scratch.data, data, dev_size);
 
-   vk_assert(vkResetCommandPool(device, cmd_pool, 0));
+   vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   vk_assert(vkBeginCommandBuffer(cmd_buffer, &buffer_begin_info));
+   vk_assert(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info));
 
    VkBufferCopy buffer_region = {0, 0, dev_size};
-   vkCmdCopyBuffer(cmd_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
+   vkCmdCopyBuffer(context->command_buffer, scratch.handle, buffer.handle, 1, &buffer_region);
 
    VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
    copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -312,19 +312,19 @@ static void vk_buffer_upload(VkDevice device, VkQueue queue, VkCommandBuffer cmd
    copy_barrier.size = dev_size;
    copy_barrier.offset = 0;
 
-   vkCmdPipelineBarrier(cmd_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+   vkCmdPipelineBarrier(context->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 
-   vk_assert(vkEndCommandBuffer(cmd_buffer));
+   vk_assert(vkEndCommandBuffer(context->command_buffer));
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &cmd_buffer;
+   submit_info.pCommandBuffers = &context->command_buffer;
 
-   vk_assert(vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE));
+   vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
    // TODO: bad for perf
-   vk_assert(vkDeviceWaitIdle(device));
+   vk_assert(vkDeviceWaitIdle(context->logical_device));
 }
 
 static void vk_assets_load(vk_context* context, s8 asset_file)
@@ -1064,6 +1064,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdBindIndexBuffer(command_buffer, context->ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
+#if 1
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
          vk_mesh_instance mi = context->mesh_instances.data[i];
@@ -1095,6 +1096,33 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
          vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
       }
+#else
+      // TODO: scratch arenas
+      VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
+
+      for(u32 i = 0; i < context->mesh_instances.count; ++i)
+      {
+         vk_mesh_instance mi = context->mesh_instances.data[i];
+         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
+
+         VkDrawIndexedIndirectCommand cmd =
+         {
+             .indexCount = (u32)md.index_count,
+             .instanceCount = 1,               // one instance per mesh_instance
+             .firstIndex = (u32)md.index_offset,
+             .vertexOffset = (i32)md.vertex_offset,
+             .firstInstance = i                // important: matches instance ID
+         };
+
+         draw_commands[i] = cmd;
+      }
+
+      //vk_buffer_upload(context->logical_device, context->graphics_queue, command_buffer, context->indirect_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+
+      free(draw_commands);
+
+      vkCmdDrawIndexedIndirect(command_buffer, context->indirect_buffer, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
+#endif
    }
 
    // draw axis

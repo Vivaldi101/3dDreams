@@ -30,7 +30,7 @@ layout(location = 3) flat out uint textureID;  // pass to fragment shader
 
 void main()
 {
-    int i = gl_DrawIDARB;
+    //int i = gl_DrawIDARB;   // TODO: use this
     vertex v = verts[gl_VertexIndex];
 
     vec3 local_pos = vec3(v.vx, v.vy, v.vz);
