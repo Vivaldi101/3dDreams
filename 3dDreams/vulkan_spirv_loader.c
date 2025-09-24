@@ -27,22 +27,21 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    return result;
 }
 
-// TODO: extract the path search here
-static arena vk_project_directory(arena* storage)
+static s8 vk_project_directory(arena* storage)
 {
-   arena result = {};
+   s8 result = {};
 
-   char* buffer = push(storage, char, MAX_PATH);
+   size dir_path_len = GetCurrentDirectory(0, 0);
 
-   GetCurrentDirectory(MAX_PATH, buffer);
+   u8* buffer = push(storage, u8, dir_path_len);
 
-   usize file_size = strlen(buffer);
+   GetCurrentDirectory((u32)dir_path_len, (char*)buffer);
 
    u32 count = 0;
 
-   assert(file_size != 0u);
+   assert(dir_path_len != 0u);
 
-   for(size i = file_size-1; i-- >= 0;)
+   for(size i = dir_path_len-1; i-- >= 0;)
    {
       if(buffer[i] == '\\')
          ++count;
@@ -53,22 +52,17 @@ static arena vk_project_directory(arena* storage)
       }
    }
 
-   file_size = strlen(buffer);
-
-   result.beg = buffer;
-   result.end = buffer + file_size;
-
-   return result;
+   return (s8){.data = buffer, .len = dir_path_len};
 }
 
 static const char** vk_shader_folder_read(arena* files, const char* shader_folder_path)
 {
-   arena project_dir = vk_project_directory(files);
+   s8 project_dir = vk_project_directory(files);
 
    WIN32_FIND_DATA file_data;
 
    char path[MAX_PATH];
-   wsprintf(path, "%s\\%s\\*", (const char*)project_dir.beg, shader_folder_path);
+   wsprintf(path, "%s\\%s\\*", (const char*)project_dir.data, shader_folder_path);
    HANDLE first_file = FindFirstFile(path, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)

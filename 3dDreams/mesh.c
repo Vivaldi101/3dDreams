@@ -454,9 +454,9 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
    size vertex_offset = 0;
 
    array(vertex) vertices = {.arena = context->storage};
-   array(u32) indices = {.arena = context->storage};
 
    // preallocate indices
+   array(u32) indices = {.arena = context->storage};
    array_resize(indices, gltf_index_count(data));
 
    // preallocate meshes

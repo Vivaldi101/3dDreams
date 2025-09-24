@@ -17,9 +17,9 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
 
-   arena project_dir = vk_project_directory(&user_data->scratch);
+   s8 project_dir = vk_project_directory(&user_data->scratch);
 
-   wsprintf(file_path, "%s\\assets\\objs\\%s", (const char*)project_dir.beg, filename);
+   wsprintf(file_path, "%s\\assets\\objs\\%s", (const char*)project_dir.data, filename);
 
    arena file_read = win32_file_read(&user_data->scratch, file_path);
 
@@ -50,20 +50,22 @@ static void vk_obj_file_read(vk_context* context, void *user_context, s8 filenam
    tinyobj_attrib_free(&attrib);
 }
 
-static vk_buffer_objects vk_gltf_read(vk_context* context, void *user_context, s8 filename)
+static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
    vk_buffer_objects result = {};
 
    array(char) file_path = {.arena = context->storage};
-   gltf_user_ctx* user_data = (gltf_user_ctx*)user_context;
+   s8 prefix = s8("%s\\assets\\gltf\\%s");
+   s8 project_dir = vk_project_directory(context->storage);
 
-   arena project_dir = vk_project_directory(&user_data->scratch);
-   file_path.count = filename.len + ((char*)project_dir.end - project_dir.beg);
-
+   file_path.count = prefix.len + filename.len + project_dir.len;
    array_resize(file_path, file_path.count);
-   wsprintf(file_path.data, "%s\\assets\\gltf\\%s", (const char*)project_dir.beg, filename.data);
+   wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
-   result = vk_gltf_load(context, (s8){.data = (u8*)file_path.data,.len = file_path.count});
+   // TODO: array(char) to s8
+   s8 gltf_name = {.data = (u8*)file_path.data, .len = file_path.count};
+
+   result = vk_gltf_load(context, gltf_name);
 
    return result;
 }
@@ -72,7 +74,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
 {
    assert(vk_valid_handle(logical_device));
 
-   arena project_dir = vk_project_directory(&scratch);
+   s8 project_dir = vk_project_directory(&scratch);
 
    size shader_len = strlen(shader_name);
    assert(shader_len != 0u);
@@ -103,7 +105,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir.beg, shader_name);
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, s8_data(project_dir), shader_name);
 
    switch(shader_stage)
    {
@@ -333,7 +335,7 @@ static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_
       gltf_user_ctx user_data = {};
       user_data.scratch = *context->storage;
 
-      result = vk_gltf_read(context, &user_data, asset_file);
+      result = vk_gltf_read(context, *context->storage, &user_data, asset_file);
    }
    else hw_message_box("Unsupported asset format");
 
@@ -1253,7 +1255,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
    return set_layout;
 }
 
-// TODO: pass all the layouts 
+// TODO: pass all the layouts
 static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* layouts, u32 layout_count, bool rtx_supported)
 {
    VkPipelineLayout layout = 0;
