@@ -195,7 +195,6 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
 
    vk_assert(vkBeginCommandBuffer(context->command_buffer, &begin_info));
 
-   // Image layout transition: UNDEFINED -> TRANSFER_DST_OPTIMAL
    VkImageMemoryBarrier img_barrier_to_transfer = {};
    img_barrier_to_transfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
    img_barrier_to_transfer.srcAccessMask = 0;
@@ -221,7 +220,6 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
       1, &img_barrier_to_transfer
    );
 
-   // BufferImageCopy region setup
    VkBufferImageCopy region = {};
    region.bufferOffset = 0;
    region.bufferRowLength = 0;
@@ -244,7 +242,6 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
       &region
    );
 
-   // Image layout transition: TRANSFER_DST_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL
    VkImageMemoryBarrier img_barrier_to_shader = {};
    img_barrier_to_shader.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
    img_barrier_to_shader.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
