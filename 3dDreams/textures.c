@@ -96,7 +96,7 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
    return vk_texture_size_blocked(w, h, levels, 0);
 }
 
-static void vk_texture_load(vk_context* context, char* img_uri, s8 gltf_path)
+static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 {
    u8* gltf_end = gltf_path.data + gltf_path.len;
    size tex_path_start = gltf_path.len;
@@ -111,15 +111,14 @@ static void vk_texture_load(vk_context* context, char* img_uri, s8 gltf_path)
 
    s8 tex_dir = s8_slice(gltf_path, 0, tex_path_start + 1);
 
-   size img_uri_len = strlen(img_uri);
-   size tex_len = img_uri_len + tex_dir.len;
+   size tex_len = img_uri.len + tex_dir.len;
 
    vk_texture tex = {};
    tex.path.arena = context->storage;
    array_resize(tex.path, tex_len + 1); // for null terminate
 
    memcpy(tex.path.data, tex_dir.data, tex_dir.len);
-   memcpy(tex.path.data + tex_dir.len, img_uri, img_uri_len);
+   memcpy(tex.path.data + tex_dir.len, img_uri.data, img_uri.len);
 
    tex.path.data[tex_len] = 0;        // null terminate
 

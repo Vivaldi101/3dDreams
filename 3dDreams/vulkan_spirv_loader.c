@@ -4,18 +4,18 @@
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
 // TODO: Change name to vk_spv_compile
-static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* storage, s8 shader_dir, const char* shader_name)
+static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* storage, s8 shader_dir, s8 shader_name)
 {
    VkShaderModule result = 0;
 
    array(char) shader_path = {storage};
    s8 prefix = s8("%sbin\\assets\\shaders\\%s");
 
-   shader_path.count = shader_dir.len + prefix.len + strlen(shader_name);  // TODO s8 for shader_name
+   shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
    array_resize(shader_path, shader_path.count);
 
    //wsprintf(shader_path.data, shader_dir.data, array_count(shader_path));
-   wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name);
+   wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name.data);
 
    arena shader_file = win32_file_read(storage, shader_path.data);
 
@@ -58,15 +58,20 @@ static s8 vk_project_directory(arena* storage)
    return (s8){.data = buffer, .len = dir_path_len};
 }
 
-static const char** vk_shader_folder_read(arena* files, const char* shader_folder_path)
+static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
 {
+   array(char) shader_path = {files};
+
+   s8 prefix = s8("%sbin\\assets\\shaders\\%s");
    s8 project_dir = vk_project_directory(files);
 
-   WIN32_FIND_DATA file_data;
+   shader_path.count = prefix.len + project_dir.len + shader_folder_path.len;
+   array_resize(shader_path, shader_path.count);
 
-   char path[MAX_PATH];
-   wsprintf(path, "%s\\%s\\*", (const char*)project_dir.data, shader_folder_path);
-   HANDLE first_file = FindFirstFile(path, &file_data);
+   wsprintf(shader_path.data, "%s\\%s\\*", (const char*)project_dir.data, shader_folder_path.data);
+
+   WIN32_FIND_DATA file_data;
+   HANDLE first_file = FindFirstFile(shader_path.data, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)
       (arena){0};
@@ -78,7 +83,7 @@ static const char** vk_shader_folder_read(arena* files, const char* shader_folde
          shader_count++;
    } while(FindNextFile(first_file, &file_data) != 0);
 
-   first_file = FindFirstFile(path, &file_data);
+   first_file = FindFirstFile(shader_path.data, &file_data);
 
    const char** shader_names = push(files, const char*, shader_count+1);
 

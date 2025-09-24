@@ -105,7 +105,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir, shader_name);
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir, s8(shader_name));
 
    switch(shader_stage)
    {
@@ -1678,7 +1678,7 @@ void vk_initialize(hw* hw)
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
    u32 shader_count = 0;
-   const char** shader_names = vk_shader_folder_read(context->storage, "bin\\assets\\shaders");
+   const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
    for(const char** p = shader_names; *p; ++p)
       shader_count++;
 

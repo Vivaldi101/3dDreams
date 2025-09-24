@@ -10,7 +10,7 @@
 #include "vulkan_ng.h"
 
 static void vk_textures_log(vk_context* context);
-static void vk_texture_load(vk_context* context, char* img_uri, s8 gltf_path);
+static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path);
 
 // TODO: remove .obj path
 typedef struct 
@@ -607,7 +607,7 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
 
       cgltf_decode_uri(img->uri);
 
-      vk_texture_load(context, img->uri, gltf_path);
+      vk_texture_load(context, s8(img->uri), gltf_path);
    }
 
    cgltf_free(data);
