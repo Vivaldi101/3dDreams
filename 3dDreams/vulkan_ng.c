@@ -54,18 +54,18 @@ static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *
 {
    vk_buffer_objects result = {};
 
-   array(char) file_path = {.arena = context->storage};
+   array(char) file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
    s8 project_dir = vk_project_directory(context->storage);
 
-   file_path.count = prefix.len + filename.len + project_dir.len;
+   file_path.count = project_dir.len + prefix.len + filename.len;
    array_resize(file_path, file_path.count);
    wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
    // TODO: array(char) to s8
-   s8 gltf_name = {.data = (u8*)file_path.data, .len = file_path.count};
+   s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
-   result = vk_gltf_load(context, gltf_name);
+   result = vk_gltf_load(context, gltf_path);
 
    return result;
 }
@@ -514,7 +514,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
 
-   array(s8) extensions = {.arena = &scratch};
+   array(s8) extensions = {&scratch};
 
    array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);

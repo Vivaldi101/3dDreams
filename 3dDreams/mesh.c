@@ -197,7 +197,7 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
    u32 primitive_index = 0;
 
    u32* ib_data = push(&scratch, u32, index_count);
-   array(vertex) vb_data = {.arena = &scratch};
+   array(vertex) vb_data = {&scratch};
 
    for(usize f = 0; f < index_count; f += 3)
    {
@@ -453,10 +453,10 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
    size index_offset = 0;
    size vertex_offset = 0;
 
-   array(vertex) vertices = {.arena = context->storage};
+   array(vertex) vertices = {context->storage};
 
    // preallocate indices
-   array(u32) indices = {.arena = context->storage};
+   array(u32) indices = {context->storage};
    array_resize(indices, gltf_index_count(data));
 
    // preallocate meshes
