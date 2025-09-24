@@ -105,7 +105,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, s8_data(project_dir), shader_name);
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir, shader_name);
 
    switch(shader_stage)
    {

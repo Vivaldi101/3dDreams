@@ -2,6 +2,7 @@
 #include "arena.h"
 #include <stdio.h>
 
+// TODO: return s8
 static arena win32_file_read(arena* file_arena, const char* path)
 {
    arena result = {};
