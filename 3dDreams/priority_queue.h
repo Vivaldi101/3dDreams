@@ -2,7 +2,6 @@
 #define _PRIORITY_QUEUE_H
 
 #include "common.h"
-#include <assert.h>
 
 typedef struct priority_queue_node
 {

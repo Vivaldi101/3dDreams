@@ -5,7 +5,6 @@
 #include "common.h"
 
 #include <math.h>
-#include <assert.h>
 
 //#define USE_SIMD
 
