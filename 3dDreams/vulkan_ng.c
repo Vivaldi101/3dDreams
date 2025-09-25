@@ -914,7 +914,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
-   clear[0].color = (VkClearColorValue){48 / c, 10 / c, 36 / c, 1.0f};
+   clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
    renderpass_info.clearValueCount = 2;
@@ -956,8 +956,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    VkDescriptorBufferInfo vb_info = {};
    vb_info.buffer = context->bos.vb.handle;
    vb_info.offset = 0;
-   vb_info.range = context->bos.vb.size;
+   vb_info.range = context->bos.vb.size;  // TODO: can be VK_WHOLE_SIZE
 
+   // TODO: into narrow contract function
    assert(vb_info.buffer);
    assert(vb_info.range > 0);
 
@@ -972,7 +973,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          context->rtx_pipeline_layout,
          1,
          1,
-         &context->descriptors.set[1],
+         &context->texture_descriptor.set,
          0,
          0
       );
@@ -988,10 +989,12 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       mb_info.offset = 0;
       mb_info.range = context->bos.mb.size;
 
+   // TODO: into narrow contract function
       assert(mb_info.buffer);
       assert(mb_info.range > 0);
 
       // update the vertex and meshlet storage buffers
+      // TODO: pass the dest set
       VkWriteDescriptorSet storage_buffer[2] = {};
       storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[0].dstBinding = 0;
@@ -1043,12 +1046,13 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          context->pipeline_layout,
          1,
          1,
-         &context->descriptors.set[1],
+         &context->texture_descriptor.set,
          0,
          0
       );
 
       // update the vertex storage buffer
+      // TODO: pass the dest set
       VkWriteDescriptorSet storage_buffer[1] = {};
       storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[0].dstBinding = 0;
@@ -1058,6 +1062,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
+      // TODO: into narrow contract function
       assert(context->bos.ib.handle);
       vkCmdBindIndexBuffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
@@ -1687,28 +1692,34 @@ void vk_initialize(hw* hw)
    spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
    context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
-   context->descriptors = vk_descriptors_create(context, *context->storage);
 
-   vk_textures_log(context);
+   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, false);
+   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, true);
+
+   vk_descriptor texture_descriptor = vk_texture_descriptor_create(context, *context->storage, 1<<16);
+
+   VkDescriptorSetLayout set_layouts[2] = {non_rtx_set_layout, texture_descriptor.layout};
+
+   VkPipelineLayout pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), false);
+   set_layouts[0] = rtx_set_layout; // create rtx layout next
+   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), true);
 
    VkPipelineCache cache = 0; // TODO: enable
 
-   context->descriptors.layouts[0] = vk_pipeline_set_layout_create(context->logical_device, false);
-   VkPipelineLayout layout = vk_pipeline_layout_create(context->logical_device, context->descriptors.layouts, array_count(context->descriptors.layouts), false);
-   context->descriptors.layouts[0] = vk_pipeline_set_layout_create(context->logical_device, true);
-   VkPipelineLayout rtx_layout = vk_pipeline_layout_create(context->logical_device, context->descriptors.layouts, array_count(context->descriptors.layouts), true);
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
+   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, pipeline_layout, &gm);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
-   context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_layout, &mm);
-
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
-   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, layout, &gm);
+   context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_pipeline_layout, &mm);
 
    vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
-   context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, layout, &am);
+   context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, pipeline_layout, &am);
 
-   context->pipeline_layout = layout;
-   context->rtx_pipeline_layout = rtx_layout;
+   context->pipeline_layout = pipeline_layout;
+   context->rtx_pipeline_layout = rtx_pipeline_layout;
+   context->texture_descriptor = texture_descriptor;
+
+   vk_textures_log(context);
 }
 
 void vk_uninitialize(hw* hw)

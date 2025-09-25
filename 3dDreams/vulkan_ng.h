@@ -72,7 +72,6 @@ align_struct
    size size;
 } vk_buffer;
 
-// TODO: use this in context
 align_struct
 {
    vk_buffer vb;        // vertex buffer
@@ -127,10 +126,9 @@ align_struct
 
 align_struct
 {
-   VkDescriptorSet set[2];             // TODO: array(VkDescriptorSetLayout)
-   VkDescriptorSetLayout layouts[2];   // TODO: array(VkDescriptorSetLayout)
-   u32 count;
-} vk_descriptors;
+   VkDescriptorSet set;            // TODO: array(VkDescriptorSetLayout)
+   VkDescriptorSetLayout layout;   // TODO: array(VkDescriptorSetLayout)
+} vk_descriptor;
 
 align_struct
 {
@@ -148,7 +146,7 @@ align_struct
 
    VkAllocationCallbacks allocator;
 
-   vk_descriptors descriptors;
+   vk_descriptor texture_descriptor;
 
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;

@@ -300,19 +300,18 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
+static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scratch, u32 max_descriptor_count)
 {
-   vk_descriptors result = {};
+   vk_descriptor result = {};
 
-   // TODO: semcompress these descriptor sets out
-   u32 descriptor_count = 1 << 16;
-
+   // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =
    {
       .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-      .descriptorCount = descriptor_count
+      .descriptorCount = max_descriptor_count
    };
 
+   // one set of image samplers
    VkDescriptorPoolCreateInfo pool_info =
    {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
@@ -347,15 +346,7 @@ static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
    VkSampler immutable_sampler;
    vk_assert(vkCreateSampler(context->logical_device, &sampler_info, 0, &immutable_sampler));
 
-   VkDescriptorSetLayoutBinding binding =
-   {
-       .binding = 0,
-       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-       .descriptorCount = descriptor_count,
-       .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-       .pImmutableSamplers = 0
-   };
-
+   // variable and partially bound descriptor arrays
    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
 
    VkDescriptorSetLayoutBindingFlagsCreateInfo binding_flags_info =
@@ -365,6 +356,17 @@ static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
        .pBindingFlags = &binding_flags
    };
 
+   // descriptor layout binding with descriptor_count image samplers
+   VkDescriptorSetLayoutBinding binding =
+   {
+       .binding = 0,
+       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+       .descriptorCount = max_descriptor_count,
+       .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+       .pImmutableSamplers = 0
+   };
+
+   // descriptor layout with one image sampler binding
    VkDescriptorSetLayoutCreateInfo layout_info =
    {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -380,7 +382,7 @@ static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
    {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
        .descriptorSetCount = 1,
-       .pDescriptorCounts = &context->textures.count,
+       .pDescriptorCounts = &context->textures.count, // actual allocate count
    };
 
    VkDescriptorSetAllocateInfo alloc_info =
@@ -394,10 +396,6 @@ static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
 
    VkDescriptorSet descriptor_set;
    vk_assert(vkAllocateDescriptorSets(context->logical_device, &alloc_info, &descriptor_set));
-
-   result.set[1] = descriptor_set;
-   result.layouts[1] = descriptor_set_layout;
-   result.count = descriptor_count;
 
    array(VkDescriptorImageInfo) image_infos = { &scratch };
    array_resize(image_infos, context->textures.count);
@@ -421,6 +419,9 @@ static vk_descriptors vk_descriptors_create(vk_context* context, arena scratch)
    };
 
    vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
+
+   result.set = descriptor_set;
+   result.layout = descriptor_set_layout;
 
    return result;
 }
