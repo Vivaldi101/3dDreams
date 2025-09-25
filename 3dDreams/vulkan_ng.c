@@ -994,16 +994,17 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       assert(mb_info.range > 0);
 
       // update the vertex and meshlet storage buffers
-      // TODO: pass the dest set
       VkWriteDescriptorSet storage_buffer[2] = {};
       storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[0].dstBinding = 0;
+      storage_buffer[0].dstSet = VK_NULL_HANDLE;
       storage_buffer[0].descriptorCount = 1;
       storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       storage_buffer[0].pBufferInfo = &vb_info;
 
       storage_buffer[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       storage_buffer[1].dstBinding = 1;
+      storage_buffer[1].dstSet = VK_NULL_HANDLE;
       storage_buffer[1].descriptorCount = 1;
       storage_buffer[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       storage_buffer[1].pBufferInfo = &mb_info;
@@ -1052,15 +1053,15 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       );
 
       // update the vertex storage buffer
-      // TODO: pass the dest set
-      VkWriteDescriptorSet storage_buffer[1] = {};
-      storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      storage_buffer[0].dstBinding = 0;
-      storage_buffer[0].descriptorCount = 1;
-      storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      storage_buffer[0].pBufferInfo = &vb_info;
+      VkWriteDescriptorSet storage_buffer = {};
+      storage_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      storage_buffer.dstBinding = 0;
+      storage_buffer.dstSet = VK_NULL_HANDLE;
+      storage_buffer.descriptorCount = 1;
+      storage_buffer.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      storage_buffer.pBufferInfo = &vb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
+      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, 1, &storage_buffer);
 
       // TODO: into narrow contract function
       assert(context->bos.ib.handle);
