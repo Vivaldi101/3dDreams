@@ -1721,6 +1721,8 @@ void vk_initialize(hw* hw)
    context->texture_descriptor = texture_descriptor;
 
    vk_textures_log(context);
+
+   spv_hash_iterate(&context->shader_modules);
 }
 
 void vk_uninitialize(hw* hw)

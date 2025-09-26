@@ -10,7 +10,8 @@ typedef struct hash_key_gltf
    i32 vi, vti, vni;
 } hash_key_gltf;
 
-// Ordered open addressing with linear probing
+// ordered open addressing with linear probing
+// TODO: iterate all keys
 typedef u32 hash_value;
 typedef struct index_hash_table
 {
@@ -57,17 +58,17 @@ static u32 obj_hash_index(hash_key_obj k)
    return hash;
 }
 
-static u32 spv_hash(const char* key)
+static u32 hash(const char* key)
 {
-   uint32_t hash = 2166136261U;
+   uint32_t result = 2166136261U;
    while(*key)
    {
-      hash *= 16777619U;
-      hash ^= (uint8_t)(*key);
+      result *= 16777619U;
+      result ^= (uint8_t)(*key);
       key++;
    }
 
-   return hash;
+   return result;
 }
 
 static void hash_insert(index_hash_table(hash_key_obj)* table, hash_key_obj key, hash_value value)
@@ -117,12 +118,15 @@ static hash_value hash_lookup(index_hash_table(hash_key_obj)* table, hash_key_ob
    return ~0u;
 }
 
+// TODO: Fix bug on full tables
 static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
 {
-   u32 index = spv_hash(key) % table->max_count;
+   u32 index = hash(key) % table->max_count;
 
    while(table->keys[index] && strcmp(table->keys[index], key) < 0)
       index = (index + 1) % table->max_count;
+
+   assert(!table->keys[index] || strcmp(table->keys[index], key) >= 0);
 
    if(table->keys[index] && strcmp(table->keys[index], key) == 0)
       return table->values[index];
@@ -130,12 +134,33 @@ static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
    return (vk_shader_modules){};
 }
 
+// TODO: pass callback to call on iterate
+static void spv_hash_iterate(spv_hash_table* table)
+{
+   u32 index = 0;
+   u32 count = 0;
+
+   while(count != table->count)
+   {
+      if(table->keys[index])
+      {
+         const char* name = table->keys[index];
+         VkShaderModule vs = table->values[index].vs;
+         VkShaderModule fs = table->values[index].fs;
+         VkShaderModule ms = table->values[index].ms;
+         printf("Shader module(vs, fs, ms) '%s': \t(%p, %p, %p)\n", name, vs, fs, ms);
+         ++count;
+      }
+      index = (index + 1) % table->max_count;
+   }
+}
+
 static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_modules value)
 {
    if(table->count == table->max_count)
       return;
 
-   u32 index = spv_hash(key) % table->max_count;
+   u32 index = hash(key) % table->max_count;
 
    while(table->keys[index])
    {
