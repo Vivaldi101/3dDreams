@@ -166,6 +166,7 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    return buffer;
 }
 
+#if 0
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
 static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
@@ -282,6 +283,7 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 
    return result;
 }
+#endif
 
 static size gltf_index_count(cgltf_data* data)
 {
@@ -382,7 +384,7 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
    {
        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
        .descriptorSetCount = 1,
-       .pDescriptorCounts = &context->textures.count, // actual allocate count
+       .pDescriptorCounts = &(u32)context->textures.count, // actual allocate count
    };
 
    VkDescriptorSetAllocateInfo alloc_info =

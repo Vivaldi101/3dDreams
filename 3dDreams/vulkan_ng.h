@@ -126,9 +126,15 @@ align_struct
 
 align_struct
 {
-   VkDescriptorSet set;            // TODO: array(VkDescriptorSetLayout)
-   VkDescriptorSetLayout layout;   // TODO: array(VkDescriptorSetLayout)
+   VkDescriptorSet set;
+   VkDescriptorSetLayout layout;
 } vk_descriptor;
+
+align_struct
+{
+   VkPipeline pipeline;
+   VkPipelineLayout layout; 
+} vk_pipeline;
 
 align_struct
 {
@@ -162,7 +168,7 @@ align_struct
    VkPipeline axis_pipeline;
    VkPipeline frustum_pipeline;
 
-   VkPipelineLayout pipeline_layout;
+   VkPipelineLayout non_rtx_pipeline_layout;
    VkPipelineLayout rtx_pipeline_layout;
 
    spv_hash_table shader_modules;

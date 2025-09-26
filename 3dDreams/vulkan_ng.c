@@ -27,6 +27,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
+#if 0
 // TODO: clean up these top-level read apis
 static void vk_obj_file_read(vk_context* context, void *user_context, s8 filename)
 {
@@ -49,6 +50,7 @@ static void vk_obj_file_read(vk_context* context, void *user_context, s8 filenam
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
 }
+#endif
 
 static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
@@ -867,6 +869,64 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
    return result;
 }
 
+// TODO: into cmd.c
+static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
+{
+   assert(buffer->handle);
+   assert(buffer->size > 0);
+
+   VkDescriptorBufferInfo result = {};
+   result.buffer = buffer->handle;
+   result.range = buffer->size;  // can be VK_WHOLE_SIZE
+   result.offset = 0;
+
+   return result;
+}
+
+static VkWriteDescriptorSet cmd_buffer_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, VkDescriptorBufferInfo buffer_info, u32 binding)
+{
+   VkWriteDescriptorSet result = {};
+   result.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   result.dstBinding = binding;
+   result.dstSet = VK_NULL_HANDLE;
+   result.descriptorCount = 1;
+   result.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   result.pBufferInfo = &buffer_info;
+
+   return result;
+}
+
+static void cmd_buffer_push_storage_buffer(VkCommandBuffer command_buffer, VkPipelineLayout layout, VkDescriptorBufferInfo buffer_info, u32 set, u32 binding)
+{
+   VkWriteDescriptorSet write_set = cmd_buffer_write_descriptor_create(command_buffer, layout, buffer_info, binding);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set, 1, &write_set);
+}
+
+static void cmd_buffer_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
+{
+   assert(buffer);
+
+   vkCmdBindIndexBuffer(command_buffer, buffer, offset, VK_INDEX_TYPE_UINT32);
+}
+
+static void cmd_buffer_bind_pipeline(VkCommandBuffer command_buffer, VkPipeline pipeline)
+{
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+}
+
+static void cmd_buffer_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLayout layout, VkDescriptorSet* sets, u32 set, u32 set_count)
+{
+   vkCmdBindDescriptorSets(command_buffer,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      layout,
+      set,
+      set_count,
+      sets,
+      0,
+      0
+   );
+}
+
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
@@ -953,179 +1013,146 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-   VkDescriptorBufferInfo vb_info = {};
-   vb_info.buffer = context->bos.vb.handle;
-   vb_info.offset = 0;
-   vb_info.range = context->bos.vb.size;  // TODO: can be VK_WHOLE_SIZE
-
-   // TODO: into narrow contract function
-   assert(vb_info.buffer);
-   assert(vb_info.range > 0);
-
-   // TODO: Currently this is broken
-   // TODO: Handle multi-meshes in the mesh shader
-   if(state->rtx_enabled)
+   if(context->bos.vb.handle && context->bos.vb.size > 0)
    {
-      // bind bindless textures
-      vkCmdBindDescriptorSets(
-         command_buffer,
-         VK_PIPELINE_BIND_POINT_GRAPHICS,
-         context->rtx_pipeline_layout,
-         1,
-         1,
-         &context->texture_descriptor.set,
-         0,
-         0
-      );
+      VkDescriptorBufferInfo vb_info = cmd_buffer_descriptor_create(&context->bos.vb);
 
-      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
-                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
-                   sizeof(mvp), &mvp);
-
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline);
-
-      VkDescriptorBufferInfo mb_info = {};
-      mb_info.buffer = context->bos.mb.handle;
-      mb_info.offset = 0;
-      mb_info.range = context->bos.mb.size;
-
-   // TODO: into narrow contract function
-      assert(mb_info.buffer);
-      assert(mb_info.range > 0);
-
-      // update the vertex and meshlet storage buffers
-      VkWriteDescriptorSet storage_buffer[2] = {};
-      storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      storage_buffer[0].dstBinding = 0;
-      storage_buffer[0].dstSet = VK_NULL_HANDLE;
-      storage_buffer[0].descriptorCount = 1;
-      storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      storage_buffer[0].pBufferInfo = &vb_info;
-
-      storage_buffer[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      storage_buffer[1].dstBinding = 1;
-      storage_buffer[1].dstSet = VK_NULL_HANDLE;
-      storage_buffer[1].descriptorCount = 1;
-      storage_buffer[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      storage_buffer[1].pBufferInfo = &mb_info;
-
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->rtx_pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
-
-      u32 meshlet_limit = 0xffff;
-      u32 draw_calls = context->meshlet_count / meshlet_limit;
-      u32 base = 0;
-
-      // 0xffff is the AMD limit - check this also on nvidia
-      // draw meshlets in chunks
-      for(u32 i = 0; i < draw_calls; ++i)
+      // TODO: Currently this is broken
+      // TODO: Handle multi-meshes in the mesh shader
+      if(state->rtx_enabled)
       {
-         vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
-                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-                            offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
-                            &base);
+         VkPipeline pipeline = context->rtx_pipeline;
+         VkPipelineLayout pipeline_layout = context->rtx_pipeline_layout;
 
-         vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
-         base += meshlet_limit;
-      }
+         cmd_buffer_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
+         cmd_buffer_bind_pipeline(command_buffer, pipeline);
+         cmd_buffer_push_storage_buffer(command_buffer, context->rtx_pipeline_layout, vb_info, 0, 0);
 
-      vkCmdPushConstants(command_buffer, context->rtx_pipeline_layout,
-                         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-                         offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
-                         &base);
+         vkCmdPushConstants(command_buffer, pipeline_layout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
+            sizeof(mvp), &mvp);
 
-      // draw rest of the meshlets
-      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
-   }
-   else
-   {
-      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
+         VkDescriptorBufferInfo mb_info = {};
+         mb_info.buffer = context->bos.mb.handle;
+         mb_info.offset = 0;
+         mb_info.range = context->bos.mb.size;
 
-      // bind bindless textures
-      vkCmdBindDescriptorSets(
-         command_buffer,
-         VK_PIPELINE_BIND_POINT_GRAPHICS,
-         context->pipeline_layout,
-         1,
-         1,
-         &context->texture_descriptor.set,
-         0,
-         0
-      );
+         // TODO: into narrow contract function
+         assert(mb_info.buffer);
+         assert(mb_info.range > 0);
 
-      // update the vertex storage buffer
-      VkWriteDescriptorSet storage_buffer = {};
-      storage_buffer.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      storage_buffer.dstBinding = 0;
-      storage_buffer.dstSet = VK_NULL_HANDLE;
-      storage_buffer.descriptorCount = 1;
-      storage_buffer.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      storage_buffer.pBufferInfo = &vb_info;
+         // update the vertex and meshlet storage buffers
+         VkWriteDescriptorSet storage_buffer[2] = {};
+         storage_buffer[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+         storage_buffer[0].dstBinding = 0;
+         storage_buffer[0].dstSet = VK_NULL_HANDLE;
+         storage_buffer[0].descriptorCount = 1;
+         storage_buffer[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+         storage_buffer[0].pBufferInfo = &vb_info;
 
-      vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->pipeline_layout, 0, 1, &storage_buffer);
+         storage_buffer[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+         storage_buffer[1].dstBinding = 1;
+         storage_buffer[1].dstSet = VK_NULL_HANDLE;
+         storage_buffer[1].descriptorCount = 1;
+         storage_buffer[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+         storage_buffer[1].pBufferInfo = &mb_info;
 
-      // TODO: into narrow contract function
-      assert(context->bos.ib.handle);
-      vkCmdBindIndexBuffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
+         vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, array_count(storage_buffer), storage_buffer);
 
-#if 1
-      for(u32 i = 0; i < context->mesh_instances.count; ++i)
-      {
-         vk_mesh_instance mi = context->mesh_instances.data[i];
-#if 0
-         f32 s = mi.scale;
-         vec4 r = mi.orientation;
-         vec3 t = mi.pos;
+         u32 meshlet_limit = 0xffff;
+         u32 draw_calls = context->meshlet_count / meshlet_limit;
+         u32 base = 0;
 
-         quaternion_to_matrix(&r, mvp.model.data);
-
-         assert(s > .0f);
-
-         // TODO: negative scales?
-         mvp.model.data[0] *= s;
-         mvp.model.data[5] *= s;
-         mvp.model.data[10] *= s;
-
-         mvp.model.data[12] = t.x;
-         mvp.model.data[13] = t.y;
-         mvp.model.data[14] = t.z;
-#else
-         mvp.model = mi.model;
-#endif
-
-         vkCmdPushConstants(command_buffer, context->pipeline_layout,
-                      VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-                      sizeof(mvp), &mvp);
-
-         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
-         vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
-      }
-#else
-      // TODO: scratch arenas
-      VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
-
-      for(u32 i = 0; i < context->mesh_instances.count; ++i)
-      {
-         vk_mesh_instance mi = context->mesh_instances.data[i];
-         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
-
-         VkDrawIndexedIndirectCommand cmd =
+         // 0xffff is the AMD limit - check this also on nvidia
+         // draw meshlets in chunks
+         for(u32 i = 0; i < draw_calls; ++i)
          {
-             .indexCount = (u32)md.index_count,
-             .instanceCount = 1,               // one instance per mesh_instance
-             .firstIndex = (u32)md.index_offset,
-             .vertexOffset = (i32)md.vertex_offset,
-             .firstInstance = i                // important: matches instance ID
-         };
+            vkCmdPushConstants(command_buffer, pipeline_layout,
+               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
+               offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+               &base);
 
-         draw_commands[i] = cmd;
+            vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
+            base += meshlet_limit;
+         }
+
+         vkCmdPushConstants(command_buffer, pipeline_layout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
+            offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
+            &base);
+
+         // draw rest of the meshlets
+         vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
       }
+      else
+      {
+         VkPipelineLayout pipeline_layout = context->non_rtx_pipeline_layout;
 
-      //vk_buffer_upload(context->logical_device, context->graphics_queue, command_buffer, context->indirect_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+         cmd_buffer_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
+         cmd_buffer_bind_pipeline(command_buffer, context->graphics_pipeline);
+         cmd_buffer_bind_buffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
-      free(draw_commands);
+         cmd_buffer_push_storage_buffer(command_buffer, pipeline_layout, vb_info, 0, 0);
+#if 1
+         for(u32 i = 0; i < context->mesh_instances.count; ++i)
+         {
+            vk_mesh_instance mi = context->mesh_instances.data[i];
+#if 0
+            f32 s = mi.scale;
+            vec4 r = mi.orientation;
+            vec3 t = mi.pos;
 
-      vkCmdDrawIndexedIndirect(command_buffer, context->indirect_buffer, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
+            quaternion_to_matrix(&r, mvp.model.data);
+
+            assert(s > .0f);
+
+            // TODO: negative scales?
+            mvp.model.data[0] *= s;
+            mvp.model.data[5] *= s;
+            mvp.model.data[10] *= s;
+
+            mvp.model.data[12] = t.x;
+            mvp.model.data[13] = t.y;
+            mvp.model.data[14] = t.z;
+#else
+            mvp.model = mi.model;
 #endif
+
+            vkCmdPushConstants(command_buffer, pipeline_layout,
+               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
+               sizeof(mvp), &mvp);
+
+            vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
+            vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
+         }
+#else
+         // TODO: scratch arenas
+         VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
+
+         for(u32 i = 0; i < context->mesh_instances.count; ++i)
+         {
+            vk_mesh_instance mi = context->mesh_instances.data[i];
+            vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
+
+            VkDrawIndexedIndirectCommand cmd =
+            {
+                .indexCount = (u32)md.index_count,
+                .instanceCount = 1,               // one instance per mesh_instance
+                .firstIndex = (u32)md.index_offset,
+                .vertexOffset = (i32)md.vertex_offset,
+                .firstInstance = i                // important: matches instance ID
+            };
+
+            draw_commands[i] = cmd;
+         }
+
+         //vk_buffer_upload(context->logical_device, context->graphics_queue, command_buffer, context->indirect_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+
+         free(draw_commands);
+
+         vkCmdDrawIndexedIndirect(command_buffer, context->indirect_buffer, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
+#endif
+      }
    }
 
    // draw axis
@@ -1699,24 +1726,24 @@ void vk_initialize(hw* hw)
 
    vk_descriptor texture_descriptor = vk_texture_descriptor_create(context, *context->storage, 1<<16);
 
-   VkDescriptorSetLayout set_layouts[2] = {non_rtx_set_layout, texture_descriptor.layout};
+   VkDescriptorSetLayout set_layouts[] = {non_rtx_set_layout, texture_descriptor.layout};
 
-   VkPipelineLayout pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), false);
+   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), false);
    set_layouts[0] = rtx_set_layout; // create rtx layout next
    VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), true);
 
    VkPipelineCache cache = 0; // TODO: enable
 
    vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
-   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, pipeline_layout, &gm);
+   context->graphics_pipeline = vk_graphics_pipeline_create(context->logical_device, context->renderpass, cache, non_rtx_pipeline_layout, &gm);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
    context->rtx_pipeline = vk_mesh_pipeline_create(context->logical_device, context->renderpass, cache, rtx_pipeline_layout, &mm);
 
    vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
-   context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, pipeline_layout, &am);
+   context->axis_pipeline = vk_axis_pipeline_create(context->logical_device, context->renderpass, cache, non_rtx_pipeline_layout, &am);
 
-   context->pipeline_layout = pipeline_layout;
+   context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
    context->rtx_pipeline_layout = rtx_pipeline_layout;
    context->texture_descriptor = texture_descriptor;
 
