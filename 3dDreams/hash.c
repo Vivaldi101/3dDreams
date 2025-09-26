@@ -118,15 +118,18 @@ static hash_value hash_lookup(index_hash_table(hash_key_obj)* table, hash_key_ob
    return ~0u;
 }
 
-// TODO: Fix bug on full tables
 static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
 {
    u32 index = hash(key) % table->max_count;
+   u32 old_index = index;
 
    while(table->keys[index] && strcmp(table->keys[index], key) < 0)
+   {
       index = (index + 1) % table->max_count;
+      if(index == old_index) break; // wrap around
+   }
 
-   assert(!table->keys[index] || strcmp(table->keys[index], key) >= 0);
+   assert(index == old_index || !table->keys[index] || strcmp(table->keys[index], key) >= 0);
 
    if(table->keys[index] && strcmp(table->keys[index], key) == 0)
       return table->values[index];
