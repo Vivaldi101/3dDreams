@@ -10,7 +10,7 @@ align_struct
    VkShaderModule ms;
 } vk_shader_modules;
 
-typedef struct 
+align_struct
 {
    vk_shader_modules* values;
    const char** keys;

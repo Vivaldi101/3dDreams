@@ -1728,39 +1728,60 @@ void vk_initialize(hw* hw)
 void vk_uninitialize(hw* hw)
 {
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
+
    vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
    vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
    vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
 
-   assert(mm.ms && mm.fs);
+   vkDeviceWaitIdle(context->logical_device);
+
+   vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
+   vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
+   vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
+
    vkDestroyShaderModule(context->logical_device, mm.ms, 0);
    vkDestroyShaderModule(context->logical_device, mm.fs, 0);
-   assert(gm.vs && gm.fs);
+
    vkDestroyShaderModule(context->logical_device, gm.vs, 0);
    vkDestroyShaderModule(context->logical_device, gm.fs, 0);
-   assert(am.vs && am.fs);
+
    vkDestroyShaderModule(context->logical_device, am.vs, 0);
    vkDestroyShaderModule(context->logical_device, am.fs, 0);
 
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
-   vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
-   vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
-   vkDestroyPipeline(context->logical_device, context->graphics_pipeline, 0);
-
    vkDestroyBuffer(context->logical_device, context->bos.ib.handle, 0);
    vkDestroyBuffer(context->logical_device, context->bos.vb.handle, 0);
    vkDestroyBuffer(context->logical_device, context->bos.mb.handle, 0);
+
+   vkFreeMemory(context->logical_device, context->bos.ib.memory, 0);
+   vkFreeMemory(context->logical_device, context->bos.vb.memory, 0);
+   vkFreeMemory(context->logical_device, context->bos.mb.memory, 0);
 
    vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
    vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
    vkDestroySemaphore(context->logical_device, context->image_ready_semaphore, 0);
 
-   vkDestroySurfaceKHR(context->instance, context->surface, 0);
+   for(u32 i = 0; i < context->framebuffers.count; ++i)
+      vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
 
-   // TODO this - must destroy all image buffers etc. before instance
-   //vkDestroyDevice(context->logical_device, 0);
-   //vkDestroyInstance(context->instance, 0);
+   for(u32 i = 0; i < context->textures.count; ++i)
+   {
+      vkDestroyImageView(context->logical_device, context->textures.data[i].image.view, 0);
+      vkDestroyImage(context->logical_device, context->textures.data[i].image.handle, 0);
+      vkFreeMemory(context->logical_device, context->textures.data[i].image.memory, 0);
+   }
+
+   for(u32 i = 0; i < context->swapchain_images.image_views.count; ++i)
+   {
+      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views.data[i], 0);
+      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views.data[i], 0);
+      vkDestroyImage(context->logical_device, context->swapchain_images.depths.data[i], 0);
+   }
+
+   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
+
+   vkDestroyDevice(context->logical_device, 0);
+   vkDestroyInstance(context->instance, 0);
 }
