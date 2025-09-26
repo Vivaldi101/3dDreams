@@ -1031,6 +1031,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    bool do_draw = false;
 
+
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
@@ -1067,7 +1068,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
             offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
             &base);
 
-         vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
+         if(do_draw)
+            vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
          base += meshlet_limit;
       }
 
@@ -1077,7 +1079,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          &base);
 
       // draw rest of the meshlets
-      vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
+      if(do_draw)
+         vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
    }
    else
    {
