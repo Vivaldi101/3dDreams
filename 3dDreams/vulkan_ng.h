@@ -82,6 +82,12 @@ align_struct
 align_struct
 {
    vk_buffer buffer;
+   u32 binding;
+} vk_buffer_binding;
+
+align_struct
+{
+   vk_buffer buffer;
    u32 count;
 } vk_meshlet;
 
@@ -143,7 +149,6 @@ align_struct
    array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;
 
-   VkBuffer indirect_buffer;
    VkInstance instance;
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
@@ -164,7 +169,7 @@ align_struct
    VkRenderPass renderpass;
 
    VkPipeline rtx_pipeline;
-   VkPipeline graphics_pipeline;
+   VkPipeline non_rtx_pipeline;
    VkPipeline axis_pipeline;
    VkPipeline frustum_pipeline;
 
