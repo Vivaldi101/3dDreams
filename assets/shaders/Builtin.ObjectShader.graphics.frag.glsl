@@ -61,15 +61,20 @@ vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 void main()
 {
     mesh_draw draw = draws[in_drawID];
+
+    // TODO: backup values for missing textures?
     uint albedo_index = draw.albedo;
     uint normal_index = draw.normal;
+    uint metal_index = draw.metal;
+    uint emissive_index = draw.emissive;
+    uint ao_index = draw.ao;
 
     vec3 albedo = pow(texture(textures[albedo_index], in_uv).rgb, vec3(2.2)); // sRGB to linear
-    vec3 mr      = texture(textures[1], in_uv).rgb;
+    vec3 mr      = texture(textures[metal_index], in_uv).rgb;
     float roughness = mr.g;
     float metallic  = mr.b;
-    vec3 emissive   = texture(textures[2], in_uv).rgb;  // apply factor if needed
-    float ao        = texture(textures[3], in_uv).r;
+    vec3 emissive   = texture(textures[emissive_index], in_uv).rgb;  // apply factor if needed
+    float ao        = texture(textures[ao_index], in_uv).r;
     vec3 normal     = texture(textures[normal_index], in_uv).rgb;
 
     vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z

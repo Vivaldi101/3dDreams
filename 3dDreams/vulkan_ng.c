@@ -972,9 +972,11 @@ static vk_buffer vk_buffer_transforms_create(vk_context* context)
    for(u32 i = 0; i < context->mesh_instances.count; ++i)
    {
       draws[i].world = context->mesh_instances.data[i].world;
-      draws[i].mesh_index = (u32)context->mesh_instances.data[i].mesh_index;
       draws[i].normal = (u32)context->mesh_instances.data[i].normal;
       draws[i].albedo = (u32)context->mesh_instances.data[i].albedo;
+      draws[i].metal = (u32)context->mesh_instances.data[i].metal;
+      draws[i].ao = (u32)context->mesh_instances.data[i].ao;
+      draws[i].emissive = (u32)context->mesh_instances.data[i].emissive;
    }
 
    size scratch_buffer_size = context->mesh_instances.count * sizeof(struct mesh_draw);

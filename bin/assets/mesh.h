@@ -18,9 +18,11 @@ struct meshlet
 
 struct mesh_draw
 {
-   uint32_t mesh_index;  // which mesh this instance draws
    uint32_t albedo;      // indices into texture descriptors
    uint32_t normal;
+   uint32_t metal;
+   uint32_t emissive;
+   uint32_t ao;
    mat4 world;           // world transform
 };
 

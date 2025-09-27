@@ -111,6 +111,9 @@ align_struct
    u32 mesh_index;  // which mesh this instance draws
    u32 albedo; 
    u32 normal;
+   u32 ao; 
+   u32 metal;
+   u32 emissive;
    mat4 world;
 } vk_mesh_instance;
 
