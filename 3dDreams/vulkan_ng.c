@@ -965,6 +965,27 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
 }
 
 // TODO: scratch arenas
+static vk_buffer vk_buffer_transforms_create(vk_context* context)
+{
+   mat4* transforms = malloc(context->mesh_instances.count * sizeof(mat4));
+
+   for(u32 i = 0; i < context->mesh_instances.count; ++i)
+      transforms[i] = context->mesh_instances.data[i].world;
+
+   size scratch_buffer_size = context->mesh_instances.count * sizeof(mat4);
+
+   VkPhysicalDeviceMemoryProperties memory_props;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer transform_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   vk_buffer_upload(context, transform_buffer, scratch_buffer, transforms, sizeof(mat4) * context->mesh_instances.count);
+
+   free(transforms);
+
+   return transform_buffer;
+}
+
 static vk_buffer vk_buffer_indirect_create(vk_context* context)
 {
    VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
@@ -1042,7 +1063,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    mvp.view = mat4_view(eye, dir);
 
-   mvp.world = mat4_identity();
+   //mvp.world = mat4_identity();
    mvp.meshlet_offset = 0;
 
    const f32 c = 255.0f;
@@ -1149,16 +1170,19 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       cmd_bind_pipeline(command_buffer, pipeline);
       cmd_bind_buffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
-      vk_buffer_binding bbs[1] = {};
+      vk_buffer_binding bbs[2] = {};
       bbs[0].buffer = context->bos.vb;
       bbs[0].binding = 0;
 
+      bbs[1].buffer = context->bos.world_transform;
+      bbs[1].binding = 1;
+
       do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
+#if 0
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
          vk_mesh_instance mi = context->mesh_instances.data[i];
-#if 0
          f32 s = mi.scale;
          vec4 r = mi.orientation;
          vec3 t = mi.pos;
@@ -1175,12 +1199,12 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          mvp.model.data[12] = t.x;
          mvp.model.data[13] = t.y;
          mvp.model.data[14] = t.z;
-#else
          mvp.world = mi.world;
-#endif
       }
+#endif
 
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
+
       if(do_draw)
          vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
    }
@@ -1297,11 +1321,17 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
    }
    else
    {
-      VkDescriptorSetLayoutBinding bindings[1] = {};
+      // TODO: pass amount of bindings to create here
+      VkDescriptorSetLayoutBinding bindings[2] = {};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
       bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+      bindings[1].binding = 1;
+      bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      bindings[1].descriptorCount = 1;
+      bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
       VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
@@ -1751,6 +1781,7 @@ void vk_initialize(hw* hw)
 
    context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
    context->bos.indirect = vk_buffer_indirect_create(context);
+   context->bos.world_transform = vk_buffer_transforms_create(context);
 
    VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, false);
    VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, true);
