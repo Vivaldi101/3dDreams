@@ -77,6 +77,7 @@ align_struct
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
    vk_buffer mb;        // mesh buffer
+   vk_buffer indirect;  // indirect rendering
 } vk_buffer_objects;
 
 align_struct
