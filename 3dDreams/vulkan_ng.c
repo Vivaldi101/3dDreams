@@ -1182,7 +1182,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
       if(do_draw)
-         vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
+         vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
    }
 
    // draw axis

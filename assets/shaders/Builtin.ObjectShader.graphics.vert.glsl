@@ -26,11 +26,11 @@ layout(binding = 0) readonly buffer Verts
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec3 out_world_frag_pos;
 layout(location = 2) out vec2 out_uv;
-layout(location = 3) flat out uint textureID;  // pass to fragment shader
+layout(location = 3) flat out uint out_textureID;  // pass to fragment shader
 
 void main()
 {
-    //int i = gl_DrawIDARB;   // TODO: use this
+    int draw_ID = gl_DrawIDARB;
     vertex v = verts[gl_VertexIndex];
 
     vec3 local_pos = vec3(v.vx, v.vy, v.vz);
@@ -46,4 +46,5 @@ void main()
     out_normal = world_normal;
     out_world_frag_pos = world_pos.xyz;
     out_uv = texcoord;
+    out_textureID = draw_ID;
 }

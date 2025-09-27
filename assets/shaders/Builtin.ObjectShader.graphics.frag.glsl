@@ -7,7 +7,7 @@ layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec3 in_normal;
 layout(location = 1) in vec3 in_world_frag_pos;
 layout(location = 2) in vec2 in_uv;
-layout(location = 3) flat in uint textureID;
+layout(location = 3) flat in uint in_textureID;
 
 layout(set = 1, binding = 0)
 uniform sampler2D textures[];
@@ -49,6 +49,7 @@ vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 
 void main()
 {
+#if 1
     // TODO: just for testing!!!
     vec3 albedo = pow(texture(textures[0], in_uv).rgb, vec3(2.2)); // sRGB to linear
     vec3 mr      = texture(textures[1], in_uv).rgb;
@@ -106,4 +107,8 @@ void main()
 
     // gamma correction back to sRGB
     out_color = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+    #else
+
+    out_color = vec4(1.f, 1.f, 1.f, 1.f);
+    #endif
 }
