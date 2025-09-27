@@ -964,9 +964,9 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
+// TODO: scratch arenas
 static vk_buffer vk_buffer_indirect_create(vk_context* context)
 {
-   // TODO: scratch arenas
    VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
 
    for(u32 i = 0; i < context->mesh_instances.count; ++i)
@@ -1154,7 +1154,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       bbs[0].binding = 0;
 
       do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
-#if 0
+
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
          vk_mesh_instance mi = context->mesh_instances.data[i];
@@ -1178,19 +1178,11 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 #else
          mvp.world = mi.world;
 #endif
-
-         cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
-         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
-         if(do_draw)
-            cmd_draw_indexed(command_buffer, md, 1, 0);
       }
-#else
-      // TODO: these must be set in indirect buffer creation
-      vk_mesh_instance mi = context->mesh_instances.data[0];
-      mvp.world = mi.world;
+
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
-      vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
-#endif
+      if(do_draw)
+         vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_instances.count, sizeof(VkDrawIndexedIndirectCommand));
    }
 
    // draw axis
