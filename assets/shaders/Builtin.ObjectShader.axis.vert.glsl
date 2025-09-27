@@ -5,7 +5,6 @@ layout(push_constant) uniform block
 {
     mat4 projection;
     mat4 view;
-    mat4 world;
    float near;
    float far;
    float ar;

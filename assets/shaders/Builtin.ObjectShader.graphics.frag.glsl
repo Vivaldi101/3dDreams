@@ -1,13 +1,24 @@
 #version 450
+
 #extension GL_ARB_separate_shader_objects : enable
-#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+#extension GL_ARB_shader_draw_parameters : require
+#extension GL_EXT_nonuniform_qualifier : require
+
+#include "mesh.h"
 
 layout(location = 0) out vec4 out_color;
 
 layout(location = 0) in vec3 in_normal;
 layout(location = 1) in vec3 in_world_frag_pos;
 layout(location = 2) in vec2 in_uv;
-layout(location = 3) flat in uint in_textureID;
+layout(location = 3) flat in uint in_drawID;
+
+layout(set = 0, binding = 1) readonly buffer mesh_draw_block
+{
+   mesh_draw draws[];
+};
 
 layout(set = 1, binding = 0)
 uniform sampler2D textures[];
@@ -49,15 +60,17 @@ vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 
 void main()
 {
-#if 1
-    // TODO: just for testing!!!
-    vec3 albedo = pow(texture(textures[0], in_uv).rgb, vec3(2.2)); // sRGB to linear
+    mesh_draw draw = draws[in_drawID];
+    uint albedo_index = draw.albedo;
+    uint normal_index = draw.normal;
+
+    vec3 albedo = pow(texture(textures[albedo_index], in_uv).rgb, vec3(2.2)); // sRGB to linear
     vec3 mr      = texture(textures[1], in_uv).rgb;
     float roughness = mr.g;
     float metallic  = mr.b;
     vec3 emissive   = texture(textures[2], in_uv).rgb;  // apply factor if needed
     float ao        = texture(textures[3], in_uv).r;
-    vec3 normal     = texture(textures[4], in_uv).rgb;
+    vec3 normal     = texture(textures[normal_index], in_uv).rgb;
 
     vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z
     vec3 lightPos  = vec3(0.0, 1.0, 1.0);      // point light
@@ -107,8 +120,4 @@ void main()
 
     // gamma correction back to sRGB
     out_color = vec4(pow(color, vec3(1.0/2.2)), 1.0);
-    #else
-
-    out_color = vec4(1.f, 1.f, 1.f, 1.f);
-    #endif
 }

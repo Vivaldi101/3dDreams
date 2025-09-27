@@ -16,4 +16,12 @@ struct meshlet
    uint8_t vertex_count;
 };
 
+struct mesh_draw
+{
+   uint32_t mesh_index;  // which mesh this instance draws
+   uint32_t albedo;      // indices into texture descriptors
+   uint32_t normal;
+   mat4 world;           // world transform
+};
+
 #endif

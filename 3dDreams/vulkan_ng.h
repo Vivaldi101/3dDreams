@@ -108,14 +108,10 @@ align_struct
 
 align_struct
 {
-   size mesh_index;  // which mesh this instance draws
-#if 0
-   vec3 pos;
-   vec4 orientation;
-   f32 scale;
-#else
+   u32 mesh_index;  // which mesh this instance draws
+   u32 albedo; 
+   u32 normal;
    mat4 world;
-#endif
 } vk_mesh_instance;
 
 align_struct

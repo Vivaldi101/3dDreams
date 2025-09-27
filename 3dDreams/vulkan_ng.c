@@ -967,21 +967,26 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
 // TODO: scratch arenas
 static vk_buffer vk_buffer_transforms_create(vk_context* context)
 {
-   mat4* transforms = malloc(context->mesh_instances.count * sizeof(mat4));
+   struct mesh_draw* draws = malloc(context->mesh_instances.count * sizeof(struct mesh_draw));
 
    for(u32 i = 0; i < context->mesh_instances.count; ++i)
-      transforms[i] = context->mesh_instances.data[i].world;
+   {
+      draws[i].world = context->mesh_instances.data[i].world;
+      draws[i].mesh_index = (u32)context->mesh_instances.data[i].mesh_index;
+      draws[i].normal = (u32)context->mesh_instances.data[i].normal;
+      draws[i].albedo = (u32)context->mesh_instances.data[i].albedo;
+   }
 
-   size scratch_buffer_size = context->mesh_instances.count * sizeof(mat4);
+   size scratch_buffer_size = context->mesh_instances.count * sizeof(struct mesh_draw);
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    vk_buffer transform_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-   vk_buffer_upload(context, transform_buffer, scratch_buffer, transforms, sizeof(mat4) * context->mesh_instances.count);
+   vk_buffer_upload(context, transform_buffer, scratch_buffer, draws, sizeof(struct mesh_draw) * context->mesh_instances.count);
 
-   free(transforms);
+   free(draws);
 
    return transform_buffer;
 }
@@ -1120,46 +1125,22 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
-      vk_buffer_binding bbs[2] = {};
+      vk_buffer_binding bbs[3] = {};
       bbs[0].buffer = context->bos.vb;
       bbs[0].binding = 0;
 
       bbs[1].buffer = context->bos.mb;
       bbs[1].binding = 1;
 
+      bbs[2].buffer = context->bos.world_transform;
+      bbs[2].binding = 2;
+
       do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      u32 meshlet_limit = 0xffff;
-      u32 draw_calls = context->meshlet_count / meshlet_limit;
-      u32 base = 0;
-
-      // 0xffff is the AMD limit - check this also on nvidia
-      // draw meshlets in chunks
-      for(u32 i = 0; i < draw_calls; ++i)
-      {
-         // TODO: cmd_push_rtx_constants()
-         vkCmdPushConstants(command_buffer, pipeline_layout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-            offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
-            &base);
-
-         if(do_draw)
-            // TODO: cmd_draw_meshs()
-            vkCmdDrawMeshTasksEXT(command_buffer, meshlet_limit, 1, 1);
-         base += meshlet_limit;
-      }
-
-      // TODO: cmd_push_rtx_constants()
-      vkCmdPushConstants(command_buffer, pipeline_layout,
-         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
-         offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
-         &base);
-
-      // draw rest of the meshlets
       if(do_draw)
-         vkCmdDrawMeshTasksEXT(command_buffer, context->meshlet_count % meshlet_limit, 1, 1);
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -1292,6 +1273,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 #endif
 }
 
+      // TODO: pass amount of bindings to create here
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
 {
    assert(vk_valid_handle(logical_device));
@@ -1300,7 +1282,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
    // TODO: cleanup
    if(rtx_supported)
    {
-      VkDescriptorSetLayoutBinding bindings[2] = {};
+      VkDescriptorSetLayoutBinding bindings[3] = {};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
@@ -1310,6 +1292,11 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[1].descriptorCount = 1;
       bindings[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+
+      bindings[2].binding = 2;
+      bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      bindings[2].descriptorCount = 1;
+      bindings[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
 
       VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
@@ -1321,7 +1308,6 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
    }
    else
    {
-      // TODO: pass amount of bindings to create here
       VkDescriptorSetLayoutBinding bindings[2] = {};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1331,7 +1317,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       bindings[1].binding = 1;
       bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[1].descriptorCount = 1;
-      bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+      bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
       VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 

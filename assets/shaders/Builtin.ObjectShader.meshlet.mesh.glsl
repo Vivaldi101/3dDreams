@@ -4,6 +4,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
 #extension GL_ARB_shading_language_include: require
+#extension GL_ARB_shader_draw_parameters : require
 #extension GL_GOOGLE_include_directive: require
 
 #define DEBUG 1
@@ -14,7 +15,6 @@ layout(push_constant) uniform block
 {
     mat4 projection;
     mat4 view;
-    mat4 world;
    float near;
    float far;
    float ar;
@@ -28,14 +28,19 @@ layout(triangles, max_vertices = 64, max_primitives = 127) out;
 const uint max_vertices = 64;
 const uint max_primitives = 127;
 
-layout(set = 0, binding = 1) readonly buffer Meshlets
+layout(set = 0, binding = 0) readonly buffer vertex_block
+{
+   vertex verts[];
+};
+
+layout(set = 0, binding = 1) readonly buffer meshlet_block
 {
    meshlet meshlets[];
 };
 
-layout(set = 0, binding = 0) readonly buffer Verts
+layout(set = 0, binding = 2) readonly buffer transform_block
 {
-   vertex verts[];
+   mat4 worlds[];
 };
 
 layout(location = 0) out vec4 out_color[];
@@ -64,6 +69,8 @@ uint32_t hash_index(uint32_t a)
 
 void main()
 {
+    int draw_ID = gl_DrawIDARB;
+
     uint mi = gl_WorkGroupID.x + globals.meshlet_offset;
     uint ti = gl_LocalInvocationID.x;
 
@@ -84,7 +91,7 @@ void main()
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
       vertex v = verts[vi];
-      vec4 vo = globals.projection * globals.view * globals.world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * worlds[draw_ID] * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 

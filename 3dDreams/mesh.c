@@ -574,29 +574,27 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
       if(node->mesh)
       {
          mat4 wm = {0};
-         mat4 lm = {0};
          cgltf_node_transform_world(node, wm.data);
-         cgltf_node_transform_local(node, lm.data);
-
-         usize mesh_index = cgltf_mesh_index(data, node->mesh);
 
          vk_mesh_instance mi = {0};
-
+         u32 mesh_index = (u32)cgltf_mesh_index(data, node->mesh);
          // index into the mesh to draw
          mi.mesh_index = mesh_index;
-#if 0
-
-         f32 s[3], r[4], t[3];
-         transform_decompose(t, r, s, wm);
-
-         // mesh instance geometry
-         mi.orientation = (vec4){r[0], r[1], r[2], r[3]};
-         mi.pos = (vec3){t[0], t[1], t[2]};
-         // TODO: no uniform scaling
-         mi.scale = max(max(s[0], s[1]), s[2]);
-#else
          mi.world = wm;
-#endif
+
+         assert(node->mesh->primitives_count == 1);
+
+         cgltf_material* material = node->mesh->primitives[0].material;
+         cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
+            ? cgltf_texture_index(data, material->pbr_metallic_roughness.base_color_texture.texture)
+            : 0;
+
+         cgltf_size normal_index = material && material->normal_texture.texture
+            ? cgltf_texture_index(data, material->normal_texture.texture)
+            : 0;
+
+         mi.albedo = (u32)albedo_index;
+         mi.normal = (u32)normal_index;
 
          array_add(context->mesh_instances, mi);
       }
