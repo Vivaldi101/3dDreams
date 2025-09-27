@@ -63,19 +63,19 @@ void main()
     mesh_draw draw = draws[in_drawID];
 
     // TODO: backup values for missing textures?
-    uint albedo_index = draw.albedo;
-    uint normal_index = draw.normal;
-    uint metal_index = draw.metal;
-    uint emissive_index = draw.emissive;
-    uint ao_index = draw.ao;
+    uint albedo_index = nonuniformEXT(draw.albedo);
+    uint normal_index = nonuniformEXT(draw.normal);
+    uint metal_index = nonuniformEXT(draw.metal);
+    uint emissive_index = nonuniformEXT(draw.emissive);
+    uint ao_index = nonuniformEXT(draw.ao);
 
     vec3 albedo = pow(texture(textures[albedo_index], in_uv).rgb, vec3(2.2)); // sRGB to linear
     vec3 mr      = texture(textures[metal_index], in_uv).rgb;
-    float roughness = mr.g;
-    float metallic  = mr.b;
     vec3 emissive   = texture(textures[emissive_index], in_uv).rgb;  // apply factor if needed
     float ao        = texture(textures[ao_index], in_uv).r;
     vec3 normal     = texture(textures[normal_index], in_uv).rgb;
+    float roughness = mr.g;
+    float metallic  = mr.b;
 
     vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z
     vec3 lightPos  = vec3(0.0, 1.0, 1.0);      // point light
