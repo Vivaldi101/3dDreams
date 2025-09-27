@@ -869,7 +869,27 @@ static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
    return result;
 }
 
-// TODO: into cmd.c
+// TODO: these into cmd.c
+static void cmd_push_all_constants(VkCommandBuffer command_buffer, VkPipelineLayout layout, mvp_transform* mvp)
+{
+   vkCmdPushConstants(command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(*mvp), mvp);
+}
+
+static void cmd_push_rtx_constants(VkCommandBuffer command_buffer, VkPipelineLayout layout, mvp_transform* mvp, u32 offset)
+{
+   vkCmdPushConstants(command_buffer, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, offset, sizeof(*mvp), mvp);
+}
+
+static void cmd_push_all_rtx_constants(VkCommandBuffer command_buffer, VkPipelineLayout layout, mvp_transform* mvp)
+{
+   cmd_push_rtx_constants(command_buffer, layout, mvp, 0);
+}
+
+static void cmd_draw_indexed(VkCommandBuffer command_buffer, vk_mesh_draw md, u32 instance_count, u32 instance)
+{
+   vkCmdDrawIndexed(command_buffer, (u32)md.index_count, instance_count, (u32)md.index_offset, (u32)md.vertex_offset, instance);
+}
+
 static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 {
    if(!buffer->handle || buffer->size <= 0)
@@ -883,7 +903,7 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
    return result;
 }
 
-static VkWriteDescriptorSet cmd_buffer_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, u32 binding, VkDescriptorBufferInfo* buffer_info)
+static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, u32 binding, VkDescriptorBufferInfo* buffer_info)
 {
    VkWriteDescriptorSet result = {};
 
@@ -897,7 +917,7 @@ static VkWriteDescriptorSet cmd_buffer_write_descriptor_create(VkCommandBuffer c
    return result;
 }
 
-static bool cmd_buffer_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
+static bool cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
 {
    array(VkWriteDescriptorSet) write_set = {&scratch};
    array(VkDescriptorBufferInfo) infos = {&scratch};
@@ -911,7 +931,7 @@ static bool cmd_buffer_push_storage_buffer(VkCommandBuffer command_buffer, arena
       if(!infos.data[i].buffer)
          return false;
 
-      VkWriteDescriptorSet set = cmd_buffer_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos.data[i]);
+      VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos.data[i]);
       array_add(write_set, set);
    }
 
@@ -920,17 +940,17 @@ static bool cmd_buffer_push_storage_buffer(VkCommandBuffer command_buffer, arena
    return true;
 }
 
-static void cmd_buffer_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
+static void cmd_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
 {
    vkCmdBindIndexBuffer(command_buffer, buffer, offset, VK_INDEX_TYPE_UINT32);
 }
 
-static void cmd_buffer_bind_pipeline(VkCommandBuffer command_buffer, VkPipeline pipeline)
+static void cmd_bind_pipeline(VkCommandBuffer command_buffer, VkPipeline pipeline)
 {
    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
-static void cmd_buffer_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLayout layout, VkDescriptorSet* sets, u32 set, u32 set_count)
+static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLayout layout, VkDescriptorSet* sets, u32 set, u32 set_count)
 {
    vkCmdBindDescriptorSets(command_buffer,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1039,8 +1059,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       VkPipeline pipeline = context->rtx_pipeline;
       VkPipelineLayout pipeline_layout = context->rtx_pipeline_layout;
 
-      cmd_buffer_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
-      cmd_buffer_bind_pipeline(command_buffer, pipeline);
+      cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
+      cmd_bind_pipeline(command_buffer, pipeline);
 
       vk_buffer_binding bbs[2] = {};
       bbs[0].buffer = context->bos.vb;
@@ -1049,11 +1069,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       bbs[1].buffer = context->bos.mb;
       bbs[1].binding = 1;
 
-      do_draw = cmd_buffer_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
-      vkCmdPushConstants(command_buffer, pipeline_layout,
-         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT, 0,
-         sizeof(mvp), &mvp);
+      cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
       u32 meshlet_limit = 0xffff;
       u32 draw_calls = context->meshlet_count / meshlet_limit;
@@ -1063,6 +1081,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       // draw meshlets in chunks
       for(u32 i = 0; i < draw_calls; ++i)
       {
+         // TODO: cmd_push_rtx_constants()
          vkCmdPushConstants(command_buffer, pipeline_layout,
             VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
             offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
@@ -1073,6 +1092,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          base += meshlet_limit;
       }
 
+      // TODO: cmd_push_rtx_constants()
       vkCmdPushConstants(command_buffer, pipeline_layout,
          VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT,
          offsetof(mvp_transform, meshlet_offset), sizeof(mvp.meshlet_offset),
@@ -1087,15 +1107,15 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       VkPipeline pipeline = context->non_rtx_pipeline;
       VkPipelineLayout pipeline_layout = context->non_rtx_pipeline_layout;
 
-      cmd_buffer_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
-      cmd_buffer_bind_pipeline(command_buffer, pipeline);
-      cmd_buffer_bind_buffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
+      cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
+      cmd_bind_pipeline(command_buffer, pipeline);
+      cmd_bind_buffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
 
       vk_buffer_binding bbs[1] = {};
       bbs[0].buffer = context->bos.vb;
       bbs[0].binding = 0;
 
-      do_draw = cmd_buffer_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 #if 1
       for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
@@ -1121,14 +1141,10 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          mvp.world = mi.world;
 #endif
 
-         vkCmdPushConstants(command_buffer, pipeline_layout,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,
-            sizeof(mvp), &mvp);
-
+         cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
          vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
-
          if(do_draw)
-            vkCmdDrawIndexed(command_buffer, (u32)md.index_count, 1, (u32)md.index_offset, (u32)md.vertex_offset, 0);
+            cmd_draw_indexed(command_buffer, md, 1, 0);
       }
 #else
       // TODO: scratch arenas
