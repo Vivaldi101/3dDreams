@@ -112,7 +112,7 @@ align_struct
    vec4 orientation;
    f32 scale;
 #else
-   mat4 model;
+   mat4 world;
 #endif
 } vk_mesh_instance;
 

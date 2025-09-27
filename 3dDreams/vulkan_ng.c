@@ -985,7 +985,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    mvp.view = mat4_view(eye, dir);
 
-   mvp.model = mat4_identity();
+   mvp.world = mat4_identity();
    mvp.meshlet_offset = 0;
 
    const f32 c = 255.0f;
@@ -1118,7 +1118,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
          mvp.model.data[13] = t.y;
          mvp.model.data[14] = t.z;
 #else
-         mvp.model = mi.model;
+         mvp.world = mi.world;
 #endif
 
          vkCmdPushConstants(command_buffer, pipeline_layout,

@@ -574,7 +574,9 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
       if(node->mesh)
       {
          mat4 wm = {0};
+         mat4 lm = {0};
          cgltf_node_transform_world(node, wm.data);
+         cgltf_node_transform_local(node, lm.data);
 
          usize mesh_index = cgltf_mesh_index(data, node->mesh);
 
@@ -593,7 +595,7 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
          // TODO: no uniform scaling
          mi.scale = max(max(s[0], s[1]), s[2]);
 #else
-         mi.model = wm;
+         mi.world = wm;
 #endif
 
          array_add(context->mesh_instances, mi);

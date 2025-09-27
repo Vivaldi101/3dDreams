@@ -477,7 +477,7 @@ typedef struct mvp_transform
 {
     mat4 projection;
     mat4 view;
-    mat4 model;
+    mat4 world;
     f32 n;
     f32 f;
     f32 ar;

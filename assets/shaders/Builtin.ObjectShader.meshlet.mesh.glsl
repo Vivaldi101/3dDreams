@@ -14,7 +14,7 @@ layout(push_constant) uniform block
 {
     mat4 projection;
     mat4 view;
-    mat4 model;
+    mat4 world;
    float near;
    float far;
    float ar;
@@ -84,7 +84,7 @@ void main()
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
       vertex v = verts[vi];
-      vec4 vo = globals.projection * globals.view * globals.model * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * globals.world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 
