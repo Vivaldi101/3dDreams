@@ -30,7 +30,7 @@ layout(set = 0, binding = 1) readonly buffer mesh_draw_block
 layout(location = 0) out vec3 out_normal;
 layout(location = 1) out vec3 out_world_frag_pos;
 layout(location = 2) out vec2 out_uv;
-layout(location = 3) flat out uint out_drawID;
+layout(location = 3) flat out uint out_draw_ID;
 
 void main()
 {
@@ -50,5 +50,5 @@ void main()
     out_normal = world_normal;
     out_world_frag_pos = world_pos.xyz;
     out_uv = texcoord;
-    out_drawID = draw_ID;
+    out_draw_ID = draw_ID;
 }

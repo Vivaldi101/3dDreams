@@ -13,7 +13,7 @@ layout(location = 0) out vec4 out_color;
 layout(location = 0) in vec3 in_normal;
 layout(location = 1) in vec3 in_world_frag_pos;
 layout(location = 2) in vec2 in_uv;
-layout(location = 3) flat in uint in_drawID;
+layout(location = 3) flat in uint in_draw_ID;
 
 layout(set = 0, binding = 1) readonly buffer mesh_draw_block
 {
@@ -60,69 +60,13 @@ vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
 
 void main()
 {
-    mesh_draw draw = draws[in_drawID];
+    mesh_draw draw = draws[in_draw_ID];
 
-    // TODO: backup values for missing textures?
-    uint albedo_index = nonuniformEXT(draw.albedo);
-    uint normal_index = nonuniformEXT(draw.normal);
-    uint metal_index = nonuniformEXT(draw.metal);
-    uint emissive_index = nonuniformEXT(draw.emissive);
-    uint ao_index = nonuniformEXT(draw.ao);
+    vec3 albedo_srgb = texture(textures[draw.albedo], in_uv).rgb;
+    vec3 albedo = pow(albedo_srgb, vec3(2.2)); // sRGB -> linear
 
-    vec3 albedo = pow(texture(textures[albedo_index], in_uv).rgb, vec3(2.2)); // sRGB to linear
-    vec3 mr      = texture(textures[metal_index], in_uv).rgb;
-    vec3 emissive   = texture(textures[emissive_index], in_uv).rgb;  // apply factor if needed
-    float ao        = texture(textures[ao_index], in_uv).r;
-    vec3 normal     = texture(textures[normal_index], in_uv).rgb;
-    float roughness = mr.g;
-    float metallic  = mr.b;
+    vec3 emissive_srgb = texture(textures[draw.emissive], in_uv).rgb;
+    vec3 emissive = pow(emissive_srgb, vec3(2.2)); // sRGB -> linear
 
-    vec3 cameraPos = vec3(0.0, 0.0, 5.0);      // camera looking down -Z
-    vec3 lightPos  = vec3(0.0, 1.0, 1.0);      // point light
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);     // white
-
-    // --- Normals ---
-    vec3 N = normalize(normal); // if you have tangents, use getNormalFromMap
-    vec3 V = normalize(cameraPos - in_world_frag_pos);
-    vec3 L = normalize(lightPos - in_world_frag_pos);
-    vec3 H = normalize(V + L);
-
-    // --- PBR Lighting ---
-    float NdotL = max(dot(N, L), 0.0);
-    float NdotV = max(dot(N, V), 0.0);
-
-    // Fresnel-Schlick
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-    vec3 F = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
-
-    // Normal Distribution (GGX)
-    float a = roughness * roughness;
-    float a2 = a * a;
-    float NdotH = max(dot(N, H), 0.0);
-    float denom = (NdotH * NdotH * (a2 - 1.0) + 1.0);
-    float D = a2 / (3.141592 * denom * denom);
-
-    float k = (roughness + 1.0);
-    k = (k * k) / 8.0;
-    float G = G1(NdotV, k) * G1(NdotL, k);
-
-    // Cook-Torrance BRDF
-    vec3 numerator = D * G * F;
-    float denominator = 4.0 * NdotV * NdotL + 0.001;
-    vec3 specular = numerator / denominator;
-
-    // Energy conservation
-    vec3 kS = F;
-    vec3 kD = (1.0 - kS) * (1.0 - metallic);
-
-    // Final lighting
-    vec3 diffuse = kD * albedo / 3.141592;
-    vec3 radiance = lightColor;
-
-    vec3 color = (diffuse + specular) * radiance * NdotL;
-    color = color * ao; // apply AO
-    color += emissive;  // add emissive
-
-    // gamma correction back to sRGB
-    out_color = vec4(pow(color, vec3(1.0/2.2)), 1.0);
+    out_color = vec4(albedo, 1.0);
 }
