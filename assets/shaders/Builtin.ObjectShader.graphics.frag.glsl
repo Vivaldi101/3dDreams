@@ -47,17 +47,6 @@ float G1(float NdotX, float k)
    return NdotX / (NdotX * (1.0 - k) + k);
 }
 
-#if 0
-// Utility to unpack normal from normal map
-vec3 getNormalFromMap(vec2 uv, vec3 normal, vec3 tangent, vec3 bitangent)
-{
-    vec3 tangentNormal = texture(normal, uv).xyz * 2.0 - 1.0;
-
-    mat3 TBN = mat3(tangent, bitangent, normal);
-    return normalize(TBN * tangentNormal);
-}
-#endif
-
 void main()
 {
     mesh_draw draw = draws[in_draw_ID];
