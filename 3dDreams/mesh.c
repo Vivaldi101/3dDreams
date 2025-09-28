@@ -592,23 +592,23 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
 
          cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
             ? cgltf_texture_index(data, material->pbr_metallic_roughness.base_color_texture.texture)
-            : 0;
+            : -1;
 
          cgltf_size normal_index = material && material->normal_texture.texture
             ? cgltf_texture_index(data, material->normal_texture.texture)
-            : 0;
+            : -1;
 
          cgltf_size ao_index = material && material->occlusion_texture.texture
             ? cgltf_texture_index(data, material->occlusion_texture.texture)
-            : 0;
+            : -1;
 
          cgltf_size metal_index = material && material->pbr_metallic_roughness.metallic_roughness_texture.texture
             ? cgltf_texture_index(data, material->pbr_metallic_roughness.metallic_roughness_texture.texture)
-            : 0;
+            : -1;
 
          cgltf_size emissive_index = material && material->emissive_texture.texture
             ? cgltf_texture_index(data, material->emissive_texture.texture)
-            : 0;
+            : -1;
 
          mi.albedo = (u32)albedo_index;
          mi.normal = (u32)normal_index;

@@ -62,11 +62,13 @@ void main()
 {
     mesh_draw draw = draws[in_draw_ID];
 
-    vec3 albedo_srgb = texture(textures[draw.albedo], in_uv).rgb;
-    vec3 albedo = pow(albedo_srgb, vec3(2.2)); // sRGB -> linear
+    vec4 albedo = vec4(1, 0, 1, 1);
+    if(draw.albedo != -1)
+      albedo = texture(textures[draw.albedo], in_uv);
 
-    vec3 emissive_srgb = texture(textures[draw.emissive], in_uv).rgb;
-    vec3 emissive = pow(emissive_srgb, vec3(2.2)); // sRGB -> linear
+    vec4 nmap = vec4(0, 0, 1, 0);
+    if(draw.normal != -1)
+      nmap = texture(textures[draw.normal], in_uv);
 
-    out_color = vec4(albedo, 1.0);
+    out_color = albedo;
 }
