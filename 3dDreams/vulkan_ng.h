@@ -77,7 +77,8 @@ align_struct
    vk_buffer vb;        // vertex buffer
    vk_buffer ib;        // index buffer
    vk_buffer mb;        // mesh buffer
-   vk_buffer indirect;  // indirect rendering
+   vk_buffer indirect;        // indirect rendering
+   vk_buffer indirect_rtx;    // indirect rendering
    vk_buffer world_transform; // world transform
 } vk_buffer_objects;
 
@@ -151,6 +152,7 @@ align_struct
    array(vk_texture) textures;
 
    VkInstance instance;
+   // devices into separate struct
    VkPhysicalDevice physical_device;
    VkDevice logical_device;
    VkSurfaceKHR surface;
@@ -202,6 +204,6 @@ typedef struct vertex vertex;
 static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size);
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+static vk_buffer vk_buffer_create(vk_context* context, size size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 #endif

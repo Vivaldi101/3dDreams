@@ -117,7 +117,7 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
    return result;
 }
 
-static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMemoryProperties memory_properties, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
+static vk_buffer vk_buffer_create(vk_context* context, size size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
    vk_buffer buffer = {0};
 
@@ -125,11 +125,14 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    create_info.size = size;
    create_info.usage = usage;
 
-   if(!vk_valid(vkCreateBuffer(device, &create_info, 0, &buffer.handle)))
+   if(!vk_valid(vkCreateBuffer(context->logical_device, &create_info, 0, &buffer.handle)))
       return (vk_buffer){0};
 
    VkMemoryRequirements memory_reqs;
-   vkGetBufferMemoryRequirements(device, buffer.handle, &memory_reqs);
+   vkGetBufferMemoryRequirements(context->logical_device, buffer.handle, &memory_reqs);
+
+   VkPhysicalDeviceMemoryProperties memory_properties;
+   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_properties);
 
    u32 memory_index = memory_properties.memoryTypeCount;
    u32 i = 0;
@@ -150,14 +153,14 @@ static vk_buffer vk_buffer_create(VkDevice device, size size, VkPhysicalDeviceMe
    allocate_info.memoryTypeIndex = memory_index;
 
    VkDeviceMemory memory = 0;
-   if(!vk_valid(vkAllocateMemory(device, &allocate_info, 0, &memory)))
+   if(!vk_valid(vkAllocateMemory(context->logical_device, &allocate_info, 0, &memory)))
       return (vk_buffer){0};
 
-   if(!vk_valid(vkBindBufferMemory(device, buffer.handle, memory, 0)))
+   if(!vk_valid(vkBindBufferMemory(context->logical_device, buffer.handle, memory, 0)))
       return (vk_buffer){0};
 
    if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-      if(!vk_valid(vkMapMemory(device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
+      if(!vk_valid(vkMapMemory(context->logical_device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
          return (vk_buffer) {0};
 
    buffer.size = allocate_info.allocationSize;
@@ -645,11 +648,11 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   result.vb = vk_buffer_create(context->logical_device, vb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.mb = vk_buffer_create(context->logical_device, mb_size, memory_props, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.ib = vk_buffer_create(context->logical_device, ib_size, memory_props, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.vb = vk_buffer_create(context, vb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.mb = vk_buffer_create(context, mb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.ib = vk_buffer_create(context, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    // vertex data
    vk_buffer_upload(context, result.vb, scratch_buffer, vertices.data, vb_size);

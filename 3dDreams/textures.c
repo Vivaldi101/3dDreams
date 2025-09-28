@@ -137,7 +137,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, tex_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer scratch_buffer = vk_buffer_create(context, tex_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    if((scratch_buffer.size >= tex_size) && vk_valid_handle(image))
    {

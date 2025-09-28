@@ -137,8 +137,6 @@ static void spv_lookup(VkDevice logical_device, arena* storage, spv_hash_table* 
    for(size i = 0; i < table->max_count; ++i)
       table->keys[i] = 0;
 
-   // TODO: routine to iterate over hash values
-
    // Compile all the shaders
    for(const char** p = shader_names; p && *p; ++p)
    {
@@ -979,43 +977,50 @@ static vk_buffer vk_buffer_transforms_create(vk_context* context, arena scratch)
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-   vk_buffer transform_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer transform_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    vk_buffer_upload(context, transform_buffer, scratch_buffer, draws, sizeof(struct mesh_draw) * context->mesh_instances.count);
 
    return transform_buffer;
 }
 
-static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch)
+static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch, bool rtx_supported)
 {
-   VkDrawIndexedIndirectCommand* draw_commands = push(&scratch,  VkDrawIndexedIndirectCommand, context->mesh_instances.count);
+   vk_buffer indirect_buffer = {};
 
-   for(u32 i = 0; i < context->mesh_instances.count; ++i)
+   if(!rtx_supported)
    {
-      vk_mesh_instance mi = context->mesh_instances.data[i];
-      vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
+      VkDrawIndexedIndirectCommand* draw_commands = push(&scratch, VkDrawIndexedIndirectCommand, context->mesh_instances.count);
 
-      VkDrawIndexedIndirectCommand cmd =
+      for(u32 i = 0; i < context->mesh_instances.count; ++i)
       {
-          .indexCount = (u32)md.index_count,
-          .instanceCount = 1,               // one instance per mesh_instance
-          .firstIndex = (u32)md.index_offset,
-          .vertexOffset = (i32)md.vertex_offset,
-          .firstInstance = i                // important: matches instance ID
-      };
+         vk_mesh_instance mi = context->mesh_instances.data[i];
+         vk_mesh_draw md = context->mesh_draws.data[mi.mesh_index];
 
-      draw_commands[i] = cmd;
+         VkDrawIndexedIndirectCommand cmd =
+         {
+             .indexCount = (u32)md.index_count,
+             .instanceCount = 1,               // one instance per mesh_instance
+             .firstIndex = (u32)md.index_offset,
+             .vertexOffset = (i32)md.vertex_offset,
+             .firstInstance = i                // important: matches instance ID
+         };
+
+         draw_commands[i] = cmd;
+      }
+
+      size scratch_buffer_size = context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand);
+
+      vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      indirect_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
    }
-
-   size scratch_buffer_size = context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand);
-
-   VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-   vk_buffer indirect_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-   vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+   else
+   {
+      // ...
+   }
 
    return indirect_buffer;
 }
@@ -1108,7 +1113,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    bool do_draw = false;
 
-
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
@@ -1133,8 +1137,10 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      if(do_draw)
-         vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+      if(do_draw && context->bos.indirect_rtx.handle)
+      {
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect_rtx.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+      }
    }
    else
    {
@@ -1154,34 +1160,12 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
-#if 0
-      for(u32 i = 0; i < context->mesh_instances.count; ++i)
-      {
-         vk_mesh_instance mi = context->mesh_instances.data[i];
-         f32 s = mi.scale;
-         vec4 r = mi.orientation;
-         vec3 t = mi.pos;
-
-         quaternion_to_matrix(&r, mvp.model.data);
-
-         assert(s > .0f);
-
-         // TODO: negative scales?
-         mvp.model.data[0] *= s;
-         mvp.model.data[5] *= s;
-         mvp.model.data[10] *= s;
-
-         mvp.model.data[12] = t.x;
-         mvp.model.data[13] = t.y;
-         mvp.model.data[14] = t.z;
-         mvp.world = mi.world;
-      }
-#endif
-
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      if(do_draw)
+      if(do_draw && context->bos.indirect.handle)
+      {
          vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+      }
    }
 
    // draw axis
@@ -1760,7 +1744,8 @@ void vk_initialize(hw* hw)
    spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
    context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
-   context->bos.indirect = vk_buffer_indirect_create(context, *context->storage);
+   context->bos.indirect = vk_buffer_indirect_create(context, *context->storage, false);
+   context->bos.indirect_rtx = vk_buffer_indirect_create(context, *context->storage, true);
    context->bos.world_transform = vk_buffer_transforms_create(context, *context->storage);
 
    VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, false);
