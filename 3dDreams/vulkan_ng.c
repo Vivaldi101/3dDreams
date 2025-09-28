@@ -920,23 +920,20 @@ static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_
 
 static bool cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
 {
-   array(VkWriteDescriptorSet) write_set = {&scratch};
-   array(VkDescriptorBufferInfo) infos = {&scratch};
-
-   array_resize(write_set, binding_count);
-   array_resize(infos, binding_count);
+   VkWriteDescriptorSet* write_set = push(&scratch, VkWriteDescriptorSet, binding_count);
+   VkDescriptorBufferInfo* infos = push(&scratch, VkDescriptorBufferInfo, binding_count);
 
    for(u32 i = 0; i < binding_count; ++i)
    {
-      infos.data[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
-      if(!infos.data[i].buffer)
+      infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
+      if(!infos[i].buffer)
          return false;
 
-      VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos.data[i]);
-      array_add(write_set, set);
+      VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos[i]);
+      write_set[i] = set;
    }
 
-   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, (u32)write_set.count, write_set.data);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_set);
 
    return true;
 }
@@ -964,10 +961,9 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
-// TODO: scratch arenas
-static vk_buffer vk_buffer_transforms_create(vk_context* context)
+static vk_buffer vk_buffer_transforms_create(vk_context* context, arena scratch)
 {
-   struct mesh_draw* draws = malloc(context->mesh_instances.count * sizeof(struct mesh_draw));
+   struct mesh_draw* draws = push(&scratch, struct mesh_draw, context->mesh_instances.count);
 
    for(u32 i = 0; i < context->mesh_instances.count; ++i)
    {
@@ -988,14 +984,12 @@ static vk_buffer vk_buffer_transforms_create(vk_context* context)
 
    vk_buffer_upload(context, transform_buffer, scratch_buffer, draws, sizeof(struct mesh_draw) * context->mesh_instances.count);
 
-   free(draws);
-
    return transform_buffer;
 }
 
-static vk_buffer vk_buffer_indirect_create(vk_context* context)
+static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch)
 {
-   VkDrawIndexedIndirectCommand* draw_commands = malloc(context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand));
+   VkDrawIndexedIndirectCommand* draw_commands = push(&scratch,  VkDrawIndexedIndirectCommand, context->mesh_instances.count);
 
    for(u32 i = 0; i < context->mesh_instances.count; ++i)
    {
@@ -1022,8 +1016,6 @@ static vk_buffer vk_buffer_indirect_create(vk_context* context)
    vk_buffer indirect_buffer = vk_buffer_create(context->logical_device, scratch_buffer_size, memory_props, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
-
-   free(draw_commands);
 
    return indirect_buffer;
 }
@@ -1768,8 +1760,8 @@ void vk_initialize(hw* hw)
    spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
 
    context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
-   context->bos.indirect = vk_buffer_indirect_create(context);
-   context->bos.world_transform = vk_buffer_transforms_create(context);
+   context->bos.indirect = vk_buffer_indirect_create(context, *context->storage);
+   context->bos.world_transform = vk_buffer_transforms_create(context, *context->storage);
 
    VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, false);
    VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, true);
