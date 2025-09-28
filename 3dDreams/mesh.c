@@ -571,8 +571,16 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = data->nodes + i;
-      if(node->mesh)
+      if(!node->mesh)
+         continue;
+
+      cgltf_mesh* mesh = node->mesh;
+
+      for(cgltf_size pi = 0; pi < mesh->primitives_count; ++pi)
       {
+         cgltf_primitive* prim = &mesh->primitives[pi];
+         cgltf_material* material = prim->material;
+
          mat4 wm = {0};
          cgltf_node_transform_world(node, wm.data);
 
@@ -582,9 +590,6 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
          mi.mesh_index = mesh_index;
          mi.world = wm;
 
-         assert(node->mesh->primitives_count == 1);
-
-         cgltf_material* material = node->mesh->primitives[0].material;
          cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
             ? cgltf_texture_index(data, material->pbr_metallic_roughness.base_color_texture.texture)
             : 0;
