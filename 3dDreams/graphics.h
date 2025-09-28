@@ -101,16 +101,15 @@ static vec3 vec3_add(const vec3* a, const vec3* b)
 
 #define vec3_normalize(a) { f32 l = vec3_len((a)); (a).x /= l; (a).y /= l; (a).z /= l;}
 
-#pragma pack(push, 1)
-typedef union
+
+typedef union __declspec(align(16))
 { 
 #if defined(USE_SIMD)
-   __declspec(align(16)) vec4 rows[4];
+   vec4 rows[4];
 #else
-   __declspec(align(16)) f32 data[16];
+   f32 data[16];
 #endif
 } mat4;
-#pragma pack(pop)
 
 static void transform_decompose(f32 translation[3], f32 rotation[4], f32 scale[3], const f32* transform)
 {
