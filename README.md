@@ -1,4 +1,4 @@
-Vulkan renderer written in C23 with minimal library dependencies (cgltf and volk)
+Vulkan renderer with mesh shading written in C23 with minimal library dependencies (cgltf, volk, stb image)
 
 <img width="1920" height="1032" alt="meshlets" src="https://github.com/user-attachments/assets/af97d79a-bd4f-431a-9b87-de0c53f1259c" />
 
