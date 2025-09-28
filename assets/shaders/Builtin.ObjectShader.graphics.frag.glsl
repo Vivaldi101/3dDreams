@@ -23,7 +23,6 @@ layout(set = 0, binding = 1) readonly buffer mesh_draw_block
 layout(set = 1, binding = 0)
 uniform sampler2D textures[];
 
-#if 0
 float ndc_to_linear_z(float ndc_z, float near, float far)
 {
    float u = far * near;
@@ -34,30 +33,19 @@ float ndc_to_linear_z(float ndc_z, float near, float far)
    return linear_z;
 }
 
-vec3 hsv_to_rgb(vec3 c)
-{
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 0.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-#endif
-
-float G1(float NdotX, float k)
-{
-   return NdotX / (NdotX * (1.0 - k) + k);
-}
-
 void main()
 {
     mesh_draw draw = draws[in_draw_ID];
 
     vec4 albedo = vec4(1, 0, 1, 1);
     if(draw.albedo != -1)
-      albedo = texture(textures[draw.albedo], in_uv);
+      albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
 
     vec4 nmap = vec4(0, 0, 1, 0);
     if(draw.normal != -1)
       nmap = texture(textures[draw.normal], in_uv);
 
-    out_color = albedo;
+    float ambient = .3f;
+    float diffuse = max(dot(normalize(in_normal), vec3(0, 0, 1)), 0.0);
+    out_color = vec4(albedo.rgb * (diffuse + ambient), 1.0); // keep opaque
 }
