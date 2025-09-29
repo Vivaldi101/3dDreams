@@ -20,10 +20,10 @@ layout(push_constant) uniform block
 
 vec3 quad[4] = vec3[]
 (
-    vec3(-3.0f, -0.0f,  3.0f),
-    vec3( 3.0f, -0.0f,  3.0f),
-    vec3( 3.0f, -0.0f, -3.0f),
-    vec3(-3.0f, -0.0f, -3.0f)
+    vec3(-3.0f, 0.0f,  3.0f),
+    vec3( 3.0f, 0.0f,  3.0f),
+    vec3( 3.0f, 0.0f, -3.0f),
+    vec3(-3.0f, 0.0f, -3.0f)
 );
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
