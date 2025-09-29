@@ -20,10 +20,10 @@ layout(push_constant) uniform block
 
 vec3 quad[4] = vec3[]
 (
-    vec3(-3.0f, -1.0f,  3.0f),
-    vec3( 3.0f, -1.0f,  3.0f),
-    vec3( 3.0f, -1.0f, -3.0f),
-    vec3(-3.0f, -1.0f, -3.0f)
+    vec3(-3.0f, -0.0f,  3.0f),
+    vec3( 3.0f, -0.0f,  3.0f),
+    vec3( 3.0f, -0.0f, -3.0f),
+    vec3(-3.0f, -0.0f, -3.0f)
 );
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
@@ -54,7 +54,7 @@ void main()
 
     if(!globals.is_procedural)
     {
-        p = vec3(verts[gl_VertexIndex].vx, verts[gl_VertexIndex].vy, verts[gl_VertexIndex].vz);
+        p = vec3(verts[gl_VertexIndex].vx, verts[gl_VertexIndex].vy, verts[gl_VertexIndex].vz) + vec3(0, 0, -0.8f);
         n = vec3(verts[gl_VertexIndex].nx, verts[gl_VertexIndex].ny, verts[gl_VertexIndex].nz);
         t = vec2(verts[gl_VertexIndex].tu, verts[gl_VertexIndex].tv);
 

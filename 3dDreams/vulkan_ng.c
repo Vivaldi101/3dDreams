@@ -1068,7 +1068,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
-   clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
+   //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
+   clear[0].color = (VkClearColorValue){1, 1, 1};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
    renderpass_info.clearValueCount = 2;
