@@ -117,16 +117,19 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
    return result;
 }
 
-static vk_buffer vk_buffer_create(vk_context* context, size size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
+static vk_buffer vk_buffer_create(vk_context* context, size buffer_size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
+   assert(buffer_size > 0);
+   assert(usage != 0);
+   assert(memory_flags != 0);
+
    vk_buffer buffer = {0};
 
    VkBufferCreateInfo create_info = {vk_info(BUFFER)};
-   create_info.size = size;
+   create_info.size = buffer_size;
    create_info.usage = usage;
 
-   if(!vk_valid(vkCreateBuffer(context->logical_device, &create_info, 0, &buffer.handle)))
-      return (vk_buffer){0};
+   vk_assert(vkCreateBuffer(context->logical_device, &create_info, 0, &buffer.handle));
 
    VkMemoryRequirements memory_reqs;
    vkGetBufferMemoryRequirements(context->logical_device, buffer.handle, &memory_reqs);
@@ -139,29 +142,22 @@ static vk_buffer vk_buffer_create(vk_context* context, size size, VkBufferUsageF
 
    while(i < memory_index)
    {
-      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags))
+      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags) && buffer_size <= (size)memory_properties.memoryHeaps[i].size)
          memory_index = i;
 
       ++i;
    }
-
-   if(i == memory_properties.memoryTypeCount)
-      return (vk_buffer){0};
 
    VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
    allocate_info.allocationSize = memory_reqs.size;
    allocate_info.memoryTypeIndex = memory_index;
 
    VkDeviceMemory memory = 0;
-   if(!vk_valid(vkAllocateMemory(context->logical_device, &allocate_info, 0, &memory)))
-      return (vk_buffer){0};
-
-   if(!vk_valid(vkBindBufferMemory(context->logical_device, buffer.handle, memory, 0)))
-      return (vk_buffer){0};
+   vk_assert(vkAllocateMemory(context->logical_device, &allocate_info, 0, &memory));
+   vk_assert(vkBindBufferMemory(context->logical_device, buffer.handle, memory, 0));
 
    if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-      if(!vk_valid(vkMapMemory(context->logical_device, memory, 0, allocate_info.allocationSize, 0, &buffer.data)))
-         return (vk_buffer) {0};
+      vk_assert(vkMapMemory(context->logical_device, memory, 0, allocate_info.allocationSize, 0, &buffer.data));
 
    buffer.size = allocate_info.allocationSize;
    buffer.memory = memory;

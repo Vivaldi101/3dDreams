@@ -15,7 +15,16 @@ layout(push_constant) uniform block
    float far;
    float ar;
    uint meshlet_offset;
+   bool is_procedural;
 } globals;
+
+vec3 quad_pos[4] = vec3[]
+(
+    vec3(-1.0f, -1.0f, 0.0f),
+    vec3( 1.0f, -1.0f, 0.0f),
+    vec3( 1.0f,  1.0f, 0.0f),
+    vec3(-1.0f,  1.0f, 0.0f)
+);
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
 {
@@ -35,7 +44,10 @@ layout(location = 3) flat out uint out_draw_ID;
 void main()
 {
     int draw_ID = gl_DrawIDARB;
-    vertex v = verts[gl_VertexIndex];
+
+    vertex v;
+    if(!globals.is_procedural)
+        v = verts[gl_VertexIndex];
 
     vec3 local_pos = vec3(v.vx, v.vy, v.vz);
     vec4 world_pos = draws[draw_ID].world * vec4(local_pos, 1.0);

@@ -916,7 +916,7 @@ static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_
    return result;
 }
 
-static bool cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
+static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
 {
    VkWriteDescriptorSet* write_set = push(&scratch, VkWriteDescriptorSet, binding_count);
    VkDescriptorBufferInfo* infos = push(&scratch, VkDescriptorBufferInfo, binding_count);
@@ -924,16 +924,12 @@ static bool cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratc
    for(u32 i = 0; i < binding_count; ++i)
    {
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
-      if(!infos[i].buffer)
-         return false;
 
       VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos[i]);
       write_set[i] = set;
    }
 
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_set);
-
-   return true;
 }
 
 static void cmd_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
@@ -1112,8 +1108,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
    vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);  // TODO: Use strip for ground planes
 
-   bool do_draw = false;
-
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
    if(state->rtx_enabled)
@@ -1134,14 +1128,11 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       bbs[2].buffer = context->bos.world_transform;
       bbs[2].binding = 2;
 
-      do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      if(do_draw && context->bos.indirect_rtx.handle)
-      {
-         vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect_rtx.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
-      }
+      vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect_rtx.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -1159,14 +1150,11 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       bbs[1].buffer = context->bos.world_transform;
       bbs[1].binding = 1;
 
-      do_draw = cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
 
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      if(do_draw && context->bos.indirect.handle)
-      {
-         vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
-      }
+      vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
    }
 
    // draw axis
@@ -1644,8 +1632,6 @@ VkInstance vk_instance_create(arena scratch)
 // TODO: think about the contracts here
 void vk_initialize(hw* hw)
 {
-   assert(hw->renderer.window.handle);
-
    VkResult volk_result = volkInitialize();
    if(!vk_valid(volk_result))
       fault(!vk_valid(volk_result));

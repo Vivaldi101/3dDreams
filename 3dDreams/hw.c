@@ -8,10 +8,10 @@
 
 static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
 {
-   PFN_vkCreateWin32SurfaceKHR vk_surface_function = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
+   assert(instance);
+   assert(window_handle);
 
-   if(!vk_surface_function)
-      return 0;
+   PFN_vkCreateWin32SurfaceKHR vk_surface_function = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
 
    VkWin32SurfaceCreateInfoKHR surface_info = {0};
    surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -19,7 +19,7 @@ static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
    surface_info.hwnd = window_handle;
 
    VkSurfaceKHR surface = 0;
-   vk_surface_function(instance, &surface_info, 0, &surface);
+   vk_assert(vk_surface_function(instance, &surface_info, 0, &surface));
 
    return surface;
 }

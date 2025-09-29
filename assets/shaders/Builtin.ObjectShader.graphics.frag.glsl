@@ -46,6 +46,8 @@ void main()
       nmap = texture(textures[draw.normal], in_uv);
 
     float ambient = .3f;
-    float diffuse = max(dot(normalize(in_normal), vec3(0, 0, 1)), 0.0);
+    float diffuse_factor = max(dot(normalize(in_normal), vec3(0, 0, 1)), 0.0);
+    vec3 light_color = vec3(1.f);
+    vec3 diffuse = diffuse_factor * light_color;
     out_color = vec4(albedo.rgb * (diffuse + ambient), 1.0); // keep opaque
 }
