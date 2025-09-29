@@ -66,14 +66,21 @@ void main()
     }
     else
     {
-         vec3 procedural_center = vec3(0.0, 0.0, 0.0); // center of quad in world space
-         float procedural_radius = 3.3;                // size of glow
-         float glow_intensity = 2.0;                   // HDR multiplier
-         float dist = length(in_world_frag_pos - procedural_center);
-         float falloff = 1.0 - smoothstep(0.0, procedural_radius, dist);
-         vec3 glow_color = vec3(0.0, 0.0, 0.85) * falloff * glow_intensity;
-         vec3 base_color = vec3(0, 0, 0);
-         vec3 final_color = clamp(base_color + glow_color, 0.0, 1.0);
-         out_color = vec4(final_color, 1.0);
+      vec3 procedural_center = vec3(0.0, 0.0, 0.0);
+      float glow_intensity = 3.0;
+      
+      float dist = length(in_world_frag_pos - procedural_center);
+      
+      // bright center + longer aura
+      float core  = exp(-dist * 6.5);     // small, bright dot
+      float halo  = exp(-dist * 1.05);     // larger glow spread
+      float falloff = core + 0.5 * halo;  // adjust 0.5 for halo strength
+      
+      vec3 glow_color = vec3(0.75, 0.86, 0.0) * falloff * glow_intensity;
+      vec3 base_color = vec3(0, 0, 0);
+      vec3 final_color = clamp(base_color + glow_color, 0.0, 1.0);
+      
+      out_color = vec4(final_color, 1.0);
+
     }
 }
