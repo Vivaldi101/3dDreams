@@ -1110,6 +1110,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+   vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);  // TODO: Use strip for ground planes
 
    bool do_draw = false;
 
@@ -1512,8 +1513,8 @@ static VkPipeline vk_graphics_pipeline_create(VkDevice logical_device, VkRenderP
    pipeline_info.pColorBlendState = &color_blend_info;
 
    VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
-   dynamic_info.pDynamicStates = (VkDynamicState[3]){VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH};
-   dynamic_info.dynamicStateCount = 3;
+   dynamic_info.pDynamicStates = (VkDynamicState[4]){VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_LINE_WIDTH, VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY};
+   dynamic_info.dynamicStateCount = 4;
    pipeline_info.pDynamicState = &dynamic_info;
 
    pipeline_info.renderPass = renderpass;
@@ -1617,10 +1618,13 @@ VkInstance vk_instance_create(arena scratch)
    const char** ext_names = push(&scratch, const char*, ext_count);
 
    for(size_t i = 0; i < ext_count; ++i)
+   {
       ext_names[i] = extensions[i].extensionName;
+      printf("Instance extension: [%zu]: %s\n", i, ext_names[i]);
+   }
 
    VkInstanceCreateInfo instance_info = {vk_info(INSTANCE)};
-   instance_info.pApplicationInfo = &(VkApplicationInfo) { .apiVersion = VK_API_VERSION_1_2 };
+   instance_info.pApplicationInfo = &(VkApplicationInfo) { .apiVersion = VK_API_VERSION_1_3 };
 
    instance_info.enabledExtensionCount = ext_count;
    instance_info.ppEnabledExtensionNames = ext_names;
