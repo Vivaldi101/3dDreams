@@ -359,8 +359,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 {
    hw* h = (hw*)user_data;
 #if _DEBUG
-   //debug_message("Validation layer message: %s\n", data->pMessage);
-   h->log(s8("Validation layer message: %s\n"), data->pMessage);
+   printf("Validation layer message: %s\n", data->pMessage);
 #endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
