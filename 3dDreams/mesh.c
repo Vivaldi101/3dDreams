@@ -142,11 +142,19 @@ static vk_buffer vk_buffer_create(vk_context* context, size buffer_size, VkBuffe
 
    while(i < memory_index)
    {
-      if(((memory_reqs.memoryTypeBits & (1 << i)) && memory_properties.memoryTypes[i].propertyFlags == memory_flags) && buffer_size <= (size)memory_properties.memoryHeaps[i].size)
+      VkMemoryType mem_type = memory_properties.memoryTypes[i];
+
+      if((memory_reqs.memoryTypeBits & (1 << i)) &&
+         (mem_type.propertyFlags & memory_flags) == memory_flags)
+      {
          memory_index = i;
+         break;
+      }
 
       ++i;
    }
+
+   assert(i != memory_properties.memoryTypeCount);
 
    VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
    allocate_info.allocationSize = memory_reqs.size;
