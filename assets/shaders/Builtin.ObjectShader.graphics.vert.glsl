@@ -18,12 +18,12 @@ layout(push_constant) uniform block
    bool is_procedural;
 } globals;
 
-vec3 quad_pos[4] = vec3[]
+vec3 quad[4] = vec3[]
 (
-    vec3(-1.0f, -1.0f, 0.0f),
-    vec3( 1.0f, -1.0f, 0.0f),
-    vec3( 1.0f,  1.0f, 0.0f),
-    vec3(-1.0f,  1.0f, 0.0f)
+    vec3(-3.0f, -1.0f,  3.0f),
+    vec3( 3.0f, -1.0f,  3.0f),
+    vec3( 3.0f, -1.0f, -3.0f),
+    vec3(-3.0f, -1.0f, -3.0f)
 );
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
@@ -46,18 +46,33 @@ void main()
     int draw_ID = gl_DrawIDARB;
 
     vertex v;
-    if(!globals.is_procedural)
-        v = verts[gl_VertexIndex];
+    vec3 p = vec3(0.f);
+    vec3 n = vec3(0.f);
+    vec2 t = vec2(0.f);
 
-    vec3 local_pos = vec3(v.vx, v.vy, v.vz);
-    vec4 world_pos = draws[draw_ID].world * vec4(local_pos, 1.0);
+    vec4 world_pos = vec4(0.f);
+
+    if(!globals.is_procedural)
+    {
+        p = vec3(verts[gl_VertexIndex].vx, verts[gl_VertexIndex].vy, verts[gl_VertexIndex].vz);
+        n = vec3(verts[gl_VertexIndex].nx, verts[gl_VertexIndex].ny, verts[gl_VertexIndex].nz);
+        t = vec2(verts[gl_VertexIndex].tu, verts[gl_VertexIndex].tv);
+
+        world_pos = draws[draw_ID].world * vec4(p, 1.0);
+    }
+    else
+    {
+        p = quad[gl_VertexIndex];
+        world_pos = vec4(p, 1.0);
+    }
+
     gl_Position = globals.projection * globals.view * world_pos;
 
     // Decode normal and transform to world space using inverse transpose
-    vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
+    vec3 normal = (n - 127.5) / 127.5;
     mat3 normal_matrix = transpose(inverse(mat3(draws[draw_ID].world)));
     vec3 world_normal = normalize(normal_matrix * normal);
-    vec2 texcoord = vec2(v.tu, v.tv);
+    vec2 texcoord = t;
 
     out_normal = world_normal;
     out_world_frag_pos = world_pos.xyz;
