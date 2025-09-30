@@ -124,13 +124,23 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-static void spv_lookup(VkDevice logical_device, arena* storage, spv_hash_table* table, const char** shader_names)
+// TODO: Rename
+static void spirv_initialize(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(context->logical_device));
+
+   u32 shader_count = 0;
+   const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
+   for(const char** p = shader_names; *p; ++p)
+      shader_count++;
+
+   spv_hash_table* table = &context->shader_modules;
+
+   table->max_count = shader_count;
 
    // TODO: make function for hash tables
-   table->keys = push(storage, const char*, table->max_count);
-   table->values = push(storage, vk_shader_modules, table->max_count);
+   table->keys = push(context->storage, const char*, table->max_count);
+   table->values = push(context->storage, vk_shader_modules, table->max_count);
 
    memset(table->values, 0, table->max_count * sizeof(vk_shader_modules));
 
@@ -149,21 +159,21 @@ static void spv_lookup(VkDevice logical_device, arena* storage, spv_hash_table* 
          {
             vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
             // TODO: optimize shader loading - load all the shaders at once
-            vk_shader_load(logical_device, *storage, *p, &ms);
+            vk_shader_load(context->logical_device, *context->storage, *p, &ms);
             spv_hash_insert(table, "meshlet", ms);
             break;
          }
          if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
             vk_shader_modules gm = spv_hash_lookup(table, "graphics");
-            vk_shader_load(logical_device, *storage, *p, &gm);
+            vk_shader_load(context->logical_device, *context->storage, *p, &gm);
             spv_hash_insert(table, "graphics", gm);
             break;
          }
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
             vk_shader_modules am = spv_hash_lookup(table, "axis");
-            vk_shader_load(logical_device, *storage, *p, &am);
+            vk_shader_load(context->logical_device, *context->storage, *p, &am);
             spv_hash_insert(table, "axis", am);
             break;
          }
@@ -359,7 +369,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 {
    hw* h = (hw*)user_data;
 #if _DEBUG
-   printf("Validation layer message: %s\n", data->pMessage);
+   printf("VALIDATION LAYER MESSAGE: %s\n", data->pMessage);
 #endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
@@ -1328,7 +1338,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
    return set_layout;
 }
 
-static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* layouts, u32 layout_count, bool rtx_supported)
+static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
 {
    VkPipelineLayout layout = 0;
 
@@ -1346,8 +1356,8 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDes
    info.pushConstantRangeCount = 1;
    info.pPushConstantRanges = &push_constants;
 
-   info.setLayoutCount = layout_count;
-   info.pSetLayouts = layouts;
+   info.setLayoutCount = (u32)set_layout_count;
+   info.pSetLayouts = set_layouts;
 
    vk_assert(vkCreatePipelineLayout(logical_device, &info, 0, &layout));
 
@@ -1658,6 +1668,44 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
+static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
+{
+   context->bos = vk_buffer_objects_create(context, gltf_name);
+   context->bos.indirect = vk_buffer_indirect_create(context, scratch, false);
+   context->bos.indirect_rtx = vk_buffer_indirect_create(context, scratch, true);
+   context->bos.world_transform = vk_buffer_transforms_create(context, scratch);
+   context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
+}
+
+static void vk_pipelines_create(vk_context* context, arena scratch)
+{
+   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context, false);
+   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context, true);
+
+   array(VkDescriptorSetLayout) set_layouts = {&scratch};
+   // set 0 for vertex SSBO, set 1 for bindless textures
+   array_push(set_layouts) = non_rtx_set_layout;
+   array_push(set_layouts) = context->texture_descriptor.layout;
+
+   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts.data, set_layouts.count, false);
+   set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0
+   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts.data, set_layouts.count, true);
+
+   context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
+   context->rtx_pipeline_layout = rtx_pipeline_layout;
+
+   VkPipelineCache cache = 0; // TODO: enable
+
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
+   context->non_rtx_pipeline = vk_graphics_pipeline_create(context, cache, &gm);
+
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
+   context->rtx_pipeline = vk_mesh_pipeline_create(context, cache, &mm);
+
+   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
+   context->axis_pipeline = vk_axis_pipeline_create(context, cache, &am);
+}
+
 void vk_initialize(hw* hw)
 {
    VkResult volk_result = volkInitialize();
@@ -1750,49 +1798,14 @@ void vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   u32 shader_count = 0;
-   const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
-   for(const char** p = shader_names; *p; ++p)
-      shader_count++;
+   spirv_initialize(context);
 
-   context->shader_modules.max_count = shader_count;
-
-   spv_lookup(context->logical_device, context->storage, &context->shader_modules, shader_names);
-
-   context->bos = vk_buffer_objects_create(context, hw->state.gltf_file);
-   context->bos.indirect = vk_buffer_indirect_create(context, *context->storage, false);
-   context->bos.indirect_rtx = vk_buffer_indirect_create(context, *context->storage, true);
-   context->bos.world_transform = vk_buffer_transforms_create(context, *context->storage);
-
-
-   vk_descriptor texture_descriptor = vk_texture_descriptor_create(context, *context->storage, 1<<16);
-   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context, false);
-   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context, true);
-   VkDescriptorSetLayout set_layouts[] = {non_rtx_set_layout, texture_descriptor.layout};
-
-   context->texture_descriptor = texture_descriptor;
-
-   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), false);
-   set_layouts[0] = rtx_set_layout; // create rtx layout next
-   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts, array_count(set_layouts), true);
-
-   context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
-   context->rtx_pipeline_layout = rtx_pipeline_layout;
-
-   VkPipelineCache cache = 0; // TODO: enable
-
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
-   context->non_rtx_pipeline = vk_graphics_pipeline_create(context, cache, &gm);
-
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
-   context->rtx_pipeline = vk_mesh_pipeline_create(context, cache, &mm);
-
-   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
-   context->axis_pipeline = vk_axis_pipeline_create(context, cache, &am);
+   vk_buffers_create(context, *context->storage, hw->state.gltf_file);
+   vk_pipelines_create(context, *context->storage);
 
    vk_textures_log(context);
 
-   spv_hash_iterate(&context->shader_modules);
+   spv_hash_log(&context->shader_modules);
 }
 
 void vk_uninitialize(hw* hw)

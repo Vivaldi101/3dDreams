@@ -137,8 +137,7 @@ static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
    return (vk_shader_modules){};
 }
 
-// TODO: pass callback to call on iterate
-static void spv_hash_iterate(spv_hash_table* table)
+static void spv_hash_log(spv_hash_table* table)
 {
    u32 index = 0;
    u32 count = 0;
