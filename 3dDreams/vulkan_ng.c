@@ -1779,10 +1779,11 @@ void vk_initialize(hw* hw)
    context->swapchain_images.depths.arena = context->storage;
    array_resize(context->swapchain_images.depths, context->swapchain_surface.image_count);
 
-   // views
+   // color views
    context->swapchain_images.image_views.arena = context->storage;
    array_resize(context->swapchain_images.image_views, context->swapchain_surface.image_count);
 
+   // depth views
    context->swapchain_images.depth_views.arena = context->storage;
    array_resize(context->swapchain_images.depth_views, context->swapchain_surface.image_count);
 

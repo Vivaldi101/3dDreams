@@ -2,6 +2,7 @@ build/
 data/
 x64/
 bin/
+.cache/
 .sln/
 .sdf/
 .swp/

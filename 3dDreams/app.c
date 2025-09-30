@@ -122,9 +122,9 @@ void app_start(int argc, const char** argv, hw* hw)
    hw_window_open(hw, "Vulkan App", x, y, w, h);
 
    //hw->state.gltf_file = s8("dragon/dragonattenuation.gltf");
-   hw->state.gltf_file = s8("damagedhelmet/damagedhelmet.gltf");
+   //hw->state.gltf_file = s8("damagedhelmet/damagedhelmet.gltf");
    //hw->state.gltf_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
-   //hw->state.gltf_file = s8("lantern/lantern.gltf");
+   hw->state.gltf_file = s8("lantern/lantern.gltf");
    //hw->state.gltf_file = s8("flighthelmet/flighthelmet.gltf");
    //hw->state.gltf_file = s8("pot/potofcoals.gltf");
    //hw->state.gltf_file = s8("sponza/sponza.gltf");

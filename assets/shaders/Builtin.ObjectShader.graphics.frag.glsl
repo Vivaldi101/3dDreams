@@ -42,35 +42,36 @@ void main()
     {
        mesh_draw draw = draws[in_draw_ID];
    
+       vec4 final = vec4(1, 1, 1, 1);
        vec4 albedo = vec4(1, 0, 1, 1);
+   
+       if(draw.emissive != -1)
+         final = vec4(texture(textures[draw.emissive], in_uv).rgb, 1.f);
+
        if(draw.albedo != -1)
-         albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
+         final += vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
    
-       vec4 nmap = vec4(0, 0, 1, 0);
-       if(draw.normal != -1)
-         nmap = texture(textures[draw.normal], in_uv);
-   
-       float diffuse_factor = max(dot(normalize(in_normal), vec3(0, 0, 1)), 0.0);
+       float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 1, 1))), 0.0);
        vec3 diffuse = diffuse_factor * light_color;
-       out_color = vec4(albedo.rgb * (diffuse + ambient), 1.0); // keep opaque
+       out_color = vec4(final.rgb * (diffuse + ambient), 1.0); // keep opaque
     }
     else
     {
-      vec3 procedural_center = vec3(0.0, 0.0, 0.0);
+      vec3 procedural_center = vec3(10.0, 7.0, 0.0);
       float glow_intensity = 3.0;
       
       float dist = length(in_world_frag_pos - procedural_center);
       
       // bright center + longer aura
-      float core  = exp(-dist * 6.5);     // small, bright dot
-      float halo  = exp(-dist * 1.05);     // larger glow spread
-      float falloff = core + 0.5 * halo;  // adjust 0.5 for halo strength
+      float core  = exp(-dist * .15);        // small, bright dot
+      float halo  = exp(-dist * 3.05);       // larger glow spread
+      float falloff = core + 0.9 * halo;     // adjust 0.5 for halo strength
       
-      vec3 glow_color = vec3(0.25, 0.86, 0.75) * falloff * glow_intensity;
+      //vec3 glow_color = vec3(0.25, 0.86, 0.75) * falloff * glow_intensity;
+      vec3 glow_color = vec3(0.85, 0.86, 0.25) * falloff * glow_intensity;
       vec3 base_color = vec3(0, 0, 0);
       vec3 final_color = clamp(base_color + glow_color, 0.0, 1.0);
       
       out_color = vec4(final_color, 1.0);
-
     }
 }
