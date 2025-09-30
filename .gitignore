@@ -1,6 +1,7 @@
 build/
 data/
 x64/
+bin/
 .sln/
 .sdf/
 .swp/
