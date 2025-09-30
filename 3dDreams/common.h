@@ -59,7 +59,7 @@ static s8 s8_slice(s8 str, size beg, size end)
 #define inv(p)
 #endif
 
-#define fault(p)  hw_message_box(p);
+#define fault(p)  {hw_message_box(p); __debugbreak();}
 
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))

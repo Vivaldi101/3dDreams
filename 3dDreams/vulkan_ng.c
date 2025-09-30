@@ -409,14 +409,14 @@ static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physica
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, arena scratch, VkInstance instance)
+static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, arena scratch)
 {
-   assert(vk_valid_handle(instance));
+   assert(vk_valid_handle(context->instance));
 
    VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {};
    VkPhysicalDevice fallback_gpu = 0;
    u32 dev_count = array_count(devs);
-   vk_assert(vkEnumeratePhysicalDevices(instance, &dev_count, devs));
+   vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
 
    for(u32 i = 0; i < dev_count; ++i)
    {
@@ -460,18 +460,18 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
    return fallback_gpu;
 }
 
-static u32 vk_logical_device_select_family_index(VkPhysicalDevice physical_device, VkSurfaceKHR surface, arena scratch)
+static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
 {
    u32 queue_family_count = 0;
-   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, 0);
+   vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_family_count, 0);
 
    VkQueueFamilyProperties* queue_families = push(&scratch, VkQueueFamilyProperties, queue_family_count);
-   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families);
+   vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_family_count, queue_families);
 
    for(u32 i = 0; i < queue_family_count; i++)
    {
       VkBool32 present_support = false;
-      vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
+      vkGetPhysicalDeviceSurfaceSupportKHR(context->physical_device, i, context->surface, &present_support);
 
       // graphics and presentation within same queue for simplicity
       if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
@@ -499,13 +499,13 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
    return max_mesh_tasks;
 }
 
-static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_device, arena scratch, u32 queue_family_index, bool rtx_supported)
+static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scratch)
 {
-   assert(vk_valid_handle(physical_device));
+   assert(vk_valid_handle(context->physical_device));
    f32 queue_prio = 1.0f;
 
    VkDeviceQueueCreateInfo queue_info = {vk_info(DEVICE_QUEUE)};
-   queue_info.queueFamilyIndex = queue_family_index; // TODO: query the right queue family
+   queue_info.queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
    queue_info.queueCount = 1;
    queue_info.pQueuePriorities = &queue_prio;
 
@@ -517,7 +517,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
-   if(rtx_supported)
+   if(context->rtx_supported)
    {
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
@@ -546,7 +546,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
 
    VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
 
-   if(rtx_supported)
+   if(context->rtx_supported)
    {
       features_frag_shading.pNext = &features_mesh_shader;
       features_mesh_shader.meshShader = true;
@@ -554,7 +554,7 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
       features_mesh_shader.multiviewMeshShader = true;
    }
 
-   vkGetPhysicalDeviceFeatures2(physical_device, &features);
+   vkGetPhysicalDeviceFeatures2(context->physical_device, &features);
 
    features.features.depthBounds = true;
    features.features.wideLines = true;
@@ -577,32 +577,32 @@ static VkDevice vk_logical_device_create(hw* hw, VkPhysicalDevice physical_devic
    ldev_info.pNext = &features;
 
    VkDevice logical_device;
-   vk_assert(vkCreateDevice(physical_device, &ldev_info, 0, &logical_device));
+   vk_assert(vkCreateDevice(context->physical_device, &ldev_info, 0, &logical_device));
 
    return logical_device;
 }
 
-static VkQueue vk_graphics_queue_create(VkDevice logical_device, u32 queue_family_index)
+static VkQueue vk_graphics_queue_create(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(context->logical_device));
 
    VkQueue graphics_queue = 0;
    u32 queue_index = 0;
 
    // TODO: Get the queue index
-   vkGetDeviceQueue(logical_device, queue_family_index, queue_index, &graphics_queue);
+   vkGetDeviceQueue(context->logical_device, context->queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }
 
-static VkSemaphore vk_semaphore_create(VkDevice logical_device)
+static VkSemaphore vk_semaphore_create(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(context->logical_device));
 
    VkSemaphore sema = 0;
 
    VkSemaphoreCreateInfo sema_info = {vk_info(SEMAPHORE)};
-   vk_assert(vkCreateSemaphore(logical_device, &sema_info, 0, &sema));
+   vk_assert(vkCreateSemaphore(context->logical_device, &sema_info, 0, &sema));
 
    return sema;
 }
@@ -636,7 +636,7 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR 
    return swapchain;
 }
 
-static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height, u32 queue_family_index)
+static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height)
 {
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
@@ -657,47 +657,47 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
 
    vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_extent.width, swapchain_extent.height, context->surface);
 
-   swapchain_info.handle = vk_swapchain_create(context->logical_device, context->surface, &swapchain_info, queue_family_index);
+   swapchain_info.handle = vk_swapchain_create(context->logical_device, context->surface, &swapchain_info, context->queue_family_index);
 
    return swapchain_info;
 }
 
-static VkCommandBuffer vk_command_buffer_create(VkDevice logical_device, VkCommandPool pool)
+static VkCommandBuffer vk_command_buffer_create(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_handle(pool));
+   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->command_pool));
 
    VkCommandBuffer buffer = 0;
    VkCommandBufferAllocateInfo buffer_allocate_info = {vk_info_allocate(COMMAND_BUFFER)};
 
    buffer_allocate_info.commandBufferCount = 1;
-   buffer_allocate_info.commandPool = pool;
+   buffer_allocate_info.commandPool = context->command_pool;
    buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-   vk_assert(vkAllocateCommandBuffers(logical_device, &buffer_allocate_info, &buffer));
+   vk_assert(vkAllocateCommandBuffers(context->logical_device, &buffer_allocate_info, &buffer));
 
    return buffer;
 }
 
-static VkCommandPool vk_command_pool_create(VkDevice logical_device, u32 queue_family_index)
+static VkCommandPool vk_command_pool_create(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(context->logical_device));
 
    VkCommandPool pool = 0;
 
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
-   pool_info.queueFamilyIndex = queue_family_index;
+   pool_info.queueFamilyIndex = context->queue_family_index;
 
-   vk_assert(vkCreateCommandPool(logical_device, &pool_info, 0, &pool));
+   vk_assert(vkCreateCommandPool(context->logical_device, &pool_info, 0, &pool));
 
    return pool;
 }
 
 
-static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color_format, VkFormat depth_format)
+static VkRenderPass vk_renderpass_create(vk_context* context)
 {
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_format(color_format));
+   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_format(context->swapchain_surface.format));
 
    VkRenderPass renderpass = 0;
 
@@ -716,7 +716,7 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color
 
    VkAttachmentDescription attachments[2] = {};
 
-   attachments[color_attachment_index].format = color_format;
+   attachments[color_attachment_index].format = context->swapchain_surface.format;
    attachments[color_attachment_index].samples = VK_SAMPLE_COUNT_1_BIT;
    attachments[color_attachment_index].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
    attachments[color_attachment_index].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -741,7 +741,7 @@ static VkRenderPass vk_renderpass_create(VkDevice logical_device, VkFormat color
    renderpass_info.attachmentCount = array_count(attachments);
    renderpass_info.pAttachments = attachments;
 
-   vk_assert(vkCreateRenderPass(logical_device, &renderpass_info, 0, &renderpass));
+   vk_assert(vkCreateRenderPass(context->logical_device, &renderpass_info, 0, &renderpass));
 
    return renderpass;
 }
@@ -848,21 +848,23 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    vkDeviceWaitIdle(context->logical_device);
 
    vk_swapchain_destroy(context);
-   context->swapchain_surface = vk_swapchain_surface_create(context, width, height, context->queue_family_index);
+   context->swapchain_surface = vk_swapchain_surface_create(context, width, height);
    vk_swapchain_update(context);
 
    printf("Viewport resized: [%u %u]\n", width, height);
 }
 
-static VkQueryPool vk_query_pool_create(VkDevice device, u32 pool_size)
+static VkQueryPool vk_query_pool_create(vk_context* context)
 {
    VkQueryPool result = 0;
 
+   context->query_pool_size = 128;
+
    VkQueryPoolCreateInfo info = {vk_info(QUERY_POOL)};
    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-   info.queryCount = pool_size;
+   info.queryCount = context->query_pool_size;
 
-   vk_assert(vkCreateQueryPool(device, &info, 0, &result));
+   vk_assert(vkCreateQueryPool(context->logical_device, &info, 0, &result));
 
    return result;
 }
@@ -1014,7 +1016,26 @@ static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch, b
    }
    else
    {
-      // ...
+      VkDrawMeshTasksIndirectCommandEXT* draw_commands = push(&scratch, VkDrawMeshTasksIndirectCommandEXT, context->mesh_instances.count);
+
+      for(u32 i = 0; i < context->mesh_instances.count; ++i)
+      {
+         VkDrawMeshTasksIndirectCommandEXT cmd =
+         {
+            .groupCountX = 1,
+            .groupCountY = 1,
+            .groupCountZ = 1,
+         };
+
+         draw_commands[i] = cmd;
+      }
+
+      size scratch_buffer_size = context->mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
+
+      vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      indirect_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+      vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->mesh_instances.count);
    }
 
    return indirect_buffer;
@@ -1250,9 +1271,9 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 }
 
       // TODO: pass amount of bindings to create here
-static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_device, bool rtx_supported)
+static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, bool rtx_supported)
 {
-   assert(vk_valid_handle(logical_device));
+   assert(vk_valid_handle(context->logical_device));
    VkDescriptorSetLayout set_layout = 0;
 
    // TODO: cleanup
@@ -1280,7 +1301,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout));
+      vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &info, 0, &set_layout));
    }
    else
    {
@@ -1301,13 +1322,12 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(VkDevice logical_devi
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(logical_device, &info, 0, &set_layout));
+      vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &info, 0, &set_layout));
    }
 
    return set_layout;
 }
 
-// TODO: pass all the layouts
 static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* layouts, u32 layout_count, bool rtx_supported)
 {
    VkPipelineLayout layout = 0;
@@ -1638,11 +1658,10 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
-// TODO: think about the contracts here
 void vk_initialize(hw* hw)
 {
    VkResult volk_result = volkInitialize();
-   if(!vk_valid(volk_result))
+   if(!vk_valid(volkInitialize()))
       fault(!vk_valid(volk_result));
 
    vk_context* context = push(&hw->vk_storage, vk_context);
@@ -1688,20 +1707,18 @@ void vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {};
    context->allocator = allocator;
 
-   // TODO: pass the context only and its components since we are not allowing any other vulkan objects than the ones inside the context
-   context->physical_device = vk_physical_device_select(hw, context, *context->storage, instance);
-   context->surface = hw->renderer.window_surface_create(instance, hw->renderer.window.handle);
-   context->queue_family_index = vk_logical_device_select_family_index(context->physical_device, context->surface, *context->storage);
-   context->logical_device = vk_logical_device_create(hw, context->physical_device, *context->storage, context->queue_family_index, context->rtx_supported);
-   context->image_ready_semaphore = vk_semaphore_create(context->logical_device);
-   context->image_done_semaphore = vk_semaphore_create(context->logical_device);
-   context->graphics_queue = vk_graphics_queue_create(context->logical_device, context->queue_family_index);
-   context->query_pool_size = 128;
-   context->query_pool = vk_query_pool_create(context->logical_device, context->query_pool_size);
-   context->command_pool = vk_command_pool_create(context->logical_device, context->queue_family_index);
-   context->command_buffer = vk_command_buffer_create(context->logical_device, context->command_pool);
-   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height, context->queue_family_index);
-   context->renderpass = vk_renderpass_create(context->logical_device, context->swapchain_surface.format, VK_FORMAT_D32_SFLOAT);
+   context->physical_device = vk_physical_device_select(hw, context, *context->storage);
+   context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
+   context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
+   context->logical_device = vk_logical_device_create(hw, context, *context->storage);
+   context->image_ready_semaphore = vk_semaphore_create(context);
+   context->image_done_semaphore = vk_semaphore_create(context);
+   context->graphics_queue = vk_graphics_queue_create(context);
+   context->query_pool = vk_query_pool_create(context);
+   context->command_pool = vk_command_pool_create(context);
+   context->command_buffer = vk_command_buffer_create(context);
+   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
+   context->renderpass = vk_renderpass_create(context);
 
    // framebuffers
    context->framebuffers.arena = context->storage;
@@ -1747,8 +1764,8 @@ void vk_initialize(hw* hw)
    context->bos.indirect_rtx = vk_buffer_indirect_create(context, *context->storage, true);
    context->bos.world_transform = vk_buffer_transforms_create(context, *context->storage);
 
-   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, false);
-   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context->logical_device, true);
+   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context, false);
+   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context, true);
 
    vk_descriptor texture_descriptor = vk_texture_descriptor_create(context, *context->storage, 1<<16);
 
