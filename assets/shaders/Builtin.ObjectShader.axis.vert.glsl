@@ -1,15 +1,7 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(push_constant) uniform block
-{
-    mat4 projection;
-    mat4 view;
-   float near;
-   float far;
-   float ar;
-   uint meshlet_offset;
-} globals;
+#include "common.glsl"
 
 layout(location = 0) out vec3 axis_color;
 

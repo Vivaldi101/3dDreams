@@ -6,17 +6,7 @@
 #extension GL_ARB_shader_draw_parameters : require
 
 #include "mesh.h"
-
-layout(push_constant) uniform block
-{
-    mat4 projection;
-    mat4 view;
-   float near;
-   float far;
-   float ar;
-   uint meshlet_offset;
-   bool is_procedural;
-} globals;
+#include "common.glsl"
 
 vec3 quad[4] = vec3[]
 (
@@ -52,7 +42,7 @@ void main()
 
     vec4 world_pos = vec4(0.f);
 
-    if(!globals.is_procedural)
+    if(!globals.draw_ground_plane)
     {
         p = vec3(verts[gl_VertexIndex].vx, verts[gl_VertexIndex].vy, verts[gl_VertexIndex].vz) + vec3(0, 0, -0.8f);
         n = vec3(verts[gl_VertexIndex].nx, verts[gl_VertexIndex].ny, verts[gl_VertexIndex].nz);

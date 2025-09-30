@@ -7,17 +7,7 @@
 #extension GL_EXT_nonuniform_qualifier : require
 
 #include "mesh.h"
-
-layout(push_constant) uniform block
-{
-    mat4 projection;
-    mat4 view;
-   float near;
-   float far;
-   float ar;
-   uint meshlet_offset;
-   bool is_procedural;
-} globals;
+#include "common.glsl"
 
 layout(location = 0) out vec4 out_color;
 
@@ -48,7 +38,7 @@ void main()
 {
     vec3 light_color = vec3(1.f);
     float ambient = .3f;
-    if(!globals.is_procedural)
+    if(!globals.draw_ground_plane)
     {
        mesh_draw draw = draws[in_draw_ID];
    

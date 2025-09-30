@@ -10,16 +10,7 @@
 #define DEBUG 1
 
 #include "mesh.h"
-
-layout(push_constant) uniform block
-{
-    mat4 projection;
-    mat4 view;
-   float near;
-   float far;
-   float ar;
-   uint meshlet_offset;
-} globals;
+#include "common.glsl"
 
 // number of threads inside the work group
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;

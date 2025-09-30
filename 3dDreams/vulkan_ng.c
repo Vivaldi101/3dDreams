@@ -1158,7 +1158,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN);
 
-      mvp.is_procedural = 1;
+      mvp.draw_ground_plane = 1;
 
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
