@@ -148,24 +148,9 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 t = hw->timer.time();
    u32 s = hw->timer.time();
 
-   f32 radius = 4.0f;
-   vec3 origin = {0.f, 0.f, 0.f};
-   f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
    f32 altitude = PI / 8.f;
-   f32 x = radius * cosf(altitude) * cosf(azimuth);
-   f32 z = radius * cosf(altitude) * sinf(azimuth);
-   f32 y = radius * sinf(altitude);
-   vec3 eye = {x, y, z};
-
-   hw->state.camera.eye = eye;
-   hw->state.camera.dir = vec3_sub(&eye, &origin);
-   hw->state.camera.smoothed_radius = radius;
-   hw->state.camera.target_radius = radius;
-   hw->state.camera.smoothed_azimuth = azimuth;
-   hw->state.camera.target_azimuth = azimuth;
-
-   hw->state.camera.smoothed_altitude = altitude;
-   hw->state.camera.target_altitude = altitude;
+   f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
+   app_camera_reset(&hw->state.camera, 40.f, altitude, azimuth);
 
    u32 begin = hw->timer.time();
    for (;;)

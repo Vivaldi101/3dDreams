@@ -94,6 +94,27 @@ static void app_camera_update(app_state* state)
    state->camera.smoothed_radius = radius;  // Optional: only needed if something else uses this
 }
 
+void app_camera_reset(app_camera* camera, f32 radius, f32 altitude, f32 azimuth)
+{
+   vec3 origin = {0.f, 0.f, 0.f};
+   f32 x = radius * cosf(altitude) * cosf(azimuth);
+   f32 z = radius * cosf(altitude) * sinf(azimuth);
+   f32 y = radius * sinf(altitude);
+   vec3 eye = {x, y, z};
+
+   memset(camera, 0, sizeof(app_camera));
+
+   camera->eye = eye;
+   camera->dir = vec3_sub(&eye, &origin);
+   camera->smoothed_radius = radius;
+   camera->target_radius = radius;
+
+   camera->smoothed_azimuth = azimuth;
+   camera->target_azimuth = azimuth;
+   camera->smoothed_altitude = altitude;
+   camera->target_altitude = altitude;
+}
+
 static void app_input_handle(app_state* state)
 {
    app_camera_update(state);
@@ -108,6 +129,13 @@ static void app_input_handle(app_state* state)
       // TODO: Raymond chen like fullscreen toggle
       state->input.key_state = 0;
       state->is_fullscreen = !state->is_fullscreen;
+   }
+   if(state->input.key == 'S' && state->input.key_state == KEY_STATE_UP)
+   {
+      state->input.key_state = 0;
+      f32 altitude = PI / 8.f;
+      f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
+      app_camera_reset(&state->camera, 40.f, altitude, azimuth);
    }
 }
 

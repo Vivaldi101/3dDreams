@@ -68,7 +68,7 @@ void main()
       float falloff = core + 0.9 * halo;     // adjust 0.5 for halo strength
       
       //vec3 glow_color = vec3(0.25, 0.86, 0.75) * falloff * glow_intensity;
-      vec3 glow_color = vec3(0.85, 0.86, 0.25) * falloff * glow_intensity;
+      vec3 glow_color = vec3(1.0, 0.47, 0.08) * falloff * glow_intensity;
       vec3 base_color = vec3(0, 0, 0);
       vec3 final_color = clamp(base_color + glow_color, 0.0, 1.0);
       
