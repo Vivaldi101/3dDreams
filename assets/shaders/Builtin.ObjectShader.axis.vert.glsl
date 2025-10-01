@@ -18,9 +18,9 @@ mat4 translate(vec3 t)
 void main() {
    
     const int verts_count = 18;
-    const float arrow_head_scale = 0.010;
-    const float axis_scale = 0.125;
-    const float axis_down_scale = axis_scale - 0.02;
+    const float arrow_head_scale = 0.210;
+    const float axis_scale = 6.125;
+    const float axis_down_scale = axis_scale - 0.62;
 vec3 positions[verts_count] = vec3[](
     // X axis
     vec3(0, 0, 0), vec3(axis_scale, 0, 0),              // Main axis
@@ -54,7 +54,7 @@ vec3 colors[verts_count] = vec3[](
     vec3(0, 0, 1), vec3(0, 0, 1),
     vec3(0, 0, 1), vec3(0, 0, 1)
 );
-    float height = 2.0;
+    float height = 30.0;
     mat4 t = translate(vec3(0.0, height, 0.0));
     gl_Position = globals.projection * globals.view * t * vec4(positions[gl_VertexIndex], 1.0);
 

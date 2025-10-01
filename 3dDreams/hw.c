@@ -150,7 +150,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    f32 altitude = PI / 8.f;
    f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-   app_camera_reset(&hw->state.camera, 40.f, altitude, azimuth);
+   app_camera_reset(&hw->state.camera, 50.f, altitude, azimuth);
 
    u32 begin = hw->timer.time();
    for (;;)

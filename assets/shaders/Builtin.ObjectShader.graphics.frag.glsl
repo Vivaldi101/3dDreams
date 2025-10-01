@@ -37,21 +37,20 @@ float ndc_to_linear_z(float ndc_z, float near, float far)
 void main()
 {
     vec3 light_color = vec3(1.f);
-    float ambient = .3f;
+    float ambient = 0.75f;
     if(!globals.draw_ground_plane)
     {
        mesh_draw draw = draws[in_draw_ID];
    
        vec4 final = vec4(1, 1, 1, 1);
-       vec4 albedo = vec4(1, 0, 1, 1);
-   
-       if(draw.emissive != -1)
-         final = vec4(texture(textures[draw.emissive], in_uv).rgb, 1.f);
 
        if(draw.albedo != -1)
-         final += vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
+         final = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
    
-       float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 1, 1))), 0.0);
+       if(draw.emissive != -1)
+         final += vec4(texture(textures[draw.emissive], in_uv).rgb, 1.f);
+
+       float diffuse_factor = max(dot(normalize(in_normal), normalize(-vec3(1, 1, 1))), 0.0);
        vec3 diffuse = diffuse_factor * light_color;
        out_color = vec4(final.rgb * (diffuse + ambient), 1.0); // keep opaque
     }
@@ -67,9 +66,9 @@ void main()
       float halo  = exp(-dist * 3.05);       // larger glow spread
       float falloff = core + 0.9 * halo;     // adjust 0.5 for halo strength
       
-      //vec3 glow_color = vec3(0.25, 0.86, 0.75) * falloff * glow_intensity;
-      vec3 glow_color = vec3(1.0, 0.47, 0.08) * falloff * glow_intensity;
-      vec3 base_color = vec3(0, 0, 0);
+      vec3 glow_color = vec3(0.95, 0.78, 0.0) * falloff * glow_intensity; // amber yellow
+      //vec3 base_color = vec3(71.0/255, 58.0/255, 10.0/255);
+      vec3 base_color = vec3(0.1176, 0.1176, 0.1176);
       vec3 final_color = clamp(base_color + glow_color, 0.0, 1.0);
       
       out_color = vec4(final_color, 1.0);

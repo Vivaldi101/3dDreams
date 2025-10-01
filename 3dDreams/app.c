@@ -25,14 +25,14 @@ static void app_camera_update(app_state* state)
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-   f32 movement_speed = 0.5f;
+   f32 movement_speed = 0.5f*5;
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       // Closer radius
       state->camera.target_radius -= movement_speed;
       state->input.mouse_wheel_state = 0;
-      state->camera.target_radius = max(state->camera.target_radius, 1.0f);
+      state->camera.target_radius = max(state->camera.target_radius, 5.0f);
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
@@ -50,6 +50,8 @@ static void app_camera_update(app_state* state)
       const f32 max_altitude = PI / 2.0f - 0.01f;
       if(state->camera.target_altitude > max_altitude) state->camera.target_altitude = max_altitude;
       if(state->camera.target_altitude < -max_altitude) state->camera.target_altitude = -max_altitude;
+
+      state->camera.target_altitude = max(state->camera.target_altitude, deg2rad(5.f));
    }
 
    // Smooth damping
@@ -135,7 +137,7 @@ static void app_input_handle(app_state* state)
       state->input.key_state = 0;
       f32 altitude = PI / 8.f;
       f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-      app_camera_reset(&state->camera, 40.f, altitude, azimuth);
+      app_camera_reset(&state->camera, 50.f, altitude, azimuth);
    }
 }
 

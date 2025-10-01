@@ -1097,7 +1097,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    const f32 c = 255.0f;
    VkClearValue clear[2] = {};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
-   clear[0].color = (VkClearColorValue){1, 1, 1};
+   clear[0].color = (VkClearColorValue){0.11f, 0.11f, 0.11f};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
    renderpass_info.clearValueCount = 2;
@@ -1196,8 +1196,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
 
    // draw axis
-   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
-   vkCmdDraw(command_buffer, 18, 1, 0, 0);
+   //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
+   //vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
    vkCmdEndRenderPass(command_buffer);
 
