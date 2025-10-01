@@ -27,9 +27,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
-#if 0
-// TODO: clean up these top-level read apis
-static void vk_obj_file_read(vk_context* context, void *user_context, s8 filename)
+static void vk_obj_file_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
@@ -44,13 +42,13 @@ static void vk_obj_file_read(vk_context* context, void *user_context, s8 filenam
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(filename), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
-   obj_load(context, *context->storage, &attrib);
+
+   //obj_load(context, scratch, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
 }
-#endif
 
 static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
