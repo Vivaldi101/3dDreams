@@ -65,12 +65,14 @@ static void app_camera_update(app_state* state)
    f32 altitude = state->camera.smoothed_altitude;
    f32 radius = state->camera.smoothed_radius;
 
-   f32 x = radius * cosf(altitude) * cosf(azimuth);
-   f32 z = radius * cosf(altitude) * sinf(azimuth);
-   f32 y = radius * sinf(altitude);
-
    vec3 origin = state->camera.origin;
+
+   f32 x = radius * cosf(altitude) * cosf(azimuth) + origin.x;
+   f32 z = radius * cosf(altitude) * sinf(azimuth) + origin.z;
+   f32 y = radius * sinf(altitude) + origin.y;
+
    vec3 eye = {x, y, z};
+
    state->camera.eye = eye;
 
    vec3 orbit_dir = vec3_sub(&eye, &origin);
@@ -86,10 +88,10 @@ static void app_camera_update(app_state* state)
 
 void app_camera_reset(app_camera* camera, f32 radius, f32 altitude, f32 azimuth)
 {
-   vec3 origin = {0.f, 0.f, 0.f};
-   f32 x = radius * cosf(altitude) * cosf(azimuth);
-   f32 z = radius * cosf(altitude) * sinf(azimuth);
-   f32 y = radius * sinf(altitude);
+   vec3 origin = {10.f, 20.f, 0.f}; // TODO: pass this
+   f32 x = radius * cosf(altitude) * cosf(azimuth) + origin.x;
+   f32 z = radius * cosf(altitude) * sinf(azimuth) + origin.z;
+   f32 y = radius * sinf(altitude) + origin.y;
    vec3 eye = {x, y, z};
 
    memset(camera, 0, sizeof(app_camera));
