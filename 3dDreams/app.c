@@ -89,6 +89,9 @@ static void app_camera_update(app_state* state)
       xz = vec3_scale(&xz, delta_x);
       up = vec3_scale(&up, delta_y);
 
+      xz = vec3_scale(&xz, .125f);
+      up = vec3_scale(&up, .125f);
+
       state->camera.origin = vec3_sub(&xz, &state->camera.origin);
       state->camera.origin = vec3_add(&up, &state->camera.origin);
    }
