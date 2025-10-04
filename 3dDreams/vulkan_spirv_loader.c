@@ -41,11 +41,13 @@ static s8 vk_project_directory(arena* storage)
    GetCurrentDirectory((u32)dir_path_len, (char*)buffer);
 
    u32 count = 0;
+   size project_path_len = dir_path_len;
 
    assert(dir_path_len != 0u);
 
    for(size i = dir_path_len-1; i-- >= 0;)
    {
+      project_path_len--;
       if(buffer[i] == '\\')
          ++count;
       if(count == 2)
@@ -55,7 +57,7 @@ static s8 vk_project_directory(arena* storage)
       }
    }
 
-   return (s8){.data = buffer, .len = dir_path_len};
+   return (s8){.data = buffer, .len = project_path_len};
 }
 
 static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)

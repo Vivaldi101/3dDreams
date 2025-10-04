@@ -2,7 +2,7 @@
 
 #include "hw.h"
 #include "app.h"
-#include "graphics.h"
+#include "math.h"
 #include "arena.h"
 
 #include <volk.c>
@@ -25,14 +25,14 @@ static void app_camera_update(app_state* state)
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-   f32 movement_speed = 0.5f*5;
+   f32 movement_speed = 5.f;
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       // closer radius
       state->camera.target_radius -= movement_speed;
       state->input.mouse_wheel_state = 0;
-      state->camera.target_radius = max(state->camera.target_radius, 5.0f);
+      state->camera.target_radius = max(state->camera.target_radius, 10.0f);
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
@@ -52,7 +52,7 @@ static void app_camera_update(app_state* state)
       if(state->camera.target_altitude < -max_altitude) state->camera.target_altitude = -max_altitude;
 
       // dont go below the ground plane
-      state->camera.target_altitude = max(state->camera.target_altitude, deg2rad(5.f));
+      //state->camera.target_altitude = max(state->camera.target_altitude, deg2rad(5.f));
    }
 
    // smooth damping
@@ -78,6 +78,15 @@ static void app_camera_update(app_state* state)
    vec3 orbit_dir = vec3_sub(&eye, &origin);
    vec3_normalize(orbit_dir);
 
+   if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
+   {
+      f32 dx = rotation_speed_x * delta_x;
+      f32 dy = rotation_speed_y * delta_y;
+
+      state->camera.origin.x += .1f;
+      state->camera.origin.z += .1f;
+   }
+
    state->camera.dir = orbit_dir;
 
    // update previous mouse position and store latest radius
@@ -86,9 +95,8 @@ static void app_camera_update(app_state* state)
    state->camera.smoothed_radius = radius;
 }
 
-void app_camera_reset(app_camera* camera, f32 radius, f32 altitude, f32 azimuth)
+void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude, f32 azimuth)
 {
-   vec3 origin = {10.f, 20.f, 0.f}; // TODO: pass this
    f32 x = radius * cosf(altitude) * cosf(azimuth) + origin.x;
    f32 z = radius * cosf(altitude) * sinf(azimuth) + origin.z;
    f32 y = radius * sinf(altitude) + origin.y;
@@ -128,7 +136,8 @@ static void app_input_handle(app_state* state)
       state->input.key_state = 0;
       f32 altitude = PI / 8.f;
       f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-      app_camera_reset(&state->camera, 50.f, altitude, azimuth);
+      vec3 origin = {};
+      app_camera_reset(&state->camera, origin, 50.f, altitude, azimuth);
    }
 }
 
@@ -145,7 +154,9 @@ void app_start(int argc, const char** argv, hw* hw)
    //hw->state.gltf_file = s8("dragon/dragonattenuation.gltf");
    //hw->state.gltf_file = s8("damagedhelmet/damagedhelmet.gltf");
    //hw->state.gltf_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
-   hw->state.gltf_file = s8("lantern/lantern.gltf");
+   hw->state.asset_file = s8("lantern/lantern.gltf");
+   //hw->state.asset_file = s8("sponza.obj");
+   //hw->state.asset_file = s8("exterior.obj");
    //hw->state.gltf_file = s8("flighthelmet/flighthelmet.gltf");
    //hw->state.gltf_file = s8("pot/potofcoals.gltf");
    //hw->state.gltf_file = s8("sponza/sponza.gltf");

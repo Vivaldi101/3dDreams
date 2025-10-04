@@ -1,6 +1,6 @@
 #include "arena.h"
 #include "common.h"
-#include "graphics.h"
+#include "math.h"
 #include "vulkan_ng.h"
 
 // TODO: extract out win32 shit out to platform layer
@@ -13,22 +13,23 @@
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
-   char file_path[MAX_PATH] = {};
-
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
+   arena file_read = {};
 
-   s8 project_dir = vk_project_directory(&user_data->scratch);
-
-   wsprintf(file_path, "%s\\assets\\objs\\%s", (const char*)project_dir.data, filename);
-
-   arena file_read = win32_file_read(&user_data->scratch, file_path);
+   if(is_mtl == 0)
+      file_read = win32_file_read(&user_data->scratch, filename);
+   else
+      file_read = win32_file_read(&user_data->scratch, s8_data(user_data->mtl_path));
 
    *len = arena_left(&file_read);
    *buf = file_read.beg;
 }
 
-static void vk_obj_file_read(vk_context* context, arena scratch, void *user_context, s8 filename)
+// TODO: Dont pass the .obj postfix in the filename
+static vk_buffer_objects vk_obj_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
+   vk_buffer_objects result = {};
+
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
    tinyobj_attrib_t attrib = {};
@@ -40,14 +41,42 @@ static void vk_obj_file_read(vk_context* context, arena scratch, void *user_cont
 
    obj_user_ctx* user_data = (obj_user_ctx*)user_context;
 
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(filename), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+   array(char) obj_file_path = {context->storage};
+   s8 assets_prefix = s8("%s\\assets\\obj\\%s");
+   s8 project_dir = vk_project_directory(context->storage);
+
+   obj_file_path.count = project_dir.len + assets_prefix.len + filename.len;
+   array_resize(obj_file_path, obj_file_path.count);
+   wsprintf(obj_file_path.data, s8_data(assets_prefix), s8_data(project_dir), s8_data(filename));
+
+   // TODO: array(char) to s8
+   s8 obj_path = {.data = (u8*)obj_file_path.data, .len = obj_file_path.count};
+
+   array(char) mtl_file_path = {context->storage};
+   mtl_file_path.count = project_dir.len + assets_prefix.len + filename.len;
+   array_resize(mtl_file_path, mtl_file_path.count);
+   wsprintf(mtl_file_path.data, s8_data(assets_prefix), s8_data(project_dir), s8_data(filename));
+
+   // TODO: do this smarter
+   char* mtl = mtl_file_path.data + mtl_file_path.count-3;
+   mtl[0] = 'm';
+   mtl[1] = 't';
+   mtl[2] = 'l';
+
+   s8 mtl_path = {.data = (u8*)mtl_file_path.data, .len = mtl_file_path.count};
+
+   user_data->mtl_path = mtl_path;
+
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(obj_path), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
-   //obj_load(context, scratch, &attrib);
+   result = obj_load(context, scratch, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
    tinyobj_attrib_free(&attrib);
+
+   return result;
 }
 
 static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *user_context, s8 filename)
@@ -58,12 +87,14 @@ static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *
    s8 prefix = s8("%s\\assets\\gltf\\%s");
    s8 project_dir = vk_project_directory(context->storage);
 
-   file_path.count = project_dir.len + prefix.len + filename.len;
+   file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(file_path, file_path.count);
    wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
    // TODO: array(char) to s8
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
+
+   assert(strcmp(gltf_path.data + gltf_path.len - 5, ".gltf") == 0);
 
    result = vk_gltf_load(context, gltf_path);
 
@@ -342,6 +373,13 @@ static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_
       user_data.scratch = *context->storage;
 
       result = vk_gltf_read(context, *context->storage, &user_data, asset_file);
+   }
+   else if(s8_is_substr(asset_file, s8(".obj")))
+   {
+      obj_user_ctx user_data = {};
+      user_data.scratch = *context->storage;
+
+      result = vk_obj_read(context, *context->storage, &user_data, asset_file);
    }
    else hw_message_box("Unsupported asset format");
 
@@ -1196,8 +1234,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
 
    // draw axis
-   //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
-   //vkCmdDraw(command_buffer, 18, 1, 0, 0);
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
+   vkCmdDraw(command_buffer, 18, 1, 0, 0);
 
    vkCmdEndRenderPass(command_buffer);
 
@@ -1799,7 +1837,7 @@ void vk_initialize(hw* hw)
 
    spirv_initialize(context);
 
-   vk_buffers_create(context, *context->storage, hw->state.gltf_file);
+   vk_buffers_create(context, *context->storage, hw->state.asset_file);
    vk_pipelines_create(context, *context->storage);
 
    vk_textures_log(context);

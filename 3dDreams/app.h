@@ -1,7 +1,7 @@
 #if !defined(_APP_H)
 #define _APP_H
 
-#include "graphics.h"
+#include "math.h"
 
 enum 
 {
@@ -59,13 +59,13 @@ align_struct app_state
    mat4 view;
    app_input input;
    app_camera camera;
-   s8 gltf_file;  // TODO: for testing
+   s8 asset_file;  // TODO: for testing
    f32 frame_delta_in_seconds;
    bool rtx_enabled;
    bool is_fullscreen;
 } app_state;
 
 void app_start(int argc, const char** argv, struct hw* hw);
-void app_camera_reset(app_camera* camera, f32 radius, f32 altitude, f32 azimuth);
+void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude, f32 azimuth);
 
 #endif

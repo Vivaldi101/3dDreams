@@ -1,7 +1,7 @@
 #include "hw.h"
 #include "common.h"
 #include "app.h"
-#include "graphics.h"
+#include "math.h"
 #include "vulkan_ng.h"  // todo: should move this out
 
 #define MAX_ARGV 32
@@ -149,8 +149,11 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    u32 s = hw->timer.time();
 
    f32 altitude = PI / 8.f;
+   //f32 altitude = 0;
    f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-   app_camera_reset(&hw->state.camera, 50.f, altitude, azimuth);
+   //f32 azimuth = 0;
+   vec3 origin = {0, 0, 0};
+   app_camera_reset(&hw->state.camera, origin, 75.f, altitude, azimuth);
 
    u32 begin = hw->timer.time();
    for (;;)

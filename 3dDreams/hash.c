@@ -13,15 +13,14 @@ typedef struct hash_key_gltf
 // ordered open addressing with linear probing
 // TODO: iterate all keys
 typedef u32 hash_value;
+
 typedef struct index_hash_table
 {
    u32* values;
-   void* keys;
+   hash_key_obj* keys;
    size max_count;
    size count;
 } index_hash_table;
-
-#define index_hash_table(T) struct index_hash_table##T {  u32* values; T* keys; size max_count; size count; }
 
 static bool obj_key_equals(hash_key_obj a, hash_key_obj b)
 {
@@ -71,7 +70,7 @@ static u32 hash(const char* key)
    return result;
 }
 
-static void hash_insert(index_hash_table(hash_key_obj)* table, hash_key_obj key, hash_value value)
+static void hash_insert(index_hash_table* table, hash_key_obj key, hash_value value)
 {
    if(table->count == table->max_count)
       return;
@@ -105,7 +104,7 @@ static void hash_insert(index_hash_table(hash_key_obj)* table, hash_key_obj key,
    table->count++;
 }
 
-static hash_value hash_lookup(index_hash_table(hash_key_obj)* table, hash_key_obj key)
+static hash_value hash_lookup(index_hash_table* table, hash_key_obj key)
 {
    u32 index = obj_hash_index(key) % table->max_count;
 
