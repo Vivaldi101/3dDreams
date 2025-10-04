@@ -80,39 +80,17 @@ static void app_camera_update(app_state* state)
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      vec3 xz_right = {};
-      vec3 xz_front = {};
+      vec3 xz = {};
       vec3 up = {0, 1, 0};
-      vec3_cross(orbit_dir, up, xz_right);
-      vec3_cross(xz_right, up, xz_front);
 
-      vec3_normalize(xz_right);
-      vec3_normalize(xz_front);
+      vec3_cross(orbit_dir, up, xz);
+      vec3_normalize(xz);
 
-      xz_right = vec3_scale(&xz_right, .5f);
-      xz_front = vec3_scale(&xz_front, .5f);
+      xz = vec3_scale(&xz, delta_x);
+      up = vec3_scale(&up, delta_y);
 
-      if(delta_x > 0 && fabs(delta_x) > fabs(delta_y))
-      {
-         state->camera.origin.x -= xz_right.x;
-         state->camera.origin.z -= xz_right.z;
-      }
-      else if(delta_x < 0 && fabs(delta_x) > fabs(delta_y))
-      {
-         state->camera.origin.x += xz_right.x;
-         state->camera.origin.z += xz_right.z;
-      }
-
-      if(delta_y < 0 && fabs(delta_y) > fabs(delta_x))
-      {
-         state->camera.origin.x += xz_front.x;
-         state->camera.origin.z += xz_front.z;
-      }
-      else if(delta_y > 0 && fabs(delta_y) > fabs(delta_x))
-      {
-         state->camera.origin.x -= xz_front.x;
-         state->camera.origin.z -= xz_front.z;
-      }
+      state->camera.origin = vec3_sub(&xz, &state->camera.origin);
+      state->camera.origin = vec3_add(&up, &state->camera.origin);
    }
 
    state->camera.dir = orbit_dir;
