@@ -931,12 +931,11 @@ static void cmd_draw_indexed(VkCommandBuffer command_buffer, vk_mesh_draw md, u3
 
 static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 {
-   if(!buffer->handle || buffer->size <= 0)
-      return (VkDescriptorBufferInfo){};
+   assert(buffer->handle && buffer->size > 0);
 
    VkDescriptorBufferInfo result = {};
    result.buffer = buffer->handle;
-   result.range = buffer->size;  // can be VK_WHOLE_SIZE
+   result.range = VK_WHOLE_SIZE;
    result.offset = 0;
 
    return result;
