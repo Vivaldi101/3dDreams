@@ -935,7 +935,8 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 
    VkDescriptorBufferInfo result = {};
    result.buffer = buffer->handle;
-   result.range = VK_WHOLE_SIZE;
+   //result.range = VK_WHOLE_SIZE;
+   result.range = buffer->size;
    result.offset = 0;
 
    return result;
