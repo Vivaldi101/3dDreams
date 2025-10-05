@@ -129,6 +129,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
+   // TODO: narrow contract
    VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
    VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -139,9 +140,10 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
    vk_buffer scratch_buffer = vk_buffer_create(context, tex_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   if((scratch_buffer.size >= tex_size) && vk_valid_handle(image))
+   // TODO: narrow
+   if(vk_valid_handle(image))
    {
-      vk_buffer_to_image_upload(context, scratch_buffer, image, extents, tex_pixels, tex_size);
+      vk_buffer_to_image_upload(context, scratch_buffer, image, extents, tex_pixels, scratch_buffer.size);
 
       tex.image.handle = image;
       tex.image.view = image_view;

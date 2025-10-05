@@ -170,6 +170,9 @@ static vk_buffer vk_buffer_create(vk_context* context, size buffer_size, VkBuffe
    buffer.size = allocate_info.allocationSize;
    buffer.memory = memory;
 
+   // for possible alignment
+   assert(buffer.size >= buffer_size);
+
    return buffer;
 }
 
@@ -271,15 +274,15 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
    result.ib = vk_buffer_create(context, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    // temp buffer
-   size scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
+   size scratch_buffer_size = max(result.mb.size, max(result.vb.size, result.ib.size));
    vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // upload vertex data
-   vk_buffer_upload(context, result.vb, scratch_buffer, vb_data.data, vb_size);
+   vk_buffer_upload(context, result.vb, scratch_buffer, vb_data.data, result.vb.size);
    // upload index data
-   vk_buffer_upload(context, result.ib, scratch_buffer, ib_data, ib_size);
+   vk_buffer_upload(context, result.ib, scratch_buffer, ib_data, result.ib.size);
    // upload meshlet data
-   vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, mb_size);
+   vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, result.mb.size);
 
    vk_mesh_draw md = {0};
    md.index_count = index_count;
@@ -646,22 +649,23 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
    usize mb_size = mb.meshlets.count * sizeof(struct meshlet);
    usize vb_size = vertices.count * sizeof(struct vertex);
    usize ib_size = indices.count * sizeof(u32);
-   usize scratch_buffer_size = max(mb_size, max(vb_size, ib_size));
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    result.vb = vk_buffer_create(context, vb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    result.mb = vk_buffer_create(context, mb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
    result.ib = vk_buffer_create(context, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
+   usize scratch_buffer_size = max(result.mb.size, max(result.vb.size, result.ib.size));
+   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
    // vertex data
-   vk_buffer_upload(context, result.vb, scratch_buffer, vertices.data, vb_size);
+   vk_buffer_upload(context, result.vb, scratch_buffer, vertices.data, result.vb.size);
    // index data
-   vk_buffer_upload(context, result.ib, scratch_buffer, indices.data, ib_size);
+   vk_buffer_upload(context, result.ib, scratch_buffer, indices.data, result.ib.size);
    // meshlet data
-   vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, mb_size);
+   vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, result.mb.size);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 
