@@ -16,10 +16,7 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
    arena file_read = {};
 
-   if(is_mtl == 0)
-      file_read = win32_file_read(&user_data->scratch, filename);
-   else
-      file_read = win32_file_read(&user_data->scratch, s8_data(user_data->mtl_path));
+   file_read = win32_file_read(&user_data->scratch, filename);
 
    *len = arena_left(&file_read);
    *buf = file_read.beg;
@@ -29,6 +26,8 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
 static vk_buffer_objects vk_obj_read(vk_context* context, arena scratch, void *user_context, s8 filename)
 {
    vk_buffer_objects result = {};
+
+   obj_user_ctx user_data = {};
 
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
@@ -79,7 +78,7 @@ static vk_buffer_objects vk_obj_read(vk_context* context, arena scratch, void *u
    return result;
 }
 
-static vk_buffer_objects vk_gltf_read(vk_context* context, arena scratch, void *user_context, s8 filename)
+static vk_buffer_objects vk_gltf_read(vk_context* context, s8 filename)
 {
    vk_buffer_objects result = {};
 
@@ -369,17 +368,11 @@ static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_
 
    if(s8_is_substr(asset_file, s8(".gltf")))
    {
-      gltf_user_ctx user_data = {};
-      user_data.scratch = *context->storage;
-
-      result = vk_gltf_read(context, *context->storage, &user_data, asset_file);
+      result = vk_gltf_read(context, asset_file);
    }
    else if(s8_is_substr(asset_file, s8(".obj")))
    {
-      obj_user_ctx user_data = {};
-      user_data.scratch = *context->storage;
-
-      result = vk_obj_read(context, *context->storage, &user_data, asset_file);
+      result = vk_obj_read(context, asset_file);
    }
    else hw_message_box("Unsupported asset format");
 
@@ -1721,7 +1714,8 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
    array(VkDescriptorSetLayout) set_layouts = {&scratch};
    // set 0 for vertex SSBO, set 1 for bindless textures
    array_push(set_layouts) = non_rtx_set_layout;
-   array_push(set_layouts) = context->texture_descriptor.layout;
+	if(context->textures.count > 0)
+		array_push(set_layouts) = context->texture_descriptor.layout;
 
    VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts.data, set_layouts.count, false);
    set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0

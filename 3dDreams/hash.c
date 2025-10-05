@@ -11,7 +11,6 @@ typedef struct hash_key_gltf
 } hash_key_gltf;
 
 // ordered open addressing with linear probing
-// TODO: iterate all keys
 typedef u32 hash_value;
 
 typedef struct index_hash_table
