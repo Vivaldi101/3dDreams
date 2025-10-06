@@ -367,14 +367,11 @@ static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_
    vk_buffer_objects result = {};
 
    if(s8_is_substr(asset_file, s8(".gltf")))
-   {
       result = vk_gltf_read(context, asset_file);
-   }
    else if(s8_is_substr(asset_file, s8(".obj")))
-   {
       result = vk_obj_read(context, asset_file);
-   }
-   else hw_message_box("Unsupported asset format");
+   else
+      hw_message_box("Unsupported asset format");
 
    return result;
 }

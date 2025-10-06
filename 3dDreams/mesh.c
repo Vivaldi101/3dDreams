@@ -445,20 +445,20 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
    cgltf_result gltf_result = cgltf_parse_file(&options, s8_data(gltf_path), &data);
 
    if(gltf_result != cgltf_result_success)
-      return (vk_buffer_objects){};
+      hw_message_box("Could not parse the .gltf file");
 
    gltf_result = cgltf_load_buffers(&options, data, s8_data(gltf_path));
    if(gltf_result != cgltf_result_success)
    {
       cgltf_free(data);
-      return (vk_buffer_objects){};
+      hw_message_box("Could not load the .gltf buffers");
    }
 
    gltf_result = cgltf_validate(data);
    if(gltf_result != cgltf_result_success)
    {
       cgltf_free(data);
-      return (vk_buffer_objects){};
+      hw_message_box("Could not validate the .gltf data");
    }
 
    size index_offset = 0;
