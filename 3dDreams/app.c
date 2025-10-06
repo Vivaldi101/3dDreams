@@ -18,8 +18,8 @@ static void app_camera_update(app_state* state)
    const f32 smoothing_factor = 1.0f - powf(0.08f, state->frame_delta_in_seconds);
 
    // half turn across view plane extents (in azimuth)
-   f32 rotation_speed_x = PI / state->camera.viewplane_width;
-   f32 rotation_speed_y = PI / state->camera.viewplane_height;
+   f32 rotation_speed_x = (2.f*PI) / state->camera.viewplane_width;
+   f32 rotation_speed_y = (2.f*PI) / state->camera.viewplane_height;
 
    // delta in pixels
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
@@ -32,7 +32,8 @@ static void app_camera_update(app_state* state)
       // closer radius
       state->camera.target_radius -= movement_speed;
       state->input.mouse_wheel_state = 0;
-      state->camera.target_radius = max(state->camera.target_radius, 10.0f);
+      // prevent flipping
+      state->camera.target_radius = max(state->camera.target_radius, 1.0f);
    }
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
