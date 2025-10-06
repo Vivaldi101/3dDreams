@@ -1208,12 +1208,11 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       bbs[1].binding = 1;
 
       cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
-
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
       vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
 
-      vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN);
+      vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
       mvp.draw_ground_plane = 1;
 
