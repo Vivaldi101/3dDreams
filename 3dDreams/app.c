@@ -25,12 +25,12 @@ static void app_camera_update(app_state* state)
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-   f32 movement_speed = 5.f;
+   f32 zoom_speed = 5.f;
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
       // closer radius
-      state->camera.target_radius -= movement_speed;
+      state->camera.target_radius -= zoom_speed;
       state->input.mouse_wheel_state = 0;
       // prevent flipping
       state->camera.target_radius = max(state->camera.target_radius, 1.0f);
@@ -38,7 +38,7 @@ static void app_camera_update(app_state* state)
    else if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_DOWN)
    {
       // further radius
-      state->camera.target_radius += movement_speed;
+      state->camera.target_radius += zoom_speed;
       state->input.mouse_wheel_state = 0;
    }
 
@@ -90,8 +90,8 @@ static void app_camera_update(app_state* state)
       xz = vec3_scale(&xz, delta_x);
       up = vec3_scale(&up, delta_y);
 
-      xz = vec3_scale(&xz, .125f);
-      up = vec3_scale(&up, .125f);
+      xz = vec3_scale(&xz, smoothing_factor);
+      up = vec3_scale(&up, smoothing_factor);
 
       state->camera.origin = vec3_sub(&xz, &state->camera.origin);
       state->camera.origin = vec3_add(&up, &state->camera.origin);
