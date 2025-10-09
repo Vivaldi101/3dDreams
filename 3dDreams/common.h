@@ -61,6 +61,9 @@ static s8 s8_slice(s8 str, size beg, size end)
 
 #define fault(p)  {hw_message_box(p); __debugbreak();}
 
+//#undef assert
+//#define assert(cond) do { if (DoYouWantToBreak(cond, __FILE__, __LINE__)) __debugbreak(); } while (0)
+
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))
 

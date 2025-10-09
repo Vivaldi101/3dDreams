@@ -27,7 +27,7 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
 {
    VkImage result = 0;
 
-   VkImageCreateInfo image_info = {};
+   VkImageCreateInfo image_info = {0};
    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
    image_info.imageType = VK_IMAGE_TYPE_2D; 
    image_info.extent = extent;
@@ -48,7 +48,7 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
    VkMemoryRequirements memory_requirements;
    vkGetImageMemoryRequirements(context->logical_device, result, &memory_requirements);
 
-   VkMemoryAllocateInfo alloc_info = {};
+   VkMemoryAllocateInfo alloc_info = {0};
    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
    alloc_info.allocationSize = memory_requirements.size;
 
@@ -113,7 +113,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    size tex_len = img_uri.len + tex_dir.len;
 
-   vk_texture tex = {};
+   vk_texture tex = {0};
    tex.path.arena = context->storage;
    array_resize(tex.path, tex_len + 1); // for null terminate
 
@@ -138,7 +138,8 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
-   vk_buffer scratch_buffer = vk_buffer_create(context, tex_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer scratch_buffer = {.size = tex_size};
+   vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // TODO: narrow
    if(vk_valid_handle(image))

@@ -188,3 +188,4 @@ static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_mo
    table->values[index] = value;
    table->count++;
 }
+

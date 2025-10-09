@@ -3,6 +3,8 @@
 
 #include "vulkan_ng.h"
 
+// TODO: Use s8 for keys
+
 align_struct
 {
    VkShaderModule vs;

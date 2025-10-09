@@ -8,14 +8,14 @@
 
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
-#include "mesh.c"
 #include "texture.c"
 #include "buffer.c"
+#include "mesh.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
-   arena file_read = {};
+   arena file_read = {0};
 
    file_read = win32_file_read(&user_data->scratch, filename);
 
@@ -23,54 +23,62 @@ static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, 
    *buf = file_read.beg;
 }
 
-// TODO: Dont pass the .obj postfix in the filename
-static vk_buffer_objects vk_obj_read(vk_context* context, arena scratch, void *user_context, s8 filename)
+#if 0
+static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 {
-   vk_buffer_objects result = {};
+   vk_buffer_objects result = {0};
 
-   obj_user_ctx user_data = {};
+   obj_user_ctx user_data = {0};
 
    tinyobj_shape_t* shapes = 0;
    tinyobj_material_t* materials = 0;
-   tinyobj_attrib_t attrib = {};
+   tinyobj_attrib_t attrib = {0};
 
    size_t shape_count = 0;
    size_t material_count = 0;
 
    tinyobj_attrib_init(&attrib);
 
-   obj_user_ctx* user_data = (obj_user_ctx*)user_context;
-
    array(char) obj_file_path = {context->storage};
-   s8 assets_prefix = s8("%s\\assets\\obj\\%s");
+   s8 prefix = s8("%s\\assets\\obj\\%s");
    s8 project_dir = vk_project_directory(context->storage);
 
-   obj_file_path.count = project_dir.len + assets_prefix.len + filename.len;
+   obj_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(obj_file_path, obj_file_path.count);
-   wsprintf(obj_file_path.data, s8_data(assets_prefix), s8_data(project_dir), s8_data(filename));
+   wsprintf(obj_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
    // TODO: array(char) to s8
    s8 obj_path = {.data = (u8*)obj_file_path.data, .len = obj_file_path.count};
 
-   array(char) mtl_file_path = {context->storage};
-   mtl_file_path.count = project_dir.len + assets_prefix.len + filename.len;
-   array_resize(mtl_file_path, mtl_file_path.count);
-   wsprintf(mtl_file_path.data, s8_data(assets_prefix), s8_data(project_dir), s8_data(filename));
+   assert(strcmp(obj_path.data + obj_path.len - 4, ".obj") == 0);
 
-   // TODO: do this smarter
-   char* mtl = mtl_file_path.data + mtl_file_path.count-3;
-   mtl[0] = 'm';
-   mtl[1] = 't';
-   mtl[2] = 'l';
+#if 0
+   array(char) mtl_file_path = {context->storage};
+   mtl_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   // +2 for zero termination for the .obj string for c-string apis
+   array_resize(mtl_file_path, mtl_file_path.count + 2);
+   mtl_file_path.data++;
+   wsprintf(mtl_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
    s8 mtl_path = {.data = (u8*)mtl_file_path.data, .len = mtl_file_path.count};
+   mtl_path.data[mtl_path.len-3] = 'm';
+   mtl_path.data[mtl_path.len-2] = 't';
+   mtl_path.data[mtl_path.len-1] = 'l';
 
-   user_data->mtl_path = mtl_path;
+   assert(strcmp(mtl_path.data + mtl_path.len - 4, ".mtl") == 0);
 
-   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(obj_path), obj_file_read_callback, user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
+   obj_path.data[obj_path.len] = 0;
+   mtl_path.data[mtl_path.len] = 0;
+
+   user_data.mtl_path = mtl_path;
+#endif
+
+   user_data.scratch = *context->storage;
+
+   if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(obj_path), obj_file_read_callback, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
-   result = obj_load(context, scratch, &attrib);
+   result = obj_load(context, *context->storage, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
@@ -78,11 +86,10 @@ static vk_buffer_objects vk_obj_read(vk_context* context, arena scratch, void *u
 
    return result;
 }
+#endif
 
-static vk_buffer_objects vk_gltf_read(vk_context* context, s8 filename)
+static void vk_gltf_read(vk_context* context, s8 filename)
 {
-   vk_buffer_objects result = {};
-
    array(char) file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
    s8 project_dir = vk_project_directory(context->storage);
@@ -96,12 +103,10 @@ static vk_buffer_objects vk_gltf_read(vk_context* context, s8 filename)
 
    assert(strcmp(gltf_path.data + gltf_path.len - 5, ".gltf") == 0);
 
-   result = vk_gltf_load(context, gltf_path);
-
-   return result;
+   vk_gltf_load(context, gltf_path);
 }
 
-static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_modules)
+static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_table)
 {
    assert(vk_valid_handle(logical_device));
 
@@ -141,13 +146,13 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    switch(shader_stage)
    {
       case VK_SHADER_STAGE_MESH_BIT_EXT:
-         shader_modules->ms = shader_module;
+         shader_table->ms = shader_module;
          break;
       case VK_SHADER_STAGE_VERTEX_BIT:
-         shader_modules->vs = shader_module;
+         shader_table->vs = shader_module;
          break;
       case VK_SHADER_STAGE_FRAGMENT_BIT:
-         shader_modules->fs = shader_module;
+         shader_table->fs = shader_module;
          break;
       default: break;
    }
@@ -163,7 +168,7 @@ static void spirv_initialize(vk_context* context)
    for(const char** p = shader_names; *p; ++p)
       shader_count++;
 
-   spv_hash_table* table = &context->shader_modules;
+   spv_hash_table* table = &context->shader_table;
 
    table->max_count = shader_count;
 
@@ -217,18 +222,15 @@ static void spirv_initialize(vk_context* context)
    }
 }
 
-static vk_buffer_objects vk_buffer_objects_create(vk_context* context, s8 asset_file)
+static void vk_buffer_objects_create(vk_context* context, s8 asset_file)
 {
-   vk_buffer_objects result = {};
-
-   if(s8_is_substr(asset_file, s8(".gltf")))
-      result = vk_gltf_read(context, asset_file);
-   else if(s8_is_substr(asset_file, s8(".obj")))
-      result = vk_obj_read(context, asset_file);
+   if (s8_is_substr(asset_file, s8(".gltf")))
+      vk_gltf_read(context, asset_file);
+   else if (s8_is_substr(asset_file, s8(".obj")))
+      ;
+      //vk_obj_read(context, asset_file);
    else
       hw_message_box("Unsupported asset format");
-
-   return result;
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
@@ -264,7 +266,7 @@ static VkFormat vk_swapchain_format(VkPhysicalDevice physical_device, VkSurfaceK
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
 
-   VkSurfaceFormatKHR formats[MAX_VULKAN_OBJECT_COUNT] = {};
+   VkSurfaceFormatKHR formats[MAX_VULKAN_OBJECT_COUNT] = {0};
    u32 format_count = array_count(formats);
    if(!vk_valid(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats)))
       return VK_FORMAT_UNDEFINED;
@@ -277,7 +279,7 @@ static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physica
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
 
-   vk_swapchain_surface result = {};
+   vk_swapchain_surface result = {0};
 
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps)))
@@ -304,7 +306,7 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
 {
    assert(vk_valid_handle(context->instance));
 
-   VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {};
+   VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {0};
    VkPhysicalDevice fallback_gpu = 0;
    u32 dev_count = array_count(devs);
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
@@ -376,10 +378,10 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
 {
    assert(vk_valid_handle(physical_device));
 
-   VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = {};
+   VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = {0};
    mesh_shader_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT;
 
-   VkPhysicalDeviceProperties2 device_props2 = {};
+   VkPhysicalDeviceProperties2 device_props2 = {0};
    device_props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
    device_props2.pNext = &mesh_shader_props;
 
@@ -531,7 +533,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
 {
    VkSurfaceCapabilitiesKHR surface_caps;
    if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
-      return (vk_swapchain_surface) {};
+      return (vk_swapchain_surface) {0};
 
    VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
 
@@ -598,14 +600,14 @@ static VkRenderPass vk_renderpass_create(vk_context* context)
    VkAttachmentReference color_attachment_ref = {color_attachment_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}; 
    VkAttachmentReference depth_attachment_ref = {depth_attachment_index, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}; 
 
-   VkSubpassDescription subpass = {};
+   VkSubpassDescription subpass = {0};
    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
    subpass.colorAttachmentCount = 1;
    subpass.pColorAttachments = &color_attachment_ref;
 
    subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
-   VkAttachmentDescription attachments[2] = {};
+   VkAttachmentDescription attachments[2] = {0};
 
    attachments[color_attachment_index].format = context->swapchain_surface.format;
    attachments[color_attachment_index].samples = VK_SAMPLE_COUNT_1_BIT;
@@ -726,7 +728,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
 
    vk_context* context = hw->renderer.backends[renderer_index];
 
-   mvp_transform mvp = {};
+   mvp_transform mvp = {0};
    const f32 ar = (f32)width / height;
 
    mvp.n = 0.01f;
@@ -785,9 +787,8 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 {
    assert(buffer->handle && buffer->size > 0);
 
-   VkDescriptorBufferInfo result = {};
+   VkDescriptorBufferInfo result = {0};
    result.buffer = buffer->handle;
-   //result.range = VK_WHOLE_SIZE;
    result.range = buffer->size;
    result.offset = 0;
 
@@ -796,7 +797,7 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 
 static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, u32 binding, VkDescriptorBufferInfo* buffer_info)
 {
-   VkWriteDescriptorSet result = {};
+   VkWriteDescriptorSet result = {0};
 
    result.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
    result.dstBinding = binding;
@@ -893,9 +894,10 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    mvp.meshlet_offset = 0;
 
    const f32 c = 255.0f;
-   VkClearValue clear[2] = {};
+   VkClearValue clear[2] = {0};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
-   clear[0].color = (VkClearColorValue){0.11f, 0.11f, 0.11f};
+   //clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
+   clear[0].color = (VkClearColorValue){0.19f, 0.19f, 0.19f};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
    renderpass_info.clearValueCount = 2;
@@ -914,7 +916,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
    vkCmdBeginRenderPass(command_buffer, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
-   VkViewport viewport = {};
+   VkViewport viewport = {0};
 
    // y-is-up
    viewport.x = 0.0f;
@@ -925,7 +927,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    viewport.minDepth = 0.0f;
    viewport.maxDepth = 1.0f;
 
-   VkRect2D scissor = {};
+   VkRect2D scissor = {0};
    scissor.offset.x = 0;
    scissor.offset.y = 0;
    scissor.extent.width = (u32)context->swapchain_surface.image_width;
@@ -945,21 +947,20 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
-      vk_buffer_binding bbs[3] = {};
-      bbs[0].buffer = context->bos.vb;
+      vk_buffer_binding bbs[3] = {0};
+      bbs[0].buffer = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
       bbs[0].binding = 0;
 
-      bbs[1].buffer = context->bos.mb;
+      bbs[1].buffer = buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
       bbs[1].binding = 1;
 
-      bbs[2].buffer = context->bos.world_transform;
+      bbs[2].buffer = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
       bbs[2].binding = 2;
 
       cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
-
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      vkCmdDrawMeshTasksIndirectEXT(command_buffer, context->bos.indirect_rtx.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+      vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name).handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -968,19 +969,19 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      cmd_bind_buffer(command_buffer, context->bos.ib.handle, 0, VK_INDEX_TYPE_UINT32);
+      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, "ib").handle, 0, VK_INDEX_TYPE_UINT32);
 
-      vk_buffer_binding bbs[2] = {};
-      bbs[0].buffer = context->bos.vb;
+      vk_buffer_binding bbs[2] = {0};
+      bbs[0].buffer = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
       bbs[0].binding = 0;
 
-      bbs[1].buffer = context->bos.world_transform;
+      bbs[1].buffer = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
       bbs[1].binding = 1;
 
       cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      vkCmdDrawIndexedIndirect(command_buffer, context->bos.indirect.handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+      vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name).handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -990,7 +991,13 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       // draw ground plane
       vkCmdDraw(command_buffer, 4, 1, 0, 0);
+
+      vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
    }
+
+   // draw frustum
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+   vkCmdDraw(command_buffer, 12, 1, 0, 0);
 
    // draw axis
    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
@@ -1084,7 +1091,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
    // TODO: cleanup
    if(rtx_supported)
    {
-      VkDescriptorSetLayoutBinding bindings[3] = {};
+      VkDescriptorSetLayoutBinding bindings[3] = {0};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
@@ -1110,7 +1117,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
    }
    else
    {
-      VkDescriptorSetLayoutBinding bindings[2] = {};
+      VkDescriptorSetLayoutBinding bindings[2] = {0};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
@@ -1139,7 +1146,7 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDes
 
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
 
-   VkPushConstantRange push_constants = {};
+   VkPushConstantRange push_constants = {0};
    if(rtx_supported)
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
    else
@@ -1169,7 +1176,7 @@ static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache c
 
    VkPipeline pipeline = 0;
 
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
+   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
    stages[0].module = shaders->ms;
@@ -1216,7 +1223,7 @@ static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache c
    depth_stencil_info.maxDepthBounds = 1.0f;
    pipeline_info.pDepthStencilState = &depth_stencil_info;
 
-   VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+   VkPipelineColorBlendAttachmentState color_blend_attachment = {0};
    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
    color_blend_attachment.blendEnable = true;
    // Src color: output color alpha
@@ -1263,7 +1270,7 @@ static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCac
 
    VkPipeline pipeline = 0;
 
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
+   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
    stages[0].module = shaders->vs;
    stages[0].pName = "main";
@@ -1310,7 +1317,7 @@ static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCac
    depth_stencil_info.maxDepthBounds = 1.0f;
    pipeline_info.pDepthStencilState = &depth_stencil_info;
 
-   VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+   VkPipelineColorBlendAttachmentState color_blend_attachment = {0};
    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
    color_blend_attachment.blendEnable = true;
    // Src color: output color alpha
@@ -1356,7 +1363,7 @@ static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache c
 
    VkPipeline pipeline = 0;
 
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {};
+   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
 
    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -1404,7 +1411,7 @@ static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache c
    depth_stencil_info.maxDepthBounds = 1.0f;
    pipeline_info.pDepthStencilState = &depth_stencil_info;
 
-   VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+   VkPipelineColorBlendAttachmentState color_blend_attachment = {0};
    color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
    VkPipelineColorBlendStateCreateInfo color_blend_info = {vk_info(PIPELINE_COLOR_BLEND_STATE)};
@@ -1465,11 +1472,18 @@ VkInstance vk_instance_create(arena scratch)
 
 static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
 {
-   context->bos = vk_buffer_objects_create(context, gltf_name);
-   context->bos.indirect = vk_buffer_indirect_create(context, scratch, false);
-   context->bos.indirect_rtx = vk_buffer_indirect_create(context, scratch, true);
-   context->bos.world_transform = vk_buffer_transforms_create(context, scratch);
+   // TODO: insert vb, ib and mb into hash table
+   vk_buffer_objects_create(context, gltf_name);
+
+   vk_buffer indirect = vk_buffer_indirect_create(context, scratch, false);
+   vk_buffer indirect_rtx = vk_buffer_indirect_create(context, scratch, true);
+   vk_buffer world_transform = vk_buffer_transforms_create(context, scratch);
+
    context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
+
+   buffer_hash_insert(&context->buffer_table, "indirect", indirect);
+   buffer_hash_insert(&context->buffer_table, "indirect_rtx", indirect_rtx);
+   buffer_hash_insert(&context->buffer_table, "transform", world_transform);
 }
 
 static void vk_pipelines_create(vk_context* context, arena scratch)
@@ -1492,14 +1506,17 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
 
    VkPipelineCache cache = 0; // TODO: enable
 
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
    context->non_rtx_pipeline = vk_graphics_pipeline_create(context, cache, &gm);
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
    context->rtx_pipeline = vk_mesh_pipeline_create(context, cache, &mm);
 
-   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
+   vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
    context->axis_pipeline = vk_axis_pipeline_create(context, cache, &am);
+
+   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
+   context->frustum_pipeline = vk_graphics_pipeline_create(context, cache, &fm);
 }
 
 void vk_initialize(hw* hw)
@@ -1548,7 +1565,7 @@ void vk_initialize(hw* hw)
 #endif
 
    // TODO: allocator
-   VkAllocationCallbacks allocator = {};
+   VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
    context->physical_device = vk_physical_device_select(hw, context, *context->storage);
@@ -1597,21 +1614,39 @@ void vk_initialize(hw* hw)
 
    spirv_initialize(context);
 
+   // TODO: create function for hash tables
+   // TODO: actual max count for buffers 
+   // TODO: compress
+   context->buffer_table.max_count = 64;
+   context->buffer_table.keys = push(context->storage, const char*, context->buffer_table.max_count);
+   context->buffer_table.values = push(context->storage, vk_buffer, context->buffer_table.max_count);
+
+   memset(context->buffer_table.values, 0, context->buffer_table.max_count * sizeof(vk_buffer));
+
+   for(size i = 0; i < context->buffer_table.max_count; ++i)
+      context->buffer_table.keys[i] = 0;
+
    vk_buffers_create(context, *context->storage, hw->state.asset_file);
    vk_pipelines_create(context, *context->storage);
 
    vk_textures_log(context);
 
-   spv_hash_log(&context->shader_modules);
+   spv_hash_log(&context->shader_table);
 }
 
 void vk_uninitialize(hw* hw)
 {
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_modules, "meshlet");
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_modules, "graphics");
-   vk_shader_modules am = spv_hash_lookup(&context->shader_modules, "axis");
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
+   vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
+   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
+
+   // TODO: also destroy the rest of the buffers
+   vk_buffer vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+   vk_buffer ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
+   vk_buffer mb = buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
 
    vkDeviceWaitIdle(context->logical_device);
 
@@ -1628,16 +1663,19 @@ void vk_uninitialize(hw* hw)
    vkDestroyShaderModule(context->logical_device, am.vs, 0);
    vkDestroyShaderModule(context->logical_device, am.fs, 0);
 
+   vkDestroyShaderModule(context->logical_device, fm.vs, 0);
+   vkDestroyShaderModule(context->logical_device, fm.fs, 0);
+
    vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
    vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
 
-   vkDestroyBuffer(context->logical_device, context->bos.ib.handle, 0);
-   vkDestroyBuffer(context->logical_device, context->bos.vb.handle, 0);
-   vkDestroyBuffer(context->logical_device, context->bos.mb.handle, 0);
+   vkDestroyBuffer(context->logical_device, ib.handle, 0);
+   vkDestroyBuffer(context->logical_device, vb.handle, 0);
+   vkDestroyBuffer(context->logical_device, mb.handle, 0);
 
-   vkFreeMemory(context->logical_device, context->bos.ib.memory, 0);
-   vkFreeMemory(context->logical_device, context->bos.vb.memory, 0);
-   vkFreeMemory(context->logical_device, context->bos.mb.memory, 0);
+   vkFreeMemory(context->logical_device, ib.memory, 0);
+   vkFreeMemory(context->logical_device, vb.memory, 0);
+   vkFreeMemory(context->logical_device, mb.memory, 0);
 
    vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
    vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);

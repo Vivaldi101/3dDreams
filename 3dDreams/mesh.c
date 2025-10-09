@@ -12,10 +12,10 @@
 static void vk_textures_log(vk_context* context);
 static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path);
 
+typedef struct vertex vertex;
 typedef struct 
 {
    arena scratch;
-   s8 mtl_path;
 } obj_user_ctx;
 
 typedef struct 
@@ -117,73 +117,19 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
    return result;
 }
 
-static vk_buffer vk_buffer_create(vk_context* context, size buffer_size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
-{
-   assert(buffer_size > 0);
-   assert(usage != 0);
-   assert(memory_flags != 0);
-
-   vk_buffer buffer = {0};
-
-   VkBufferCreateInfo create_info = {vk_info(BUFFER)};
-   create_info.size = buffer_size;
-   create_info.usage = usage;
-
-   vk_assert(vkCreateBuffer(context->logical_device, &create_info, 0, &buffer.handle));
-
-   VkMemoryRequirements memory_reqs;
-   vkGetBufferMemoryRequirements(context->logical_device, buffer.handle, &memory_reqs);
-
-   VkPhysicalDeviceMemoryProperties memory_properties;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_properties);
-
-   u32 memory_index = memory_properties.memoryTypeCount;
-   u32 i = 0;
-
-   while(i < memory_index)
-   {
-      VkMemoryType mem_type = memory_properties.memoryTypes[i];
-
-      if((memory_reqs.memoryTypeBits & (1 << i)) &&
-         (mem_type.propertyFlags & memory_flags) == memory_flags)
-      {
-         memory_index = i;
-         break;
-      }
-
-      ++i;
-   }
-
-   assert(i != memory_properties.memoryTypeCount);
-
-   VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
-   allocate_info.allocationSize = memory_reqs.size;
-   allocate_info.memoryTypeIndex = memory_index;
-
-   VkDeviceMemory memory = 0;
-   vk_assert(vkAllocateMemory(context->logical_device, &allocate_info, 0, &memory));
-   vk_assert(vkBindBufferMemory(context->logical_device, buffer.handle, memory, 0));
-
-   if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-      vk_assert(vkMapMemory(context->logical_device, memory, 0, allocate_info.allocationSize, 0, &buffer.data));
-
-   buffer.size = allocate_info.allocationSize;
-   buffer.memory = memory;
-
-   // for possible alignment
-   assert(buffer.size >= buffer_size);
-
-   return buffer;
-}
-
+#if 0
 // TODO: extract the non-obj parts out of this and reuse for vertex de-duplication
 static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_attrib_t* attrib)
 {
-   vk_buffer_objects result = {};
+   vk_buffer_objects result = {0};
 
    context->mesh_draws.arena = context->storage;
    // single .obj mesh
    array_resize(context->mesh_draws, 1);
+
+   context->mesh_instances.arena = context->storage;
+   // single .obj mesh
+   array_resize(context->mesh_instances, 1);
 
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -263,19 +209,22 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 
    vk_meshlet_buffer mb = meshlet_build(*context->storage, vb_data.count, ib_data, index_count);
 
-   usize vb_size = vb_data.count * sizeof(struct vertex);
-   usize mb_size = mb.meshlets.count * sizeof(struct meshlet);
+   usize vb_size = vb_data.count * sizeof(vertex);
+   usize mb_size = mb.meshlets.count * sizeof(meshlet);
    usize ib_size = index_count * sizeof(u32);
 
    context->meshlet_count = (u32)mb.meshlets.count;
 
-   result.vb = vk_buffer_create(context, vb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.mb = vk_buffer_create(context, mb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.ib = vk_buffer_create(context, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.vb.size = vb_size;
+   vk_buffer_allocate(&result.vb, context->logical_device, context->physical_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   //result.vb = vk_buffer_create_and_bind(context->logical_device, vb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.mb = vk_buffer_create_and_bind(context->logical_device, mb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   result.ib = vk_buffer_create_and_bind(context->logical_device, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    // temp buffer
    size scratch_buffer_size = max(result.mb.size, max(result.vb.size, result.ib.size));
-   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer scratch_buffer = vk_buffer_create_and_bind(context->logical_device, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // upload vertex data
    vk_buffer_upload(context, result.vb, scratch_buffer, vb_data.data, result.vb.size);
@@ -288,10 +237,15 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
    md.index_count = index_count;
    array_add(context->mesh_draws, md);
 
+   vk_mesh_instance mi = {0};
+   mi.mesh_index = 0;   // single mesh
+   array_add(context->mesh_instances, mi);
+
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
 
    return result;
 }
+#endif
 
 static size gltf_index_count(cgltf_data* data)
 {
@@ -312,7 +266,7 @@ static size gltf_index_count(cgltf_data* data)
 
 static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scratch, u32 max_descriptor_count)
 {
-   vk_descriptor result = {};
+   vk_descriptor result = {0};
 
    // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =
@@ -388,58 +342,60 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
    VkDescriptorSetLayout descriptor_set_layout = 0;
    vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &layout_info, 0, &descriptor_set_layout));
 
-   VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info =
+	if(context->textures.count > 0)
    {
-       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
-       .descriptorSetCount = 1,
-       .pDescriptorCounts = &(u32)context->textures.count, // actual allocate count
-   };
+		VkDescriptorSetVariableDescriptorCountAllocateInfo variable_count_info =
+		{
+			 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO,
+			 .descriptorSetCount = 1,
+			 .pDescriptorCounts = &(u32)context->textures.count, // actual allocate count
+		};
 
-   VkDescriptorSetAllocateInfo alloc_info =
-   {
-       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-       .pNext = &variable_count_info,
-       .descriptorPool = descriptor_pool,
-       .descriptorSetCount = 1,
-       .pSetLayouts = &descriptor_set_layout,
-   };
+		VkDescriptorSetAllocateInfo alloc_info =
+		{
+			 .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			 .pNext = &variable_count_info,
+			 .descriptorPool = descriptor_pool,
+			 .descriptorSetCount = 1,
+			 .pSetLayouts = &descriptor_set_layout,
+		};
 
-   VkDescriptorSet descriptor_set;
-   vk_assert(vkAllocateDescriptorSets(context->logical_device, &alloc_info, &descriptor_set));
+		VkDescriptorSet descriptor_set;
+		vk_assert(vkAllocateDescriptorSets(context->logical_device, &alloc_info, &descriptor_set));
 
-   array(VkDescriptorImageInfo) image_infos = { &scratch };
-   array_resize(image_infos, context->textures.count);
+		array(VkDescriptorImageInfo) image_infos = {&scratch};
+		array_resize(image_infos, context->textures.count);
 
-   for(uint32_t i = 0; i < context->textures.count; ++i)
-   {
-      image_infos.data[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      image_infos.data[i].imageView = context->textures.data[i].image.view;
-      image_infos.data[i].sampler = immutable_sampler;
-   }
+		for(uint32_t i = 0; i < context->textures.count; ++i)
+		{
+			image_infos.data[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			image_infos.data[i].imageView = context->textures.data[i].image.view;
+			image_infos.data[i].sampler = immutable_sampler;
+		}
 
-   VkWriteDescriptorSet write =
-   {
-       .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-       .dstSet = descriptor_set,
-       .dstBinding = 0,
-       .dstArrayElement = 0,
-       .descriptorCount = (u32)context->textures.count,
-       .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-       .pImageInfo = image_infos.data,
-   };
+		VkWriteDescriptorSet write =
+		{
+			 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			 .dstSet = descriptor_set,
+			 .dstBinding = 0,
+			 .dstArrayElement = 0,
+			 .descriptorCount = (u32)context->textures.count,
+			 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			 .pImageInfo = image_infos.data,
+		};
 
-   vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
+		vkUpdateDescriptorSets(context->logical_device, 1, &write, 0, 0);
 
-   result.set = descriptor_set;
-   result.layout = descriptor_set_layout;
+		result.set = descriptor_set;
+		result.layout = descriptor_set_layout;
 
-   return result;
+	}
+
+	return result;
 }
 
-static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
+static void vk_gltf_load(vk_context* context, s8 gltf_path)
 {
-   vk_buffer_objects result = {};
-
    cgltf_options options = {0};
    cgltf_data* data = 0;
    cgltf_result gltf_result = cgltf_parse_file(&options, s8_data(gltf_path), &data);
@@ -643,31 +599,42 @@ static vk_buffer_objects vk_gltf_load(vk_context* context, s8 gltf_path)
 
    cgltf_free(data);
 
-   vk_meshlet_buffer mb = meshlet_build(*context->storage, vertices.count, indices.data, indices.count);
-   context->meshlet_count = (u32)mb.meshlets.count;
+   vk_meshlet_buffer mlb = meshlet_build(*context->storage, vertices.count, indices.data, indices.count);
+   context->meshlet_count = (u32)mlb.meshlets.count;
 
-   usize mb_size = mb.meshlets.count * sizeof(struct meshlet);
-   usize vb_size = vertices.count * sizeof(struct vertex);
+   usize mb_size = mlb.meshlets.count * sizeof(meshlet);
+   usize vb_size = vertices.count * sizeof(vertex);
    usize ib_size = indices.count * sizeof(u32);
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
 
-   result.vb = vk_buffer_create(context, vb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.mb = vk_buffer_create(context, mb_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-   result.ib = vk_buffer_create(context, ib_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer mb = {0};
+   vk_buffer vb = {0};
+   vk_buffer ib = {0};
 
-   usize scratch_buffer_size = max(result.mb.size, max(result.vb.size, result.ib.size));
-   vk_buffer scratch_buffer = vk_buffer_create(context, scratch_buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   mb.size = mb_size;
+   vb.size = vb_size;
+   ib.size = ib_size;
+
+   vk_buffer_create_and_bind(&vb, context->logical_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer_create_and_bind(&mb, context->logical_device, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer_create_and_bind(&ib, context->logical_device, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+   buffer_hash_insert(&context->buffer_table, "mb", mb);
+   buffer_hash_insert(&context->buffer_table, "vb", vb);
+   buffer_hash_insert(&context->buffer_table, "ib", ib);
+
+   usize scratch_buffer_size = max(mb.size, max(vb.size, ib.size));
+   vk_buffer scratch_buffer = {.size = scratch_buffer_size};
+   vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // vertex data
-   vk_buffer_upload(context, result.vb, scratch_buffer, vertices.data, result.vb.size);
+   vk_buffer_upload(context, vb, scratch_buffer, vertices.data, vb.size);
    // index data
-   vk_buffer_upload(context, result.ib, scratch_buffer, indices.data, result.ib.size);
+   vk_buffer_upload(context, ib, scratch_buffer, indices.data, ib.size);
    // meshlet data
-   vk_buffer_upload(context, result.mb, scratch_buffer, mb.meshlets.data, result.mb.size);
+   vk_buffer_upload(context, mb, scratch_buffer, mlb.meshlets.data, mb.size);
 
    vk_buffer_destroy(context->logical_device, &scratch_buffer);
-
-   return result;
 }

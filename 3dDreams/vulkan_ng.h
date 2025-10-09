@@ -47,7 +47,7 @@
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 typedef enum file_format { FILE_FORMAT_OBJ = 0, FILE_FORMAT_GLTF = 1 } file_format;
 
-align_struct
+align_struct vk_swapchain_surface
 {
    u32 image_width;
    u32 image_height;
@@ -56,7 +56,7 @@ align_struct
    VkSwapchainKHR handle;
 } vk_swapchain_surface;
 
-align_struct
+align_struct vk_swapchain_images
 {
    array(VkImage) images;
    array(VkImage) depths;
@@ -64,7 +64,7 @@ align_struct
    array(VkImageView) depth_views;
 } vk_swapchain_images;
 
-align_struct
+align_struct vk_buffer
 {
    VkBuffer handle;
    VkDeviceMemory memory;
@@ -72,29 +72,19 @@ align_struct
    size size;
 } vk_buffer;
 
-align_struct
-{
-   vk_buffer vb;        // vertex buffer
-   vk_buffer ib;        // index buffer
-   vk_buffer mb;        // mesh buffer
-   vk_buffer indirect;        // indirect rendering
-   vk_buffer indirect_rtx;    // indirect rendering
-   vk_buffer world_transform; // world transform
-} vk_buffer_objects;
-
-align_struct
+align_struct vk_buffer_binding
 {
    vk_buffer buffer;
    u32 binding;
 } vk_buffer_binding;
 
-align_struct
+align_struct vk_meshlet
 {
    vk_buffer buffer;
    u32 count;
 } vk_meshlet;
 
-align_struct
+align_struct vk_image
 {
    VkImage handle;
    VkImageView view;
@@ -102,12 +92,12 @@ align_struct
 } vk_image;
 
 typedef struct meshlet meshlet;
-align_struct
+align_struct vk_meshlet_buffer
 {
    array(meshlet) meshlets;
 } vk_meshlet_buffer;
 
-align_struct
+align_struct vk_mesh_instance
 {
    u32 mesh_index;  // which mesh this instance draws
    u32 albedo; 
@@ -118,7 +108,7 @@ align_struct
    mat4 world;
 } vk_mesh_instance;
 
-align_struct
+align_struct vk_mesh_draw
 {
    // TODO: u32 sizes?
    size index_offset;
@@ -126,25 +116,33 @@ align_struct
    size vertex_offset;
 } vk_mesh_draw;
 
-align_struct
+align_struct vk_texture
 {
    array(char) path;
    vk_image image;
 } vk_texture;
 
-align_struct
+align_struct vk_descriptor
 {
    VkDescriptorSet set;
    VkDescriptorSetLayout layout;
 } vk_descriptor;
 
-align_struct
+align_struct vk_pipeline
 {
    VkPipeline pipeline;
    VkPipelineLayout layout; 
 } vk_pipeline;
 
-align_struct
+align_struct vk_buffer_hash_table
+{
+   struct vk_buffer* values;
+   const char** keys;
+   size max_count;
+   size count;
+} vk_buffer_hash_table;
+
+align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_mesh_draw) mesh_draws;
@@ -179,9 +177,9 @@ align_struct
    VkPipelineLayout non_rtx_pipeline_layout;
    VkPipelineLayout rtx_pipeline_layout;
 
-   spv_hash_table shader_modules;
+   spv_hash_table shader_table;
 
-   vk_buffer_objects bos; // buffer objects
+   vk_buffer_hash_table buffer_table;
 
    u32 meshlet_count;
 
@@ -199,11 +197,11 @@ align_struct
 void vk_initialize(hw* hw);
 void vk_uninitialize(hw* hw);
 
-typedef struct vertex vertex;
 // TODO: these in buffer.h
 static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size);
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
-static vk_buffer vk_buffer_create(vk_context* context, size size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+static bool vk_buffer_create_and_bind(vk_buffer* buffer, VkDevice logical_device, VkBufferUsageFlags usage, VkPhysicalDevice physical_device, VkMemoryPropertyFlags memory_flags);
+static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDevice physical, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 #endif
