@@ -1472,7 +1472,6 @@ VkInstance vk_instance_create(arena scratch)
 
 static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
 {
-   // TODO: insert vb, ib and mb into hash table
    vk_buffer_objects_create(context, gltf_name);
 
    vk_buffer indirect = vk_buffer_indirect_create(context, scratch, false);
@@ -1615,7 +1614,7 @@ void vk_initialize(hw* hw)
    spirv_initialize(context);
 
    // TODO: create function for hash tables
-   // TODO: actual max count for buffers 
+   // TODO: actual max count for buffers
    // TODO: compress
    context->buffer_table.max_count = 64;
    context->buffer_table.keys = push(context->storage, const char*, context->buffer_table.max_count);
