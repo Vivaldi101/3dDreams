@@ -1643,10 +1643,13 @@ void vk_uninitialize(hw* hw)
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
 
-   // TODO: also destroy the rest of the buffers
    vk_buffer vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
    vk_buffer ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
    vk_buffer mb = buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+
+   vk_buffer indirect = buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
+   vk_buffer indirect_rtx = buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
+   vk_buffer transform = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
 
    vkDeviceWaitIdle(context->logical_device);
 
@@ -1676,6 +1679,14 @@ void vk_uninitialize(hw* hw)
    vkFreeMemory(context->logical_device, ib.memory, 0);
    vkFreeMemory(context->logical_device, vb.memory, 0);
    vkFreeMemory(context->logical_device, mb.memory, 0);
+
+   vkDestroyBuffer(context->logical_device, indirect.handle, 0);
+   vkDestroyBuffer(context->logical_device, indirect_rtx.handle, 0);
+   vkDestroyBuffer(context->logical_device, transform.handle, 0);
+
+   vkFreeMemory(context->logical_device, indirect.memory, 0);
+   vkFreeMemory(context->logical_device, indirect_rtx.memory, 0);
+   vkFreeMemory(context->logical_device, transform.memory, 0);
 
    vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
    vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
