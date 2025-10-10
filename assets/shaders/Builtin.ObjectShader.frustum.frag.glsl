@@ -19,6 +19,5 @@ void main()
 {
     float linear_z = ndc_to_linear_z(gl_FragCoord.z, globals.near, globals.far);
 
-    //out_color = vec4(1.0);
-    out_color = vec4(vec3(linear_z*0.125*0.5, 0.0, 0.0), 1.0);
+    out_color = vec4(0.125);
 }

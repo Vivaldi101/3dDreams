@@ -161,7 +161,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
 // TODO: Rename
 static void spirv_initialize(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
@@ -193,28 +193,28 @@ static void spirv_initialize(vk_context* context)
          {
             vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
             // TODO: optimize shader loading - load all the shaders at once
-            vk_shader_load(context->logical_device, *context->storage, *p, &ms);
+            vk_shader_load(context->devices.logical, *context->storage, *p, &ms);
             spv_hash_insert(table, "meshlet", ms);
             break;
          }
          if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
          {
             vk_shader_modules gm = spv_hash_lookup(table, "graphics");
-            vk_shader_load(context->logical_device, *context->storage, *p, &gm);
+            vk_shader_load(context->devices.logical, *context->storage, *p, &gm);
             spv_hash_insert(table, "graphics", gm);
             break;
          }
          if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
          {
             vk_shader_modules am = spv_hash_lookup(table, "axis");
-            vk_shader_load(context->logical_device, *context->storage, *p, &am);
+            vk_shader_load(context->devices.logical, *context->storage, *p, &am);
             spv_hash_insert(table, "axis", am);
             break;
          }
          if(strncmp(shader_name + i, "frustum", strlen("frustum")) == 0)
          {
             vk_shader_modules fm = spv_hash_lookup(table, "frustum");
-            vk_shader_load(context->logical_device, *context->storage, *p, &fm);
+            vk_shader_load(context->devices.logical, *context->storage, *p, &fm);
             spv_hash_insert(table, "frustum", fm);
             break;
          }
@@ -356,15 +356,15 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
 static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
 {
    u32 queue_family_count = 0;
-   vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_family_count, 0);
+   vkGetPhysicalDeviceQueueFamilyProperties(context->devices.physical, &queue_family_count, 0);
 
    VkQueueFamilyProperties* queue_families = push(&scratch, VkQueueFamilyProperties, queue_family_count);
-   vkGetPhysicalDeviceQueueFamilyProperties(context->physical_device, &queue_family_count, queue_families);
+   vkGetPhysicalDeviceQueueFamilyProperties(context->devices.physical, &queue_family_count, queue_families);
 
    for(u32 i = 0; i < queue_family_count; i++)
    {
       VkBool32 present_support = false;
-      vkGetPhysicalDeviceSurfaceSupportKHR(context->physical_device, i, context->surface, &present_support);
+      vkGetPhysicalDeviceSurfaceSupportKHR(context->devices.physical, i, context->surface, &present_support);
 
       // graphics and presentation within same queue for simplicity
       if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
@@ -394,7 +394,7 @@ static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
 
 static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scratch)
 {
-   assert(vk_valid_handle(context->physical_device));
+   assert(vk_valid_handle(context->devices.physical));
    f32 queue_prio = 1.0f;
 
    VkDeviceQueueCreateInfo queue_info = {vk_info(DEVICE_QUEUE)};
@@ -447,7 +447,7 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
       features_mesh_shader.multiviewMeshShader = true;
    }
 
-   vkGetPhysicalDeviceFeatures2(context->physical_device, &features);
+   vkGetPhysicalDeviceFeatures2(context->devices.physical, &features);
 
    features.features.depthBounds = true;
    features.features.wideLines = true;
@@ -470,32 +470,32 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
    ldev_info.pNext = &features;
 
    VkDevice logical_device;
-   vk_assert(vkCreateDevice(context->physical_device, &ldev_info, 0, &logical_device));
+   vk_assert(vkCreateDevice(context->devices.physical, &ldev_info, 0, &logical_device));
 
    return logical_device;
 }
 
 static VkQueue vk_graphics_queue_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
 
    VkQueue graphics_queue = 0;
    u32 queue_index = 0;
 
    // TODO: Get the queue index
-   vkGetDeviceQueue(context->logical_device, context->queue_family_index, queue_index, &graphics_queue);
+   vkGetDeviceQueue(context->devices.logical, context->queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }
 
 static VkSemaphore vk_semaphore_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
 
    VkSemaphore sema = 0;
 
    VkSemaphoreCreateInfo sema_info = {vk_info(SEMAPHORE)};
-   vk_assert(vkCreateSemaphore(context->logical_device, &sema_info, 0, &sema));
+   vk_assert(vkCreateSemaphore(context->devices.logical, &sema_info, 0, &sema));
 
    return sema;
 }
@@ -532,7 +532,7 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR 
 static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height)
 {
    VkSurfaceCapabilitiesKHR surface_caps;
-   if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->physical_device, context->surface, &surface_caps)))
+   if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->devices.physical, context->surface, &surface_caps)))
       return (vk_swapchain_surface) {0};
 
    VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
@@ -548,16 +548,16 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->physical_device, swapchain_extent.width, swapchain_extent.height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
-   swapchain_info.handle = vk_swapchain_create(context->logical_device, context->surface, &swapchain_info, context->queue_family_index);
+   swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
 
    return swapchain_info;
 }
 
 static VkCommandBuffer vk_command_buffer_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    assert(vk_valid_handle(context->command_pool));
 
    VkCommandBuffer buffer = 0;
@@ -567,21 +567,21 @@ static VkCommandBuffer vk_command_buffer_create(vk_context* context)
    buffer_allocate_info.commandPool = context->command_pool;
    buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-   vk_assert(vkAllocateCommandBuffers(context->logical_device, &buffer_allocate_info, &buffer));
+   vk_assert(vkAllocateCommandBuffers(context->devices.logical, &buffer_allocate_info, &buffer));
 
    return buffer;
 }
 
 static VkCommandPool vk_command_pool_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
 
    VkCommandPool pool = 0;
 
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
    pool_info.queueFamilyIndex = context->queue_family_index;
 
-   vk_assert(vkCreateCommandPool(context->logical_device, &pool_info, 0, &pool));
+   vk_assert(vkCreateCommandPool(context->devices.logical, &pool_info, 0, &pool));
 
    return pool;
 }
@@ -589,7 +589,7 @@ static VkCommandPool vk_command_pool_create(vk_context* context)
 
 static VkRenderPass vk_renderpass_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    assert(vk_valid_format(context->swapchain_surface.format));
 
    VkRenderPass renderpass = 0;
@@ -634,7 +634,7 @@ static VkRenderPass vk_renderpass_create(vk_context* context)
    renderpass_info.attachmentCount = array_count(attachments);
    renderpass_info.pAttachments = attachments;
 
-   vk_assert(vkCreateRenderPass(context->logical_device, &renderpass_info, 0, &renderpass));
+   vk_assert(vkCreateRenderPass(context->devices.logical, &renderpass_info, 0, &renderpass));
 
    return renderpass;
 }
@@ -685,22 +685,22 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
 
 static void vk_swapchain_destroy(vk_context* context)
 {
-   vkDeviceWaitIdle(context->logical_device);
+   vkDeviceWaitIdle(context->devices.logical);
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views.data[i], 0);
-      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.image_views.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.depth_views.data[i], 0);
    }
    for(u32 i = 0; i < context->framebuffers.count; ++i)
-      vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
+      vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
+   vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
 }
 
 // TODO: Break into separate routines
 static void vk_swapchain_update(vk_context* context)
 {
-   vk_assert(vkGetSwapchainImagesKHR(context->logical_device, context->swapchain_surface.handle, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
+   vk_assert(vkGetSwapchainImagesKHR(context->devices.logical, context->swapchain_surface.handle, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
 
    VkExtent3D depth_extent = {context->swapchain_surface.image_width, context->swapchain_surface.image_height, 1};
 
@@ -713,7 +713,7 @@ static void vk_swapchain_update(vk_context* context)
 
       VkImageView attachments[2] = {context->swapchain_images.image_views.data[i], context->swapchain_images.depth_views.data[i]};
 
-      VkFramebuffer fb = vk_framebuffer_create(context->logical_device, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
+      VkFramebuffer fb = vk_framebuffer_create(context->devices.logical, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
       context->framebuffers.data[i] = fb;
    }
 }
@@ -738,7 +738,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    hw->renderer.mvp = mvp;
 
-   vkDeviceWaitIdle(context->logical_device);
+   vkDeviceWaitIdle(context->devices.logical);
 
    vk_swapchain_destroy(context);
    context->swapchain_surface = vk_swapchain_surface_create(context, width, height);
@@ -757,7 +757,7 @@ static VkQueryPool vk_query_pool_create(vk_context* context)
    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
    info.queryCount = context->query_pool_size;
 
-   vk_assert(vkCreateQueryPool(context->logical_device, &info, 0, &result));
+   vk_assert(vkCreateQueryPool(context->devices.logical, &info, 0, &result));
 
    return result;
 }
@@ -851,7 +851,7 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
-   VkResult next_image_result = vkAcquireNextImageKHR(context->logical_device, context->swapchain_surface.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
+   VkResult next_image_result = vkAcquireNextImageKHR(context->devices.logical, context->swapchain_surface.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
       vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
@@ -859,7 +859,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
 
-   vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -948,19 +948,21 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       cmd_bind_pipeline(command_buffer, pipeline);
 
       vk_buffer_binding bbs[3] = {0};
-      bbs[0].buffer = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+      bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
       bbs[0].binding = 0;
 
-      bbs[1].buffer = buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+      bbs[1].buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
       bbs[1].binding = 1;
 
-      bbs[2].buffer = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+      bbs[2].buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
       bbs[2].binding = 2;
 
       cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name).handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+
+      if (buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -969,19 +971,20 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, "ib").handle, 0, VK_INDEX_TYPE_UINT32);
+      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, "ib")->handle, 0, VK_INDEX_TYPE_UINT32);
 
       vk_buffer_binding bbs[2] = {0};
-      bbs[0].buffer = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+      bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
       bbs[0].binding = 0;
 
-      bbs[1].buffer = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+      bbs[1].buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
       bbs[1].binding = 1;
 
       cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name).handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+      if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
+         vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -1048,10 +1051,10 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    // wait until all queue ops are done
    // essentialy run gpu and cpu in sync (60 FPS usually)
    // TODO: This is bad way to do sync but who cares for now
-   vk_assert(vkDeviceWaitIdle(context->logical_device));
+   vk_assert(vkDeviceWaitIdle(context->devices.logical));
 
    u64 query_results[2];
-   vk_assert(vkGetQueryPoolResults(context->logical_device, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
+   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 
 #if 1
    f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
@@ -1085,7 +1088,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
       // TODO: pass amount of bindings to create here
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, bool rtx_supported)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    VkDescriptorSetLayout set_layout = 0;
 
    // TODO: cleanup
@@ -1113,7 +1116,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &info, 0, &set_layout));
+      vk_assert(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, &set_layout));
    }
    else
    {
@@ -1134,7 +1137,7 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(context->logical_device, &info, 0, &set_layout));
+      vk_assert(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, &set_layout));
    }
 
    return set_layout;
@@ -1169,7 +1172,7 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDes
 // TODO: Cleanup these pipelines
 static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    assert(vk_valid_handle(shaders->ms));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache)); // TODO: enable
@@ -1255,7 +1258,7 @@ static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache c
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->logical_device, cache, 1, &pipeline_info, 0, &pipeline));
+   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
 
    return pipeline;
 }
@@ -1263,7 +1266,7 @@ static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache c
 // TODO: Cleanup these pipelines
 static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    assert(vk_valid_handle(shaders->vs));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache));
@@ -1349,14 +1352,14 @@ static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCac
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->logical_device, cache, 1, &pipeline_info, 0, &pipeline));
+   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
 
    return pipeline;
 }
 
 static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->logical_device));
+   assert(vk_valid_handle(context->devices.logical));
    assert(vk_valid_handle(shaders->vs));
    assert(vk_valid_handle(shaders->fs));
    assert(!vk_valid_handle(cache));
@@ -1427,7 +1430,7 @@ static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache c
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->logical_device, cache, 1, &pipeline_info, 0, &pipeline));
+   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
 
    return pipeline;
 }
@@ -1474,15 +1477,20 @@ static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
 {
    vk_buffer_objects_create(context, gltf_name);
 
-   vk_buffer indirect = vk_buffer_indirect_create(context, scratch, false);
-   vk_buffer indirect_rtx = vk_buffer_indirect_create(context, scratch, true);
+   vk_buffer indirect_buffer = {0};
+   vk_buffer indirect_rtx_buffer = {0};
+
+   if (vk_buffer_indirect_create(&indirect_buffer, context, scratch, false))
+      buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
+
+   if (vk_buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
+      buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
+
    vk_buffer world_transform = vk_buffer_transforms_create(context, scratch);
 
    context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
 
-   buffer_hash_insert(&context->buffer_table, "indirect", indirect);
-   buffer_hash_insert(&context->buffer_table, "indirect_rtx", indirect_rtx);
-   buffer_hash_insert(&context->buffer_table, "transform", world_transform);
+   buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
 }
 
 static void vk_pipelines_create(vk_context* context, arena scratch)
@@ -1496,9 +1504,9 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
 	if(context->textures.count > 0)
 		array_push(set_layouts) = context->texture_descriptor.layout;
 
-   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts.data, set_layouts.count, false);
+   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, false);
    set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0
-   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->logical_device, set_layouts.data, set_layouts.count, true);
+   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, true);
 
    context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
    context->rtx_pipeline_layout = rtx_pipeline_layout;
@@ -1567,10 +1575,10 @@ void vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   context->physical_device = vk_physical_device_select(hw, context, *context->storage);
+   context->devices.physical = vk_physical_device_select(hw, context, *context->storage);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
-   context->logical_device = vk_logical_device_create(hw, context, *context->storage);
+   context->devices.logical = vk_logical_device_create(hw, context, *context->storage);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(context);
@@ -1642,74 +1650,74 @@ void vk_uninitialize(hw* hw)
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
 
-   vk_buffer vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-   vk_buffer ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
-   vk_buffer mb = buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+   vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+   vk_buffer ib = *buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
+   vk_buffer mb = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
 
-   vk_buffer indirect = buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
-   vk_buffer indirect_rtx = buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
-   vk_buffer transform = buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+   vk_buffer indirect = *buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
+   vk_buffer indirect_rtx = *buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
+   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
 
-   vkDeviceWaitIdle(context->logical_device);
+   vkDeviceWaitIdle(context->devices.logical);
 
-   vkDestroyPipeline(context->logical_device, context->axis_pipeline, 0);
-   vkDestroyPipeline(context->logical_device, context->frustum_pipeline, 0);
-   vkDestroyPipeline(context->logical_device, context->non_rtx_pipeline, 0);
+   vkDestroyPipeline(context->devices.logical, context->axis_pipeline, 0);
+   vkDestroyPipeline(context->devices.logical, context->frustum_pipeline, 0);
+   vkDestroyPipeline(context->devices.logical, context->non_rtx_pipeline, 0);
 
-   vkDestroyShaderModule(context->logical_device, mm.ms, 0);
-   vkDestroyShaderModule(context->logical_device, mm.fs, 0);
+   vkDestroyShaderModule(context->devices.logical, mm.ms, 0);
+   vkDestroyShaderModule(context->devices.logical, mm.fs, 0);
 
-   vkDestroyShaderModule(context->logical_device, gm.vs, 0);
-   vkDestroyShaderModule(context->logical_device, gm.fs, 0);
+   vkDestroyShaderModule(context->devices.logical, gm.vs, 0);
+   vkDestroyShaderModule(context->devices.logical, gm.fs, 0);
 
-   vkDestroyShaderModule(context->logical_device, am.vs, 0);
-   vkDestroyShaderModule(context->logical_device, am.fs, 0);
+   vkDestroyShaderModule(context->devices.logical, am.vs, 0);
+   vkDestroyShaderModule(context->devices.logical, am.fs, 0);
 
-   vkDestroyShaderModule(context->logical_device, fm.vs, 0);
-   vkDestroyShaderModule(context->logical_device, fm.fs, 0);
+   vkDestroyShaderModule(context->devices.logical, fm.vs, 0);
+   vkDestroyShaderModule(context->devices.logical, fm.fs, 0);
 
-   vkDestroyCommandPool(context->logical_device, context->command_pool, 0);
-   vkDestroyQueryPool(context->logical_device, context->query_pool, 0);
+   vkDestroyCommandPool(context->devices.logical, context->command_pool, 0);
+   vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
 
-   vkDestroyBuffer(context->logical_device, ib.handle, 0);
-   vkDestroyBuffer(context->logical_device, vb.handle, 0);
-   vkDestroyBuffer(context->logical_device, mb.handle, 0);
+   vkDestroyBuffer(context->devices.logical, ib.handle, 0);
+   vkDestroyBuffer(context->devices.logical, vb.handle, 0);
+   vkDestroyBuffer(context->devices.logical, mb.handle, 0);
 
-   vkFreeMemory(context->logical_device, ib.memory, 0);
-   vkFreeMemory(context->logical_device, vb.memory, 0);
-   vkFreeMemory(context->logical_device, mb.memory, 0);
+   vkFreeMemory(context->devices.logical, ib.memory, 0);
+   vkFreeMemory(context->devices.logical, vb.memory, 0);
+   vkFreeMemory(context->devices.logical, mb.memory, 0);
 
-   vkDestroyBuffer(context->logical_device, indirect.handle, 0);
-   vkDestroyBuffer(context->logical_device, indirect_rtx.handle, 0);
-   vkDestroyBuffer(context->logical_device, transform.handle, 0);
+   vkDestroyBuffer(context->devices.logical, indirect.handle, 0);
+   vkDestroyBuffer(context->devices.logical, indirect_rtx.handle, 0);
+   vkDestroyBuffer(context->devices.logical, transform.handle, 0);
 
-   vkFreeMemory(context->logical_device, indirect.memory, 0);
-   vkFreeMemory(context->logical_device, indirect_rtx.memory, 0);
-   vkFreeMemory(context->logical_device, transform.memory, 0);
+   vkFreeMemory(context->devices.logical, indirect.memory, 0);
+   vkFreeMemory(context->devices.logical, indirect_rtx.memory, 0);
+   vkFreeMemory(context->devices.logical, transform.memory, 0);
 
-   vkDestroyRenderPass(context->logical_device, context->renderpass, 0);
-   vkDestroySemaphore(context->logical_device, context->image_done_semaphore, 0);
-   vkDestroySemaphore(context->logical_device, context->image_ready_semaphore, 0);
+   vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
+   vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);
+   vkDestroySemaphore(context->devices.logical, context->image_ready_semaphore, 0);
 
    for(u32 i = 0; i < context->framebuffers.count; ++i)
-      vkDestroyFramebuffer(context->logical_device, context->framebuffers.data[i], 0);
+      vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
 
    for(u32 i = 0; i < context->textures.count; ++i)
    {
-      vkDestroyImageView(context->logical_device, context->textures.data[i].image.view, 0);
-      vkDestroyImage(context->logical_device, context->textures.data[i].image.handle, 0);
-      vkFreeMemory(context->logical_device, context->textures.data[i].image.memory, 0);
+      vkDestroyImageView(context->devices.logical, context->textures.data[i].image.view, 0);
+      vkDestroyImage(context->devices.logical, context->textures.data[i].image.handle, 0);
+      vkFreeMemory(context->devices.logical, context->textures.data[i].image.memory, 0);
    }
 
    for(u32 i = 0; i < context->swapchain_images.image_views.count; ++i)
    {
-      vkDestroyImageView(context->logical_device, context->swapchain_images.image_views.data[i], 0);
-      vkDestroyImageView(context->logical_device, context->swapchain_images.depth_views.data[i], 0);
-      vkDestroyImage(context->logical_device, context->swapchain_images.depths.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.image_views.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.depth_views.data[i], 0);
+      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i], 0);
    }
 
-   vkDestroySwapchainKHR(context->logical_device, context->swapchain_surface.handle, 0);
+   vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
 
-   vkDestroyDevice(context->logical_device, 0);
+   vkDestroyDevice(context->devices.logical, 0);
    vkDestroyInstance(context->instance, 0);
 }

@@ -17,7 +17,7 @@ static VkImageView vk_image_view_create(vk_context* context, VkFormat format, Vk
    view_info.subresourceRange.layerCount = 1;
    view_info.subresourceRange.levelCount = 1;
 
-   if(!vk_valid(vkCreateImageView(context->logical_device, &view_info, 0, &image_view)))
+   if(!vk_valid(vkCreateImageView(context->devices.logical, &view_info, 0, &image_view)))
       return VK_NULL_HANDLE;
 
    return image_view;
@@ -42,18 +42,18 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
 
-   if(vkCreateImage(context->logical_device, &image_info, 0, &result) != VK_SUCCESS)
+   if(vkCreateImage(context->devices.logical, &image_info, 0, &result) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
    VkMemoryRequirements memory_requirements;
-   vkGetImageMemoryRequirements(context->logical_device, result, &memory_requirements);
+   vkGetImageMemoryRequirements(context->devices.logical, result, &memory_requirements);
 
    VkMemoryAllocateInfo alloc_info = {0};
    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
    alloc_info.allocationSize = memory_requirements.size;
 
    VkPhysicalDeviceMemoryProperties memory_properties;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_properties);
+   vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_properties);
 
    uint32_t memory_type_index = VK_MAX_MEMORY_TYPES;
    for(uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
@@ -70,10 +70,10 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
    alloc_info.memoryTypeIndex = memory_type_index;
 
    VkDeviceMemory memory;
-   if(vkAllocateMemory(context->logical_device, &alloc_info, 0, &memory) != VK_SUCCESS)
+   if(vkAllocateMemory(context->devices.logical, &alloc_info, 0, &memory) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
-   if(vkBindImageMemory(context->logical_device, result, memory, 0) != VK_SUCCESS)
+   if(vkBindImageMemory(context->devices.logical, result, memory, 0) != VK_SUCCESS)
       return VK_NULL_HANDLE;
 
    return result;
@@ -137,9 +137,9 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
    VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
    vk_buffer scratch_buffer = {.size = tex_size};
-   vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // TODO: narrow
    if(vk_valid_handle(image))

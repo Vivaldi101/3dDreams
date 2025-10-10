@@ -87,7 +87,7 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
 
    memcpy(scratch.data, data, dev_size);
 
-   vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
 
    VkCommandBufferBeginInfo begin_info = {0};
    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -179,7 +179,7 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
    // TODO: bad for perf
-   vk_assert(vkDeviceWaitIdle(context->logical_device));
+   vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }
 
 static void vk_buffer_upload(vk_context* context, vk_buffer to, vk_buffer from, const void* data, VkDeviceSize dev_size)
@@ -189,7 +189,7 @@ static void vk_buffer_upload(vk_context* context, vk_buffer to, vk_buffer from, 
    assert(from.data && from.size >= (size)dev_size);
    memcpy(from.data, data, dev_size);
 
-   vk_assert(vkResetCommandPool(context->logical_device, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -220,7 +220,7 @@ static void vk_buffer_upload(vk_context* context, vk_buffer to, vk_buffer from, 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on
    // TODO: bad for perf
-   vk_assert(vkDeviceWaitIdle(context->logical_device));
+   vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }
 
 static vk_buffer vk_buffer_transforms_create(vk_context* context, arena scratch)
@@ -240,20 +240,21 @@ static vk_buffer vk_buffer_transforms_create(vk_context* context, arena scratch)
    size scratch_buffer_size = context->mesh_instances.count * sizeof(struct mesh_draw);
 
    VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->physical_device, &memory_props);
+   vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
    vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-   vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    vk_buffer transform_buffer = {.size = scratch_buffer_size};
-   vk_buffer_create_and_bind(&transform_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   vk_buffer_create_and_bind(&transform_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    vk_buffer_upload(context, transform_buffer, scratch_buffer, draws, sizeof(struct mesh_draw) * context->mesh_instances.count);
 
    return transform_buffer;
 }
 
-static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch, bool rtx_supported)
+// TODO: no bool params
+static bool vk_buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool rtx_supported)
 {
-   vk_buffer indirect_buffer = {0};
+   bool success = false;
 
    if(!rtx_supported)
    {
@@ -279,12 +280,13 @@ static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch, b
       size scratch_buffer_size = context->mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand);
 
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      success = vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-      indirect_buffer.size = scratch_buffer_size;
-      vk_buffer_create_and_bind(&indirect_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      indirect_buffer->size = scratch_buffer_size;
+      success &= vk_buffer_create_and_bind(indirect_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-      vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+      if (success)
+         vk_buffer_upload(context, *indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
    }
    else
    {
@@ -305,14 +307,14 @@ static vk_buffer vk_buffer_indirect_create(vk_context* context, arena scratch, b
       size scratch_buffer_size = context->mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
 
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      vk_buffer_create_and_bind(&scratch_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->physical_device, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-      indirect_buffer.size = scratch_buffer_size;
-      vk_buffer_create_and_bind(&indirect_buffer, context->logical_device, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->physical_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-      vk_buffer_upload(context, indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->mesh_instances.count);
+      success = vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      indirect_buffer->size = scratch_buffer_size;
+      success &= vk_buffer_create_and_bind(indirect_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      if (success)
+         vk_buffer_upload(context, *indirect_buffer, scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->mesh_instances.count);
    }
 
-   return indirect_buffer;
+   return success;
 }
 
 static void buffer_hash_insert(vk_buffer_hash_table* table, const char* key, vk_buffer value)
@@ -349,7 +351,7 @@ static void buffer_hash_insert(vk_buffer_hash_table* table, const char* key, vk_
    table->count++;
 }
 
-static vk_buffer buffer_hash_lookup(vk_buffer_hash_table* table, const char* key)
+static vk_buffer* buffer_hash_lookup(vk_buffer_hash_table* table, const char* key)
 {
    u32 index = hash(key) % table->max_count;
    u32 old_index = index;
@@ -363,7 +365,7 @@ static vk_buffer buffer_hash_lookup(vk_buffer_hash_table* table, const char* key
    assert(index == old_index || !table->keys[index] || strcmp(table->keys[index], key) >= 0);
 
    if(table->keys[index] && strcmp(table->keys[index], key) == 0)
-      return table->values[index];
+      return &table->values[index];
 
-   return (vk_buffer){};
+   return 0;
 }

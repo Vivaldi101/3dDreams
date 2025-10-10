@@ -142,6 +142,12 @@ align_struct vk_buffer_hash_table
    size count;
 } vk_buffer_hash_table;
 
+align_struct vk_device
+{
+   VkPhysicalDevice physical;
+   VkDevice logical;
+} vk_devce;
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
@@ -150,8 +156,9 @@ align_struct vk_context
    array(vk_texture) textures;
 
    VkInstance instance;
-   // devices into separate struct
    VkPhysicalDevice physical_device;
+   vk_devce devices;
+
    VkDevice logical_device;
    VkSurfaceKHR surface;
    u32 query_pool_size;
