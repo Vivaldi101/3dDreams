@@ -52,7 +52,6 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 
    assert(strcmp(obj_path.data + obj_path.len - 4, ".obj") == 0);
 
-#if 0
    array(char) mtl_file_path = {context->storage};
    mtl_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
    // +2 for zero termination for the .obj string for c-string apis
@@ -71,7 +70,6 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
    mtl_path.data[mtl_path.len] = 0;
 
    user_data.mtl_path = mtl_path;
-#endif
 
    user_data.scratch = *context->storage;
 
@@ -98,10 +96,9 @@ static void vk_gltf_read(vk_context* context, s8 filename)
    array_resize(file_path, file_path.count);
    wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
 
-   // TODO: array(char) to s8
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
-   assert(strcmp(gltf_path.data + gltf_path.len - 5, ".gltf") == 0);
+   assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
 
    vk_gltf_load(context, gltf_path);
 }
