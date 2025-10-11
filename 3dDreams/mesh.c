@@ -646,14 +646,14 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    return true;
 }
 
-static void gltf_load(vk_context* context, s8 gltf_path)
+static bool gltf_load(vk_context* context, s8 gltf_path)
 {
    cgltf_data* data = 0;
 
    if(!gltf_load_data(&data, gltf_path))
    {
       printf("Could not load gltf: %s\n", s8_data(gltf_path));
-      return;
+      return false;
    }
 
    assert(data);
@@ -662,8 +662,10 @@ static void gltf_load(vk_context* context, s8 gltf_path)
    {
       printf("Could not load mesh in gltf: %s\n", s8_data(gltf_path));
       cgltf_free(data);
-      return;
+      return false;
    }
 
    cgltf_free(data);
+
+   return true;
 }

@@ -201,7 +201,8 @@ align_struct vk_context
    bool rtx_supported;
 } vk_context;
 
-void vk_initialize(hw* hw);
+// vk_initialize => vk_uninitialize
+bool vk_initialize(hw* hw);
 void vk_uninitialize(hw* hw);
 
 // TODO: these in buffer.h

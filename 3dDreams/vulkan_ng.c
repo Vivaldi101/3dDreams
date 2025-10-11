@@ -86,7 +86,7 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 }
 #endif
 
-static void vk_gltf_read(vk_context* context, s8 filename)
+static bool vk_gltf_read(vk_context* context, s8 filename)
 {
    array(char) file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
@@ -100,7 +100,7 @@ static void vk_gltf_read(vk_context* context, s8 filename)
 
    assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
 
-   gltf_load(context, gltf_path);
+   return gltf_load(context, gltf_path);
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_table)
@@ -219,15 +219,18 @@ static void spirv_initialize(vk_context* context)
    }
 }
 
-static void vk_buffer_objects_create(vk_context* context, s8 asset_file)
+static bool vk_assets_read(vk_context* context, s8 asset_file)
 {
+   bool success = false;
    if (s8_is_substr(asset_file, s8(".gltf")))
-      vk_gltf_read(context, asset_file);
+      success = vk_gltf_read(context, asset_file);
    else if (s8_is_substr(asset_file, s8(".obj")))
       ;
       //vk_obj_read(context, asset_file);
    else
-      hw_message_box("Unsupported asset format");
+      printf("Unsupported asset format: %s\n", s8_data(asset_file));
+
+   return success;
 }
 
 static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
@@ -1481,9 +1484,10 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
-static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
+static bool vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
 {
-   vk_buffer_objects_create(context, gltf_name);
+   if(!vk_assets_read(context, gltf_name))
+      return false;
 
    vk_buffer indirect_buffer = {0};
    vk_buffer indirect_rtx_buffer = {0};
@@ -1499,6 +1503,8 @@ static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
       buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
 
    context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
+
+   return true;
 }
 
 static void vk_pipelines_create(vk_context* context, arena scratch)
@@ -1534,7 +1540,7 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
    context->frustum_pipeline = vk_graphics_pipeline_create(context, cache, &fm);
 }
 
-void vk_initialize(hw* hw)
+bool vk_initialize(hw* hw)
 {
    VkResult volk_result = volkInitialize();
    if(!vk_valid(volkInitialize()))
@@ -1641,12 +1647,16 @@ void vk_initialize(hw* hw)
    for(size i = 0; i < context->buffer_table.max_count; ++i)
       context->buffer_table.keys[i] = 0;
 
-   vk_buffers_create(context, *context->storage, hw->state.asset_file);
+   if(!vk_buffers_create(context, *context->storage, hw->state.asset_file))
+      return false;
+
    vk_pipelines_create(context, *context->storage);
 
    vk_textures_log(context);
 
    spv_hash_log(&context->shader_table);
+
+   return true;
 }
 
 void vk_uninitialize(hw* hw)
