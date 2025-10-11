@@ -971,16 +971,26 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, "ib")->handle, 0, VK_INDEX_TYPE_UINT32);
+      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0, VK_INDEX_TYPE_UINT32);
 
-      vk_buffer_binding bbs[2] = {0};
-      bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-      bbs[0].binding = 0;
+      // TODO: Compress drawing to pass scratch
+      arena scratch = *context->storage;
+      array(vk_buffer_binding) bbs = {&scratch};
 
-      bbs[1].buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
-      bbs[1].binding = 1;
+      // TODO: Compress
+      if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+      }
 
-      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      if(buffer_hash_lookup(&context->buffer_table, transform_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+      }
+
+      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs.data, (u32)bbs.count, 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
       if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
@@ -1479,18 +1489,18 @@ static void vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
 
    vk_buffer indirect_buffer = {0};
    vk_buffer indirect_rtx_buffer = {0};
+   vk_buffer world_transform = {0};
 
-   if (vk_buffer_indirect_create(&indirect_buffer, context, scratch, false))
+   if(vk_buffer_indirect_create(&indirect_buffer, context, scratch, false))
       buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
 
-   if (vk_buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
+   if(vk_buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
       buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
 
-   vk_buffer world_transform = vk_buffer_transforms_create(context, scratch);
+   if(vk_buffer_transforms_create(&world_transform, context, scratch))
+      buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
 
    context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
-
-   buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
 }
 
 static void vk_pipelines_create(vk_context* context, arena scratch)

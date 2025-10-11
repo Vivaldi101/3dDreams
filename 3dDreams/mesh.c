@@ -630,11 +630,11 @@ static void vk_gltf_load(vk_context* context, s8 gltf_path)
    vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // vertex data
-   vk_buffer_upload(context, vb, scratch_buffer, vertices.data, vb.size);
+   vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
    // index data
-   vk_buffer_upload(context, ib, scratch_buffer, indices.data, ib.size);
+   vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
    // meshlet data
-   vk_buffer_upload(context, mb, scratch_buffer, mlb.meshlets.data, mb.size);
+   vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
 
    vk_buffer_destroy(context->devices.logical, &scratch_buffer);
 }

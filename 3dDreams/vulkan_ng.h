@@ -205,7 +205,7 @@ void vk_initialize(hw* hw);
 void vk_uninitialize(hw* hw);
 
 // TODO: these in buffer.h
-static void vk_buffer_upload(vk_context* context, vk_buffer buffer, vk_buffer scratch, const void* data, VkDeviceSize dev_size);
+static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from, const void* data, VkDeviceSize dev_size);
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
 static bool vk_buffer_create_and_bind(vk_buffer* buffer, VkDevice logical_device, VkBufferUsageFlags usage, VkPhysicalDevice physical_device, VkMemoryPropertyFlags memory_flags);
