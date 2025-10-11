@@ -2,7 +2,7 @@
 #include "common.h"
 #include "app.h"
 #include "math.h"
-#include "vulkan_ng.h"  // todo: should move this out
+#include "vulkan_ng.h"
 
 #define MAX_ARGV 32
 
@@ -47,71 +47,61 @@ void hw_window_close(hw* hw)
 
 #define MSEC_PER_SIM ((1.0/60)*1000)
 
-static f64 global_game_time_residual;
+static i64 global_game_time_residual;
 static int global_game_frame;
+static i64 global_perf_counter_frequency;
 
-static LARGE_INTEGER GetWallClock()
+static i64 clock_query_counter()
 {
 	LARGE_INTEGER result;
    QueryPerformanceCounter(&result);
 
+   return result.QuadPart;
+}
+
+static LARGE_INTEGER clock_query_frequency()
+{
+	LARGE_INTEGER result;
+   QueryPerformanceFrequency(&result);
+
+   global_perf_counter_frequency = result.QuadPart;
+
    return result;
 }
 
-static u64 global_perf_counter_frequency;
-
-static f32 GetSecondsElapsed(LARGE_INTEGER start, LARGE_INTEGER end)
+static f64 clock_seconds_elapsed(i64 start, i64 end)
 {
-   return ((f32)end.QuadPart - start.QuadPart) / (f32)global_perf_counter_frequency;
+   return ((f64)end - (f64)start) / (f64)global_perf_counter_frequency;
 }
 
-#if 0
-static void hw_frame_sync2(hw* hw)
+static f64 clock_time_to_counter(f64 time)
 {
-   LARGE_INTEGER work_counter = GetWallClock();
-   f32 work_seconds_elapsed = GetSecondsElapsed(last_counter, work_counter);
-   f32 seconds_elapsed_for_frame = work_seconds_elapsed;
-   if(seconds_elapsed_for_frame < 0) // todo: replace 0
-   {
-      if(1) {
-         DWORD sleep_ms = (DWORD)(1000.0f * (target_seconds_per_frame - seconds_elapsed_for_frame));
-         if(sleep_ms > 0) {
-            Sleep(sleep_ms - 1);
-         }
-      }
-      f32 test_spf = GetSecondsElapsed(last_counter, GetWallClock());
-      while(seconds_elapsed_for_frame < target_seconds_per_frame) {
-         seconds_elapsed_for_frame = GetSecondsElapsed(last_counter, GetWallClock());
-      }
-   }
-   else {
-      //miss frame rate
-   }
+   return (f64)global_perf_counter_frequency * time;
 }
-#endif
 
-// TODO: Use perf counters for better granularity
 static void hw_frame_sync(hw* hw)
 {
 	int num_frames_to_run = 0;
+   const i64 counter_delta = (i64)clock_time_to_counter(0.01666666666666666666666666666667);
+
    for (;;)
    {
-      const int current_frame_time = hw->timer.time();
-      static int last_frame_time = 0;
-      if (last_frame_time == 0)
-         last_frame_time = current_frame_time;
+      const i64 current_counter = clock_query_counter();
+      static i64 last_counter = 0;
+      if (last_counter == 0)
+         last_counter = current_counter;
 
-      int delta_milli_seconds = current_frame_time - last_frame_time;
-      last_frame_time = current_frame_time;
+      i64 delta_counter = current_counter - last_counter;
+      last_counter = current_counter;
 
-      global_game_time_residual += delta_milli_seconds;
+      global_game_time_residual += delta_counter;
 
       for (;;)
       {
          // how much to wait before running the next frame
-         if (global_game_time_residual < MSEC_PER_SIM)
+         if (global_game_time_residual < counter_delta)
             break;
-         global_game_time_residual -= MSEC_PER_SIM;
+         global_game_time_residual -= counter_delta;
          global_game_frame++;
          num_frames_to_run++;
       }
@@ -120,6 +110,10 @@ static void hw_frame_sync(hw* hw)
 
       hw->timer.sleep(0);
    }
+
+   //i64 end = clock_query_counter();
+   //printf("Frame delta counter: %lld\n", end - begin);
+   //printf("Frame delta counter: %f\n", 1.f/clock_seconds_elapsed(begin, end));
 }
 
 static void hw_frame_render(hw* hw)
@@ -144,9 +138,7 @@ static void hw_log(hw* hw, s8 message, ...)
 
 void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_state* state), void (*app_input_function)(struct app_state* state))
 {
-   // start the timer
-   u32 t = hw->timer.time();
-   u32 s = hw->timer.time();
+   clock_query_frequency();
 
    f32 altitude = PI / 8.f;
    //f32 altitude = 0;
@@ -155,7 +147,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    vec3 origin = {0, 0, 0};
    app_camera_reset(&hw->state.camera, origin, 100.f, altitude, azimuth);
 
-   u32 begin = hw->timer.time();
+   //u32 begin = hw->timer.time();
+   i64 begin = clock_query_counter();
    for (;;)
    {
       if (!hw->platform_loop())
@@ -173,10 +166,13 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       // TODO: Pass the frame rate to sync to
       hw_frame_sync(hw);
 
-      u32 end = hw->timer.time();
-      hw->state.frame_delta_in_seconds = (end - begin) / 1000.0f;
+      i64 end = clock_query_counter();
+
+      hw->state.frame_delta_in_seconds = (f32)clock_seconds_elapsed(begin, end);
 
       begin = end;
+
+      printf("FPS: %.2f\n", 1.f/hw->state.frame_delta_in_seconds);
    }
 }
 

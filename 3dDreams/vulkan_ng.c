@@ -1067,7 +1067,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    u64 query_results[2];
    vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 
-#if 1
+#if 0
    f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
    f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
 
