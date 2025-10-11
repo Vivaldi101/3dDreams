@@ -971,7 +971,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0, VK_INDEX_TYPE_UINT32);
+      if (buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
+         cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0, VK_INDEX_TYPE_UINT32);
 
       // TODO: Compress drawing to pass scratch
       arena scratch = *context->storage;
