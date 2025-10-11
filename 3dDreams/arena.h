@@ -45,6 +45,8 @@ typedef struct arena
    void* end;  // one past the end
 } arena;
 
+// TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
+
 #define array(T) struct { arena* arena; size count; T* data; }
 
 typedef struct array

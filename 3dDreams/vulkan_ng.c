@@ -100,7 +100,7 @@ static void vk_gltf_read(vk_context* context, s8 filename)
 
    assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
 
-   vk_gltf_load(context, gltf_path);
+   gltf_load(context, gltf_path);
 }
 
 static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_table)

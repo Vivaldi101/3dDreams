@@ -1,5 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
+// TODO: Rename to gltf.c
+
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
 
@@ -394,32 +396,33 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
 	return result;
 }
 
-static void vk_gltf_load(vk_context* context, s8 gltf_path)
+static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
 {
    cgltf_options options = {0};
-   cgltf_data* data = 0;
-   cgltf_result gltf_result = cgltf_parse_file(&options, s8_data(gltf_path), &data);
+   cgltf_result gltf_result = cgltf_parse_file(&options, s8_data(gltf_path), data);
 
-   if(gltf_result != cgltf_result_success)
-      hw_message_box("Could not parse the .gltf file");
+   if (gltf_result != cgltf_result_success)
+      return false;
 
-   gltf_result = cgltf_load_buffers(&options, data, s8_data(gltf_path));
-   if(gltf_result != cgltf_result_success)
-   {
-      cgltf_free(data);
-      hw_message_box("Could not load the .gltf buffers");
-   }
-
-   gltf_result = cgltf_validate(data);
+   gltf_result = cgltf_load_buffers(&options, *data, s8_data(gltf_path));
    if(gltf_result != cgltf_result_success)
    {
-      cgltf_free(data);
-      hw_message_box("Could not validate the .gltf data");
+      cgltf_free(*data);
+      return false;
    }
 
-   size index_offset = 0;
-   size vertex_offset = 0;
+   gltf_result = cgltf_validate(*data);
+   if(gltf_result != cgltf_result_success)
+   {
+      cgltf_free(*data);
+      return false;
+   }
 
+   return true;
+}
+
+static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
+{
    array(vertex) vertices = {context->storage};
 
    // preallocate indices
@@ -437,6 +440,9 @@ static void vk_gltf_load(vk_context* context, s8 gltf_path)
    // preallocate textures
    context->textures.arena = context->storage;
    array_resize(context->textures, data->textures_count);
+
+   size index_offset = 0;
+   size vertex_offset = 0;
 
    for(usize i = 0; i < data->meshes_count; ++i)
    {
@@ -597,8 +603,6 @@ static void vk_gltf_load(vk_context* context, s8 gltf_path)
       vk_texture_load(context, s8(img->uri), gltf_path);
    }
 
-   cgltf_free(data);
-
    vk_meshlet_buffer mlb = meshlet_build(*context->storage, vertices.count, indices.data, indices.count);
    context->meshlet_count = (u32)mlb.meshlets.count;
 
@@ -611,31 +615,54 @@ static void vk_gltf_load(vk_context* context, s8 gltf_path)
    vk_buffer ib = {.size = ib_size};
 
    usize scratch_buffer_size = max(mb.size, max(vb.size, ib.size));
-   vk_buffer scratch_buffer = {.size = scratch_buffer_size};
+   vk_buffer scratch_buffer = { .size = scratch_buffer_size };
 
-   if(vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+   if(!vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
+   if(!vk_buffer_create_and_bind(&vb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
+
+   // vertex data
+   vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
+   buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
+
+   if (!vk_buffer_create_and_bind(&mb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
+
+   // meshlet data
+   vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
+   buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
+
+   if (!vk_buffer_create_and_bind(&ib, context->devices.logical, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
+
+   // index data
+   vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
+   buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
+
+   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+
+   return true;
+}
+
+static void gltf_load(vk_context* context, s8 gltf_path)
+{
+   cgltf_data* data = 0;
+
+   if(!gltf_load_data(&data, gltf_path))
    {
-      if(vk_buffer_create_and_bind(&vb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      {
-         // vertex data
-         vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
-         buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
-      }
-
-      if(vk_buffer_create_and_bind(&mb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      {
-         // meshlet data
-         vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
-         buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
-      }
-
-      if(vk_buffer_create_and_bind(&ib, context->devices.logical, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      {
-         // index data
-         vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
-         buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
-      }
-
-      vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+      printf("Could not load gltf: %s\n", s8_data(gltf_path));
+      return;
    }
+
+   assert(data);
+
+   if(!gltf_load_mesh(context, data, gltf_path))
+   {
+      printf("Could not load mesh in gltf: %s\n", s8_data(gltf_path));
+      return;
+   }
+
+   cgltf_free(data);
 }
