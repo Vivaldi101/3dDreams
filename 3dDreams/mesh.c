@@ -661,6 +661,7 @@ static void gltf_load(vk_context* context, s8 gltf_path)
    if(!gltf_load_mesh(context, data, gltf_path))
    {
       printf("Could not load mesh in gltf: %s\n", s8_data(gltf_path));
+      cgltf_free(data);
       return;
    }
 
