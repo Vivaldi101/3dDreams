@@ -1543,8 +1543,8 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
 bool vk_initialize(hw* hw)
 {
    VkResult volk_result = volkInitialize();
-   if(!vk_valid(volkInitialize()))
-      fault(!vk_valid(volk_result));
+   if (!vk_valid(volkInitialize()))
+      return false;
 
    vk_context* context = push(&hw->vk_storage, vk_context);
 
@@ -1558,7 +1558,7 @@ bool vk_initialize(hw* hw)
 
    VkInstance instance = vk_instance_create(*context->storage);
    if(!instance)
-      fault(!instance);
+      return false;
 
    volkLoadInstance(instance);
    context->instance = instance;
@@ -1581,7 +1581,7 @@ bool vk_initialize(hw* hw)
 
       VkResult debug_result = vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger);
       if(!vk_valid(volk_result))
-         fault(!vk_valid(volk_result));
+         return false;
    }
 #endif
 
@@ -1651,16 +1651,14 @@ bool vk_initialize(hw* hw)
       return false;
 
    vk_pipelines_create(context, *context->storage);
-
    vk_textures_log(context);
-
-   spv_hash_log(&context->shader_table);
 
    return true;
 }
 
 void vk_uninitialize(hw* hw)
 {
+   // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
