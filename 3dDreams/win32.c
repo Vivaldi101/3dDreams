@@ -25,11 +25,14 @@ static void win32_sleep(u32 ms)
    Sleep(ms);
 }
 
-static u32 win32_time()
+static i64 win32_query_counter()
 {
-   static DWORD sys_time_base = 0;
-   if(sys_time_base == 0) sys_time_base = timeGetTime();
-   return timeGetTime() - sys_time_base;
+   return clock_query_counter();
+}
+
+static f64 win32_seconds_elapsed(i64 begin, i64 end)
+{
+   return clock_seconds_elapsed(begin, end);
 }
 
 static void win32_window_title(hw* hw, s8 message, ...)
@@ -350,7 +353,7 @@ int main(int argc, char** argv)
    hw.renderer.window_surface_create = window_surface_create;
 
    hw.timer.sleep = win32_sleep;
-   hw.timer.time = win32_time;
+   hw.timer.time = win32_query_counter;
 
    hw.platform_loop = win32_platform_loop;
 

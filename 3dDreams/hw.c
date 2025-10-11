@@ -45,8 +45,6 @@ void hw_window_close(hw* hw)
    hw->renderer.window.close(hw->renderer.window);
 }
 
-#define MSEC_PER_SIM ((1.0/60)*1000)
-
 static i64 global_game_time_residual;
 static int global_game_frame;
 static i64 global_perf_counter_frequency;
@@ -110,10 +108,6 @@ static void hw_frame_sync(hw* hw)
 
       hw->timer.sleep(0);
    }
-
-   //i64 end = clock_query_counter();
-   //printf("Frame delta counter: %lld\n", end - begin);
-   //printf("Frame delta counter: %f\n", 1.f/clock_seconds_elapsed(begin, end));
 }
 
 static void hw_frame_render(hw* hw)
@@ -147,7 +141,6 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    vec3 origin = {0, 0, 0};
    app_camera_reset(&hw->state.camera, origin, 100.f, altitude, azimuth);
 
-   //u32 begin = hw->timer.time();
    i64 begin = clock_query_counter();
    for (;;)
    {

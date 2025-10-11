@@ -53,7 +53,7 @@ align_struct hw_renderer
 align_struct hw_timer
 {
    void(*sleep)(u32 ms);
-   u32(*time)();
+   i64(*time)();
 } hw_timer;
 
 align_struct hw
