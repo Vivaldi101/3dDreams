@@ -266,10 +266,8 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scratch, u32 max_descriptor_count)
+static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, arena scratch, u32 max_descriptor_count)
 {
-   vk_descriptor result = {0};
-
    // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =
    {
@@ -287,7 +285,8 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
    };
 
    VkDescriptorPool descriptor_pool = 0;
-   vk_assert(vkCreateDescriptorPool(context->devices.logical, &pool_info, 0, &descriptor_pool));
+   if(!vk_valid(vkCreateDescriptorPool(context->devices.logical, &pool_info, 0, &descriptor_pool)))
+      return false;
 
    VkSamplerCreateInfo sampler_info =
    {
@@ -310,7 +309,8 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
    };
 
    VkSampler immutable_sampler;
-   vk_assert(vkCreateSampler(context->devices.logical, &sampler_info, 0, &immutable_sampler));
+   if(!vk_valid(vkCreateSampler(context->devices.logical, &sampler_info, 0, &immutable_sampler)))
+      return false;
 
    // variable and partially bound descriptor arrays
    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
@@ -342,7 +342,8 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
    };
 
    VkDescriptorSetLayout descriptor_set_layout = 0;
-   vk_assert(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, 0, &descriptor_set_layout));
+   if (!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, 0, &descriptor_set_layout)))
+      return false;
 
 	if(context->textures.count > 0)
    {
@@ -363,7 +364,8 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
 		};
 
 		VkDescriptorSet descriptor_set;
-		vk_assert(vkAllocateDescriptorSets(context->devices.logical, &alloc_info, &descriptor_set));
+      if(!vk_valid(vkAllocateDescriptorSets(context->devices.logical, &alloc_info, &descriptor_set)))
+         return false;
 
 		array(VkDescriptorImageInfo) image_infos = {&scratch};
 		array_resize(image_infos, context->textures.count);
@@ -388,12 +390,12 @@ static vk_descriptor vk_texture_descriptor_create(vk_context* context, arena scr
 
 		vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
 
-		result.set = descriptor_set;
-		result.layout = descriptor_set_layout;
+		descriptor->set = descriptor_set;
+		descriptor->layout = descriptor_set_layout;
 
 	}
 
-	return result;
+   return true;
 }
 
 static bool gltf_load_data(cgltf_data** data, s8 gltf_path)

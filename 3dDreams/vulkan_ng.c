@@ -1110,7 +1110,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 #endif
 }
 
-      // TODO: pass amount of bindings to create here
+// TODO: pass amount of bindings to create here
 static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, bool rtx_supported)
 {
    assert(vk_valid_handle(context->devices.logical));
@@ -1498,29 +1498,38 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
-static bool vk_buffers_create(vk_context* context, arena scratch, s8 gltf_name)
+static bool vk_buffers_create(vk_context* context, arena scratch)
 {
-   if(!vk_assets_read(context, gltf_name))
+   vk_buffer indirect_buffer = { 0 };
+   vk_buffer indirect_rtx_buffer = { 0 };
+   vk_buffer world_transform = { 0 };
+
+   // TODO: pass devices
+   if(!buffer_indirect_create(&indirect_buffer, context, scratch, false))
       return false;
 
-   vk_buffer indirect_buffer = {0};
-   vk_buffer indirect_rtx_buffer = {0};
-   vk_buffer world_transform = {0};
+   buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
 
-   if(vk_buffer_indirect_create(&indirect_buffer, context, scratch, false))
-      buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
+   // TODO: pass devices
+   if(!buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
+      return false;
 
-   if(vk_buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
-      buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
+   buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
 
-   if(vk_buffer_transforms_create(&world_transform, context, scratch))
-      buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
+   // TODO: pass devices
+   if(!buffer_transforms_create(&world_transform, context, scratch))
+      return false;
 
-   context->texture_descriptor = vk_texture_descriptor_create(context, scratch, 1<<16);
+   buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
+
+   // TODO: pass devices and textures
+   if(!texture_descriptor_create(&context->texture_descriptor, context, scratch, 1 << 16))
+      return false;
 
    return true;
 }
 
+// TODO: Wide
 static void vk_pipelines_create(vk_context* context, arena scratch)
 {
    VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context, false);
@@ -1661,7 +1670,10 @@ bool vk_initialize(hw* hw)
    for(size i = 0; i < context->buffer_table.max_count; ++i)
       context->buffer_table.keys[i] = 0;
 
-   if(!vk_buffers_create(context, *context->storage, hw->state.asset_file))
+   if(!vk_assets_read(context, hw->state.asset_file))
+      return false;
+
+   if(!vk_buffers_create(context, *context->storage))
       return false;
 
    vk_pipelines_create(context, *context->storage);

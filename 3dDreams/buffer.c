@@ -224,7 +224,7 @@ static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }
 
-static bool vk_buffer_transforms_create(vk_buffer* transform_buffer, vk_context* context, arena scratch)
+static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* context, arena scratch)
 {
    bool success = false;
 
@@ -256,7 +256,8 @@ static bool vk_buffer_transforms_create(vk_buffer* transform_buffer, vk_context*
 }
 
 // TODO: no bool params
-static bool vk_buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool rtx_supported)
+// TODO: pass the devices struct
+static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool rtx_supported)
 {
    bool success = false;
 
