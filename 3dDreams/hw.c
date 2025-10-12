@@ -77,10 +77,10 @@ static f64 clock_time_to_counter(f64 time)
    return (f64)global_perf_counter_frequency * time;
 }
 
-static void hw_frame_sync(hw* hw)
+static void hw_frame_sync(hw* hw, f64 frame_delta)
 {
 	int num_frames_to_run = 0;
-   const i64 counter_delta = (i64)clock_time_to_counter(0.01666666666666666666666666666667);
+   const i64 counter_delta = (i64)clock_time_to_counter(frame_delta);
 
    for (;;)
    {
@@ -156,8 +156,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       // TODO: Use perf counters for better granularity
       hw_frame_render(hw);
       // Sync to defined frame rate
-      // TODO: Pass the frame rate to sync to
-      hw_frame_sync(hw);
+      hw_frame_sync(hw, 0.01666666666666666666666666666667);
 
       i64 end = clock_query_counter();
 
