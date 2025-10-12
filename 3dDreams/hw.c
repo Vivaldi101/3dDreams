@@ -156,7 +156,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       // TODO: Use perf counters for better granularity
       hw_frame_render(hw);
       // Sync to defined frame rate
-      hw_frame_sync(hw, 0.01666666666666666666666666666667);
+      hw_frame_sync(hw, 0.01666666666666666666666666666667 / 1);
 
       i64 end = clock_query_counter();
 
