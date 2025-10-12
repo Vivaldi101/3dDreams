@@ -281,7 +281,10 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    if(formats.count == 0)
       return VK_FORMAT_UNDEFINED;
 
-   // TODO: pick the best swapchain format
+   for(size i = 0; i < formats.count; ++i)
+      if (formats.data[i].format == VK_FORMAT_R8G8B8A8_UNORM)
+         return formats.data[i].format;
+
    return formats.data[0].format;
 }
 
