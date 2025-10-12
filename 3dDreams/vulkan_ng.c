@@ -277,6 +277,10 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    if(!vk_valid(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats.data)))
       return VK_FORMAT_UNDEFINED;
 
+   formats.count = format_count;
+   if(formats.count == 0)
+      return VK_FORMAT_UNDEFINED;
+
    // TODO: pick the best swapchain format
    return formats.data[0].format;
 }
