@@ -261,20 +261,27 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
    return false;
 }
 
-static VkFormat vk_swapchain_format(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
+static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
 
-   VkSurfaceFormatKHR formats[MAX_VULKAN_OBJECT_COUNT] = {0};
-   u32 format_count = array_count(formats);
-   if(!vk_valid(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats)))
+   array(VkSurfaceFormatKHR) formats = {&scratch};
+
+   u32 format_count = 0;
+   if(!vk_valid(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, 0)))
       return VK_FORMAT_UNDEFINED;
 
-   return formats[0].format;
+   array_resize(formats, format_count);
+
+   if(!vk_valid(vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_count, formats.data)))
+      return VK_FORMAT_UNDEFINED;
+
+   // TODO: pick the best swapchain format
+   return formats.data[0].format;
 }
 
-static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
@@ -297,7 +304,7 @@ static vk_swapchain_surface vk_window_swapchain_surface(VkPhysicalDevice physica
    result.image_width = width;
    result.image_height = height;
    result.image_count = image_count;
-   result.format = vk_swapchain_format(physical_device, surface);
+   result.format = vk_swapchain_format(scratch, physical_device, surface);
 
    return result;
 }
@@ -548,7 +555,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
    swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
 

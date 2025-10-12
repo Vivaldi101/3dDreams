@@ -164,7 +164,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
       begin = end;
 
-      printf("FPS: %.2f\n", 1.f/hw->state.frame_delta_in_seconds);
+      //printf("FPS: %.2f\n", 1.f/hw->state.frame_delta_in_seconds);
    }
 }
 

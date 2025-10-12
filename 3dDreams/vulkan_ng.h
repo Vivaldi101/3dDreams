@@ -45,7 +45,6 @@
 
 // TODO: Remove these and use arena arrays
 enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
-typedef enum file_format { FILE_FORMAT_OBJ = 0, FILE_FORMAT_GLTF = 1 } file_format;
 
 align_struct vk_swapchain_surface
 {
