@@ -46,7 +46,6 @@ void hw_window_close(hw* hw)
 }
 
 static i64 global_game_time_residual;
-static int global_game_frame;
 static i64 global_perf_counter_frequency;
 
 static i64 clock_query_counter()
@@ -80,7 +79,7 @@ static f64 clock_time_to_counter(f64 time)
 static void hw_frame_sync(hw* hw, f64 frame_delta)
 {
 	int num_frames_to_run = 0;
-   const i64 counter_delta = (i64)clock_time_to_counter(frame_delta);
+   const i64 counter_delta = (i64)(clock_time_to_counter(frame_delta) + .5f);
 
    for (;;)
    {
@@ -100,7 +99,6 @@ static void hw_frame_sync(hw* hw, f64 frame_delta)
          if (global_game_time_residual < counter_delta)
             break;
          global_game_time_residual -= counter_delta;
-         global_game_frame++;
          num_frames_to_run++;
       }
       if (num_frames_to_run > 0)
@@ -153,18 +151,17 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       app_input_function(&hw->state);
       app_frame_function(hw->vk_storage, &hw->state);
 
-      // TODO: Use perf counters for better granularity
       hw_frame_render(hw);
-      // Sync to defined frame rate
+      // sync to defined frame rate
       hw_frame_sync(hw, 0.01666666666666666666666666666667 / 1);
 
       i64 end = clock_query_counter();
 
-      hw->state.frame_delta_in_seconds = (f32)clock_seconds_elapsed(begin, end);
+      hw->state.frame_delta_in_seconds = clock_seconds_elapsed(begin, end);
 
       begin = end;
 
-      //printf("FPS: %.2f\n", 1.f/hw->state.frame_delta_in_seconds);
+      hw->window_title(hw, s8("FPS: %u"), (u32)((1.f/hw->state.frame_delta_in_seconds)+.5f));
    }
 }
 

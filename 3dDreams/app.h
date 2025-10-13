@@ -59,7 +59,7 @@ align_struct app_state
    app_input input;
    app_camera camera;
    s8 asset_file;  // TODO: for testing
-   f32 frame_delta_in_seconds;
+   f64 frame_delta_in_seconds;
    bool rtx_enabled;
    bool is_fullscreen;
 } app_state;

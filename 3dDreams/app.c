@@ -15,7 +15,7 @@ static void app_frame(arena scratch, app_state* state)
 
 static void app_camera_update(app_state* state)
 {
-   const f32 smoothing_factor = 1.0f - powf(0.08f, state->frame_delta_in_seconds);
+   const f32 smoothing_factor = 1.0f - powf(0.08f, (f32)state->frame_delta_in_seconds);
 
    // half turn across view plane extents (in azimuth)
    f32 rotation_speed_x = (2.f*PI) / state->camera.viewplane_width;
