@@ -139,7 +139,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
    //f32 azimuth = 0;
    vec3 origin = {0, 0, 0};
-   app_camera_reset(&hw->state.camera, origin, 100.f, altitude, azimuth);
+   app_camera_reset(&hw->state.camera, origin, 50.f, altitude, azimuth);
 
    i64 begin = clock_query_counter();
    for (;;)

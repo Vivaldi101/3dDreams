@@ -42,17 +42,23 @@ void main()
     {
        mesh_draw draw = draws[in_draw_ID];
    
-       vec4 final = vec4(1, 1, 1, 1);
+       //vec4 final = vec4(1, 1, 1, 1);
+       vec4 albedo = vec4(.5, .5, .5, 1);
+       vec3 emissive = vec3(0.0);
 
        if(draw.albedo != -1)
-         final = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
+         //final = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
+         albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
    
        if(draw.emissive != -1)
-         final += vec4(texture(textures[draw.emissive], in_uv).rgb, 1.f);
+         //final += texture(textures[draw.emissive], in_uv).rgb;
+         emissive = texture(textures[draw.emissive], in_uv).rgb;
 
-       float diffuse_factor = max(dot(normalize(in_normal), normalize(-vec3(1, 1, 1))), 0.0);
+       float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 1, 0))), 0.0);
        vec3 diffuse = diffuse_factor * light_color;
-       out_color = vec4(final.rgb * (diffuse + ambient), 1.0); // keep opaque
+
+       //out_color = vec4(final.rgb * (diffuse + ambient), 1.0); // keep opaque
+       out_color = vec4(albedo.rgb * sqrt(diffuse_factor + 0.05) + emissive, albedo.a);
     }
     else
     {

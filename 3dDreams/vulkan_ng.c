@@ -1024,8 +1024,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    }
 
    // draw frustum
-   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
-   vkCmdDraw(command_buffer, 12, 1, 0, 0);
+   //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+   //vkCmdDraw(command_buffer, 12, 1, 0, 0);
 
    // draw axis
    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->axis_pipeline);
