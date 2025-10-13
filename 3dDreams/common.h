@@ -69,6 +69,8 @@ static s8 s8_slice(s8 str, size beg, size end)
 #define implies(p, q) (!(p) || (q))
 
 #define custom_alignment 64
+static_assert(custom_alignment == 64);
+
 #define align_struct __declspec(align(custom_alignment)) typedef struct
 #define align_union __declspec(align(custom_alignment)) typedef union
 
