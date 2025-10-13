@@ -374,3 +374,20 @@ static vk_buffer* buffer_hash_lookup(vk_buffer_hash_table* table, const char* ke
 
    return 0;
 }
+
+static void buffer_hash_clear(vk_buffer_hash_table* table)
+{
+   memset(table->values, 0, table->max_count * sizeof(vk_buffer));
+   memset(table->keys, 0, table->max_count * sizeof(*table->keys));
+}
+
+static vk_buffer_hash_table buffer_hash_create(size max_count, arena* a)
+{
+   vk_buffer_hash_table result = {0};
+
+   result.max_count = max_count;
+   result.keys = push(a, const char*, max_count);
+   result.values = push(a, vk_buffer, max_count);
+
+   return result;
+}

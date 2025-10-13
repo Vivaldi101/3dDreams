@@ -1658,17 +1658,8 @@ bool vk_initialize(hw* hw)
 
    spirv_initialize(context);
 
-   // TODO: create function for hash tables
-   // TODO: actual max count for buffers
-   // TODO: compress
-   context->buffer_table.max_count = 64;
-   context->buffer_table.keys = push(context->storage, const char*, context->buffer_table.max_count);
-   context->buffer_table.values = push(context->storage, vk_buffer, context->buffer_table.max_count);
-
-   memset(context->buffer_table.values, 0, context->buffer_table.max_count * sizeof(vk_buffer));
-
-   for(size i = 0; i < context->buffer_table.max_count; ++i)
-      context->buffer_table.keys[i] = 0;
+   context->buffer_table = buffer_hash_create(100, context->storage);
+   buffer_hash_clear(&context->buffer_table);
 
    if(!vk_assets_read(context, hw->state.asset_file))
       return false;
