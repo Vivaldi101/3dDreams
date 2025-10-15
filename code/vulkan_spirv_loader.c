@@ -9,7 +9,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    VkShaderModule result = 0;
 
    array(char) shader_path = {storage};
-   s8 prefix = s8("%sbin\\assets\\shaders\\%s");
+   s8 prefix = s8("%s\\bin\\assets\\shaders\\%s");
 
    shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
    array_resize(shader_path, shader_path.count);
@@ -30,34 +30,46 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    return result;
 }
 
-static s8 vk_project_directory(arena* storage)
+// TODO: Should be in win32.c
+static s8 win32_module_path(arena* a)
 {
-   s8 result = {};
+   size dir_path_len = 0;
+   u8* buffer = push(a, u8, MAX_PATH);
 
-   size dir_path_len = GetCurrentDirectory(0, 0);
-
-   u8* buffer = push(storage, u8, dir_path_len);
-
-   GetCurrentDirectory((u32)dir_path_len, (char*)buffer);
-
-   u32 count = 0;
-   size project_path_len = dir_path_len;
-
-   assert(dir_path_len != 0u);
-
-   for(size i = dir_path_len-1; i-- >= 0;)
+   for (;;)
    {
-      project_path_len--;
-      if(buffer[i] == '\\')
-         ++count;
-      if(count == 1)
-      {
-         buffer[i+1] = 0;
-         break;
-      }
-   }
+      dir_path_len = GetModuleFileName(NULL, buffer, MAX_PATH);
+      if(dir_path_len == 0)
+         return s8("");
 
-   return (s8){.data = buffer, .len = project_path_len};
+      if(dir_path_len == MAX_PATH)
+      {
+         buffer = push(a, u8, MAX_PATH*2);
+         continue;
+      }
+
+      return (s8){buffer, dir_path_len};
+   }
+}
+
+static s8 vk_exe_directory(arena* a)
+{
+   u32 count = 0;
+   s8 buffer = win32_module_path(a);
+
+   if(buffer.len == 0)
+      return (s8){0};
+
+   s8 project_name = s8("3dDreams");
+   size index = s8_is_substr_count(buffer, project_name);
+
+   if(index == -1)
+      return (s8){0};
+
+   buffer.len = index + project_name.len;
+   buffer.data[buffer.len] = 0;
+
+   return buffer;
 }
 
 static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
@@ -65,18 +77,21 @@ static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
    array(char) shader_path = {files};
 
    s8 prefix = s8("%sbin\\assets\\shaders\\%s");
-   s8 project_dir = vk_project_directory(files);
+   s8 exe_dir = vk_exe_directory(files);
 
-   shader_path.count = prefix.len + project_dir.len + shader_folder_path.len;
+   if(exe_dir.len == 0)
+      return 0;
+
+   shader_path.count = prefix.len + exe_dir.len + shader_folder_path.len;
    array_resize(shader_path, shader_path.count);
 
-   wsprintf(shader_path.data, "%s\\%s\\*", (const char*)project_dir.data, shader_folder_path.data);
+   wsprintf(shader_path.data, "%s\\%s\\*", (const char*)exe_dir.data, shader_folder_path.data);
 
    WIN32_FIND_DATA file_data;
    HANDLE first_file = FindFirstFile(shader_path.data, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)
-      (arena){0};
+      return 0;
 
    u32 shader_count = 0;
 
@@ -96,7 +111,7 @@ static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
          usize file_len = strlen(file_data.cFileName);
          char* p = push(files, char, file_len+1);
 
-         if(p)
+         if(p) 
          {
             memcpy(p, file_data.cFileName, file_len);
             p[file_len] = 0;

@@ -99,9 +99,9 @@ align_struct vk_meshlet_buffer
 align_struct vk_mesh_instance
 {
    u32 mesh_index;  // which mesh this instance draws
-   u32 albedo;
+   u32 albedo; 
    u32 normal;
-   u32 ao;
+   u32 ao; 
    u32 metal;
    u32 emissive;
    mat4 world;
@@ -130,7 +130,7 @@ align_struct vk_descriptor
 align_struct vk_pipeline
 {
    VkPipeline pipeline;
-   VkPipelineLayout layout;
+   VkPipelineLayout layout; 
 } vk_pipeline;
 
 align_struct vk_buffer_hash_table

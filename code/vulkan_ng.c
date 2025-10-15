@@ -41,11 +41,11 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 
    array(char) obj_file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\obj\\%s");
-   s8 project_dir = vk_project_directory(context->storage);
+   s8 exe_dir = vk_project_directory(context->storage);
 
-   obj_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   obj_file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(obj_file_path, obj_file_path.count);
-   wsprintf(obj_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(obj_file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    // TODO: array(char) to s8
    s8 obj_path = {.data = (u8*)obj_file_path.data, .len = obj_file_path.count};
@@ -53,11 +53,11 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
    assert(strcmp(obj_path.data + obj_path.len - 4, ".obj") == 0);
 
    array(char) mtl_file_path = {context->storage};
-   mtl_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   mtl_file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    // +2 for zero termination for the .obj string for c-string apis
    array_resize(mtl_file_path, mtl_file_path.count + 2);
    mtl_file_path.data++;
-   wsprintf(mtl_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(mtl_file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    s8 mtl_path = {.data = (u8*)mtl_file_path.data, .len = mtl_file_path.count};
    mtl_path.data[mtl_path.len-3] = 'm';
@@ -90,18 +90,15 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
 {
    array(char) file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
-   s8 project_dir = vk_project_directory(context->storage);
-	printf("Module path: %s\n", s8_data(project_dir));
+   s8 exe_dir = vk_exe_directory(context->storage);
 
-   file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(file_path, file_path.count);
-   wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
    assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
-
-	printf("Reading gltf path: %s\n", s8_data(gltf_path));
 
    return gltf_load(context, gltf_path);
 }
@@ -110,7 +107,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
 {
    assert(vk_valid_handle(logical_device));
 
-   s8 project_dir = vk_project_directory(&scratch);
+   s8 exe_dir = vk_exe_directory(&scratch);
 
    size shader_len = strlen(shader_name);
    assert(shader_len != 0u);
@@ -141,7 +138,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir, s8(shader_name));
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, s8(shader_name));
 
    switch(shader_stage)
    {
@@ -158,13 +155,16 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-// TODO: Rename
-static void spirv_initialize(vk_context* context)
+// TODO: Rename this!
+static bool spirv_initialize(vk_context* context)
 {
    assert(vk_valid_handle(context->devices.logical));
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
+   if(!shader_names)
+      return false;
+
    for(const char** p = shader_names; *p; ++p)
       shader_count++;
 
@@ -220,6 +220,8 @@ static void spirv_initialize(vk_context* context)
          }
       }
    }
+
+   return true;
 }
 
 static bool vk_assets_read(vk_context* context, s8 asset_file)
@@ -614,8 +616,8 @@ static VkRenderPass vk_renderpass_create(vk_context* context)
    const u32 color_attachment_index = 0;
    const u32 depth_attachment_index = 1;
 
-   VkAttachmentReference color_attachment_ref = {color_attachment_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
-   VkAttachmentReference depth_attachment_ref = {depth_attachment_index, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+   VkAttachmentReference color_attachment_ref = {color_attachment_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}; 
+   VkAttachmentReference depth_attachment_ref = {depth_attachment_index, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL}; 
 
    VkSubpassDescription subpass = {0};
    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -645,7 +647,7 @@ static VkRenderPass vk_renderpass_create(vk_context* context)
    attachments[depth_attachment_index].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 
-   VkRenderPassCreateInfo renderpass_info = {vk_info(RENDER_PASS)};
+   VkRenderPassCreateInfo renderpass_info = {vk_info(RENDER_PASS)}; 
    renderpass_info.subpassCount = 1;
    renderpass_info.pSubpasses = &subpass;
    renderpass_info.attachmentCount = array_count(attachments);
@@ -677,7 +679,7 @@ static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass
 }
 
 VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspect,
-                                         VkAccessFlags src_access, VkAccessFlags dst_access,
+                                         VkAccessFlags src_access, VkAccessFlags dst_access, 
                                          VkImageLayout old_layout, VkImageLayout new_layout)
 {
    VkImageMemoryBarrier result = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
@@ -1659,18 +1661,30 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   spirv_initialize(context);
+   if(!spirv_initialize(context))
+   {
+      printf("Could not compile and load all the shader modules\n");
+      return false;
+   }
 
    context->buffer_table = buffer_hash_create(100, context->storage);
    buffer_hash_clear(&context->buffer_table);
 
    if(!vk_assets_read(context, hw->state.asset_file))
+   {
+      printf("Could not read all the assets\n");
       return false;
+   }
 
    if(!vk_buffers_create(context, *context->storage))
+   {
+      printf("Could not create all the buffer objects\n");
       return false;
+   }
 
+   // TODO: wide contract for this
    vk_pipelines_create(context, *context->storage);
+
    vk_textures_log(context);
 
    return true;
