@@ -12,3 +12,5 @@ bin/
 .vs/**
 ipch/**
 *.swp
+**/3dDreams
+**/3dDreams/
