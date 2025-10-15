@@ -155,13 +155,16 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-// TODO: Rename
-static void spirv_initialize(vk_context* context)
+// TODO: Rename this!
+static bool spirv_initialize(vk_context* context)
 {
    assert(vk_valid_handle(context->devices.logical));
 
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
+   if(!shader_names)
+      return false;
+
    for(const char** p = shader_names; *p; ++p)
       shader_count++;
 
@@ -217,6 +220,8 @@ static void spirv_initialize(vk_context* context)
          }
       }
    }
+
+   return true;
 }
 
 static bool vk_assets_read(vk_context* context, s8 asset_file)
@@ -1656,18 +1661,30 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   spirv_initialize(context);
+   if(!spirv_initialize(context))
+   {
+      printf("Could not compile and load all the shader modules\n");
+      return false;
+   }
 
    context->buffer_table = buffer_hash_create(100, context->storage);
    buffer_hash_clear(&context->buffer_table);
 
    if(!vk_assets_read(context, hw->state.asset_file))
+   {
+      printf("Could not read all the assets\n");
       return false;
+   }
 
    if(!vk_buffers_create(context, *context->storage))
+   {
+      printf("Could not create all the buffer objects\n");
       return false;
+   }
 
+   // TODO: wide contract for this
    vk_pipelines_create(context, *context->storage);
+
    vk_textures_log(context);
 
    return true;

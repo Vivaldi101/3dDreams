@@ -56,17 +56,18 @@ static s8 vk_exe_directory(arena* a)
 {
    u32 count = 0;
    s8 buffer = win32_module_path(a);
-   if(buffer.len == 0)  // TODO: Handle invalid module paths on the calling side
-      return buffer;
 
-   size exe_dir_len = buffer.len;
-   size index = s8_is_substr_count(buffer, s8("3dDreams"));
+   if(buffer.len == 0)
+      return (s8){0};
 
-   if(index != -1)
-   {
-      buffer.len = index + s8("3dDreams").len;
-      buffer.data[buffer.len] = 0;
-   }
+   s8 project_name = s8("3dDreams");
+   size index = s8_is_substr_count(buffer, project_name);
+
+   if(index == -1)
+      return (s8){0};
+
+   buffer.len = index + project_name.len;
+   buffer.data[buffer.len] = 0;
 
    return buffer;
 }
@@ -78,6 +79,9 @@ static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
    s8 prefix = s8("%sbin\\assets\\shaders\\%s");
    s8 exe_dir = vk_exe_directory(files);
 
+   if(exe_dir.len == 0)
+      return 0;
+
    shader_path.count = prefix.len + exe_dir.len + shader_folder_path.len;
    array_resize(shader_path, shader_path.count);
 
@@ -87,7 +91,7 @@ static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
    HANDLE first_file = FindFirstFile(shader_path.data, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)
-      (arena){0};
+      return 0;
 
    u32 shader_count = 0;
 
