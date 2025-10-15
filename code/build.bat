@@ -12,7 +12,14 @@ IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build
 del /Q/F/S *.* > nul
 
-cl -MT -nologo -Od -Oi -Zi -FC -W3 /std:clatest %IGNORE_WARNINGS%  -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" ..\code\app.c ..\code\win32.c /link %WIN32_LIBS% /DEBUG -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d.exe
+REM DEBUG build
+
+REM cl -MT -nologo -Od -Oi -Zi -FC -W3 /std:clatest /D_DEBUG %IGNORE_WARNINGS%  -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" ..\code\app.c ..\code\win32.c /link %WIN32_LIBS% /DEBUG -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d.exe
+
+REM RELEASE build
+
+cl -MT -nologo -O2 -Oi -Os -GL -fp:fast /FC -W3 /std:clatest /DNDEBUG %IGNORE_WARNINGS% -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" ..\code\app.c ..\code\win32.c /link %WIN32_LIBS% /incremental:no /LTCG /OPT:REF /OPT:ICF /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d.exe
+
 
 IF %ERRORLEVEL% EQU 0 (
     echo Success!
