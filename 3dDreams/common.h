@@ -29,6 +29,12 @@ typedef struct
    size len;
 } s8;
 
+static bool s8_is_same(s8 a, s8 b)
+{
+   return strcmp(a.data, b.data);
+}
+
+// TODO: Should really be just strncmp this too
 static bool s8_is_substr(s8 str, s8 sub)
 {
    for(size i = 0; i < str.len; ++i)
@@ -36,6 +42,15 @@ static bool s8_is_substr(s8 str, s8 sub)
          return true;
 
    return false;
+}
+
+static size s8_is_substr_count(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
+         return i;
+
+   return -1;
 }
 
 static s8 s8_slice(s8 str, size beg, size end)

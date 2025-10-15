@@ -41,11 +41,11 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 
    array(char) obj_file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\obj\\%s");
-   s8 project_dir = vk_project_directory(context->storage);
+   s8 exe_dir = vk_project_directory(context->storage);
 
-   obj_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   obj_file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(obj_file_path, obj_file_path.count);
-   wsprintf(obj_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(obj_file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    // TODO: array(char) to s8
    s8 obj_path = {.data = (u8*)obj_file_path.data, .len = obj_file_path.count};
@@ -53,11 +53,11 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
    assert(strcmp(obj_path.data + obj_path.len - 4, ".obj") == 0);
 
    array(char) mtl_file_path = {context->storage};
-   mtl_file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   mtl_file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    // +2 for zero termination for the .obj string for c-string apis
    array_resize(mtl_file_path, mtl_file_path.count + 2);
    mtl_file_path.data++;
-   wsprintf(mtl_file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(mtl_file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    s8 mtl_path = {.data = (u8*)mtl_file_path.data, .len = mtl_file_path.count};
    mtl_path.data[mtl_path.len-3] = 'm';
@@ -90,11 +90,11 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
 {
    array(char) file_path = {context->storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
-   s8 project_dir = vk_project_directory(context->storage);
+   s8 exe_dir = vk_exe_directory(context->storage);
 
-   file_path.count = project_dir.len + prefix.len + filename.len - s8("%s%s").len;
+   file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(file_path, file_path.count);
-   wsprintf(file_path.data, s8_data(prefix), (const char*)project_dir.data, filename.data);
+   wsprintf(file_path.data, s8_data(prefix), (const char*)exe_dir.data, filename.data);
 
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
@@ -107,7 +107,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
 {
    assert(vk_valid_handle(logical_device));
 
-   s8 project_dir = vk_project_directory(&scratch);
+   s8 exe_dir = vk_exe_directory(&scratch);
 
    size shader_len = strlen(shader_name);
    assert(shader_len != 0u);
@@ -138,7 +138,7 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, project_dir, s8(shader_name));
+   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, s8(shader_name));
 
    switch(shader_stage)
    {
