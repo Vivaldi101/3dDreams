@@ -33,7 +33,6 @@ IF /I "%1"=="d" (
         /link %WIN32_LIBS% /DEBUG -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_debug.exe
 
     popd
-    goto :EOF
 )
 
 IF /I "%1"=="r" (
@@ -43,13 +42,7 @@ IF /I "%1"=="r" (
         /link %WIN32_LIBS% /incremental:no /LTCG /OPT:REF /OPT:ICF /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_release.exe
 
     popd
-    goto :EOF
 )
-
-echo Invalid option: %1
-echo Usage: %0 [debug|release]
-popd
-exit /b 1
 
 REM -----------------------------
 REM Error reporting
