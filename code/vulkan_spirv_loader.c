@@ -14,7 +14,6 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
    shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
    array_resize(shader_path, shader_path.count);
 
-   //wsprintf(shader_path.data, shader_dir.data, array_count(shader_path));
    wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name.data);
 
    arena shader_file = win32_file_read(storage, shader_path.data);
