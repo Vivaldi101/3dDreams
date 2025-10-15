@@ -14,3 +14,26 @@ ipch/**
 *.swp
 **/3dDreams
 **/3dDreams/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.ncb
+*.opendb
+*.VC.db
+
+# Other generated files
+*.log
+*.tlog
+*.pdb
+*.obj
+*.exe
+*.dll
+*.ilk
+*.idb
+*.pch
+*.cache
+*.manifest
+*.res
+*.tmp
