@@ -21,7 +21,7 @@ set IGNORE_WARNINGS=-wd4127 -wd4706 -wd4100 -wd4996 -wd4505 -wd4201
 
 IF NOT EXIST %ROOT%..\build mkdir %ROOT%..\build
 pushd %ROOT%..\build
-del /Q/F/S *.* > nul
+REM del /Q/F/S *.* > nul
 
 REM -----------------------------
 REM Choose build type
