@@ -1116,7 +1116,7 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 }
 
 // TODO: pass amount of bindings to create here
-static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, vk_context* context, bool rtx_supported)
+static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool rtx_supported)
 {
    // TODO: cleanup
    if(rtx_supported)
@@ -1143,7 +1143,7 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, vk_
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      if(!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, set_layout)))
+      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, 0, set_layout)))
          return false;
    }
    else
@@ -1165,17 +1165,15 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, vk_
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      if(!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, set_layout)))
+      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, 0, set_layout)))
          return false;
    }
 
    return true;
 }
 
-static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
+static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
 {
-   VkPipelineLayout layout = 0;
-
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
 
    VkPushConstantRange push_constants = {0};
@@ -1193,21 +1191,15 @@ static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDes
    info.setLayoutCount = (u32)set_layout_count;
    info.pSetLayouts = set_layouts;
 
-   vk_assert(vkCreatePipelineLayout(logical_device, &info, 0, &layout));
+   if(!vk_valid(vkCreatePipelineLayout(logical_device, &info, 0, layout)))
+      return false;
 
-   return layout;
+   return true;
 }
 
 // TODO: Cleanup these pipelines
-static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_handle(shaders->ms));
-   assert(vk_valid_handle(shaders->fs));
-   assert(!vk_valid_handle(cache)); // TODO: enable
-
-   VkPipeline pipeline = 0;
-
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
    stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
@@ -1287,21 +1279,14 @@ static VkPipeline vk_mesh_pipeline_create(vk_context* context, VkPipelineCache c
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+      return false;
 
-   return pipeline;
+   return true;
 }
 
-// TODO: Cleanup these pipelines
-static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_handle(shaders->vs));
-   assert(vk_valid_handle(shaders->fs));
-   assert(!vk_valid_handle(cache));
-
-   VkPipeline pipeline = 0;
-
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
    stages[0].module = shaders->vs;
@@ -1381,20 +1366,14 @@ static VkPipeline vk_graphics_pipeline_create(vk_context* context, VkPipelineCac
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+      return false;
 
-   return pipeline;
+   return true;
 }
 
-static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_handle(shaders->vs));
-   assert(vk_valid_handle(shaders->fs));
-   assert(!vk_valid_handle(cache));
-
-   VkPipeline pipeline = 0;
-
    VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
 
    stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1454,14 +1433,15 @@ static VkPipeline vk_axis_pipeline_create(vk_context* context, VkPipelineCache c
    VkPipelineDynamicStateCreateInfo dynamic_info = {vk_info(PIPELINE_DYNAMIC_STATE)};
    dynamic_info.pDynamicStates = (VkDynamicState[3]){VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
    dynamic_info.dynamicStateCount = 2;
-   pipeline_info.pDynamicState = &dynamic_info;
 
+   pipeline_info.pDynamicState = &dynamic_info;
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   vk_assert(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, &pipeline));
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+      return false;
 
-   return pipeline;
+   return true;
 }
 
 VkInstance vk_instance_create(arena scratch)
@@ -1538,9 +1518,9 @@ static bool vk_pipelines_create(vk_context* context, arena scratch)
    VkDescriptorSetLayout non_rtx_set_layout = 0;
    VkDescriptorSetLayout rtx_set_layout = 0;
 
-   if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context, false))
+   if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context->devices.logical, false))
       return false;
-   if(!vk_pipeline_set_layout_create(&rtx_set_layout, context, true))
+   if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
       return false;
 
    array(VkDescriptorSetLayout) set_layouts = {&scratch};
@@ -1549,31 +1529,50 @@ static bool vk_pipelines_create(vk_context* context, arena scratch)
 	if(context->textures.count > 0)
 		array_push(set_layouts) = context->texture_descriptor.layout;
 
-   // wide
-   VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, false);
+   VkPipelineLayout non_rtx_pipeline_layout = 0;
+   VkPipelineLayout rtx_pipeline_layout = 0;
+
+   if(!vk_pipeline_layout_create(&non_rtx_pipeline_layout, context->devices.logical, set_layouts.data, set_layouts.count, false))
+      return false;
+
    set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0
-   VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, true);
+
+   if(!vk_pipeline_layout_create(&rtx_pipeline_layout, context->devices.logical, set_layouts.data, set_layouts.count, true))
+      return false;
 
    context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
    context->rtx_pipeline_layout = rtx_pipeline_layout;
 
    VkPipelineCache cache = 0; // TODO: enable
 
+   VkPipeline graphics = 0;
+   VkPipeline axis = 0;
+   VkPipeline frustum = 0;
+   VkPipeline mesh = 0;
+
+   // TODO: static global const char* names for shader modules
    vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
-   // wide
-   context->non_rtx_pipeline = vk_graphics_pipeline_create(context, cache, &gm);
+
+   if (!vk_graphics_pipeline_create(&graphics, context, cache, &gm))
+      return false;
+   context->non_rtx_pipeline = graphics;
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
-   // wide
-   context->rtx_pipeline = vk_mesh_pipeline_create(context, cache, &mm);
+
+   if(!vk_mesh_pipeline_create(&mesh, context, cache, &mm))
+      return false;
+   context->rtx_pipeline = mesh;
 
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
-   // wide
-   context->axis_pipeline = vk_axis_pipeline_create(context, cache, &am);
+
+   if(!vk_axis_pipeline_create(&axis, context, cache, &am))
+      return false;
+   context->axis_pipeline = axis;
 
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
-   // wide
-   context->frustum_pipeline = vk_graphics_pipeline_create(context, cache, &fm);
+   if (!vk_graphics_pipeline_create(&frustum, context, cache, &fm))
+      return false;
+   context->frustum_pipeline = frustum;
 
    return true;
 }
@@ -1692,7 +1691,6 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   // TODO: wide contract for this
    if(!vk_pipelines_create(context, *context->storage))
    {
       printf("Could not create all the pipelines\n");
