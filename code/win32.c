@@ -361,9 +361,7 @@ int main(int argc, char** argv)
 
    hw.log = win32_log;
 
-   timeBeginPeriod(1);
    app_start(argc, argv, &hw);
-   timeEndPeriod(1);
 
    bool gr = global_free(base, 0, MEM_RELEASE);
    assert(gr);
