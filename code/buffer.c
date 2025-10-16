@@ -9,6 +9,11 @@ static const char* indirect_buffer_name = "indirect";
 static const char* indirect_rtx_buffer_name = "indirect_rtx";
 static const char* transform_buffer_name = "transform";
 
+static const char* meshlet_module_name = "meshlet";
+static const char* graphics_module_name = "graphics";
+static const char* axis_module_name = "axis";
+static const char* frustum_module_name = "frustum";
+
 static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDevice physical, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
    VkBufferCreateInfo create_info = {vk_info(BUFFER)};

@@ -155,11 +155,8 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
    }
 }
 
-// TODO: Rename this!
 static bool spirv_initialize(vk_context* context)
 {
-   assert(vk_valid_handle(context->devices.logical));
-
    u32 shader_count = 0;
    const char** shader_names = vk_shader_folder_read(context->storage, s8("bin\\assets\\shaders"));
    if(!shader_names)
@@ -189,33 +186,33 @@ static bool spirv_initialize(vk_context* context)
 
       for(usize i = 0; i < shader_len; ++i)
       {
-         if(strncmp(shader_name + i, "meshlet", strlen("meshlet")) == 0)
+         if(strncmp(shader_name + i, meshlet_module_name, strlen(meshlet_module_name)) == 0)
          {
-            vk_shader_modules ms = spv_hash_lookup(table, "meshlet");
+            vk_shader_modules ms = spv_hash_lookup(table, meshlet_module_name);
             // TODO: optimize shader loading - load all the shaders at once
             vk_shader_load(context->devices.logical, *context->storage, *p, &ms);
-            spv_hash_insert(table, "meshlet", ms);
+            spv_hash_insert(table, meshlet_module_name, ms);
             break;
          }
-         if(strncmp(shader_name + i, "graphics", strlen("graphics")) == 0)
+         if(strncmp(shader_name + i, graphics_module_name, strlen(graphics_module_name)) == 0)
          {
-            vk_shader_modules gm = spv_hash_lookup(table, "graphics");
+            vk_shader_modules gm = spv_hash_lookup(table, graphics_module_name);
             vk_shader_load(context->devices.logical, *context->storage, *p, &gm);
-            spv_hash_insert(table, "graphics", gm);
+            spv_hash_insert(table, graphics_module_name, gm);
             break;
          }
-         if(strncmp(shader_name + i, "axis", strlen("axis")) == 0)
+         if(strncmp(shader_name + i, axis_module_name, strlen(axis_module_name)) == 0)
          {
-            vk_shader_modules am = spv_hash_lookup(table, "axis");
+            vk_shader_modules am = spv_hash_lookup(table, axis_module_name);
             vk_shader_load(context->devices.logical, *context->storage, *p, &am);
-            spv_hash_insert(table, "axis", am);
+            spv_hash_insert(table, axis_module_name, am);
             break;
          }
-         if(strncmp(shader_name + i, "frustum", strlen("frustum")) == 0)
+         if(strncmp(shader_name + i, frustum_module_name, strlen(frustum_module_name)) == 0)
          {
-            vk_shader_modules fm = spv_hash_lookup(table, "frustum");
+            vk_shader_modules fm = spv_hash_lookup(table, frustum_module_name);
             vk_shader_load(context->devices.logical, *context->storage, *p, &fm);
-            spv_hash_insert(table, "frustum", fm);
+            spv_hash_insert(table, frustum_module_name, fm);
             break;
          }
       }
@@ -1551,25 +1548,25 @@ static bool vk_pipelines_create(vk_context* context, arena scratch)
    VkPipeline mesh = 0;
 
    // TODO: static global const char* names for shader modules
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, graphics_module_name);
 
    if (!vk_graphics_pipeline_create(&graphics, context, cache, &gm))
       return false;
    context->non_rtx_pipeline = graphics;
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, meshlet_module_name);
 
    if(!vk_mesh_pipeline_create(&mesh, context, cache, &mm))
       return false;
    context->rtx_pipeline = mesh;
 
-   vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
+   vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
 
    if(!vk_axis_pipeline_create(&axis, context, cache, &am))
       return false;
    context->axis_pipeline = axis;
 
-   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
+   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
    if (!vk_graphics_pipeline_create(&frustum, context, cache, &fm))
       return false;
    context->frustum_pipeline = frustum;
@@ -1626,6 +1623,7 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
+   // TODO: wide contracts
    context->devices.physical = vk_physical_device_select(hw, context, *context->storage);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
@@ -1707,10 +1705,10 @@ void vk_uninitialize(hw* hw)
    // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
-   vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
-   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
+   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, meshlet_module_name);
+   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, graphics_module_name);
+   vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
+   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
 
    vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
    vk_buffer ib = *buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
