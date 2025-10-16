@@ -1670,14 +1670,14 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
+   context->buffer_table = buffer_hash_create(100, context->storage);
+   buffer_hash_clear(&context->buffer_table);
+
    if(!spirv_initialize(context))
    {
       printf("Could not compile and load all the shader modules\n");
       return false;
    }
-
-   context->buffer_table = buffer_hash_create(100, context->storage);
-   buffer_hash_clear(&context->buffer_table);
 
    if(!vk_assets_read(context, hw->state.asset_file))
    {
