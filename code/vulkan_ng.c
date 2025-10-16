@@ -1116,11 +1116,8 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
 }
 
 // TODO: pass amount of bindings to create here
-static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, bool rtx_supported)
+static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, vk_context* context, bool rtx_supported)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   VkDescriptorSetLayout set_layout = 0;
-
    // TODO: cleanup
    if(rtx_supported)
    {
@@ -1146,7 +1143,8 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, &set_layout));
+      if(!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, set_layout)))
+         return false;
    }
    else
    {
@@ -1167,10 +1165,11 @@ static VkDescriptorSetLayout vk_pipeline_set_layout_create(vk_context* context, 
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      vk_assert(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, &set_layout));
+      if(!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &info, 0, set_layout)))
+         return false;
    }
 
-   return set_layout;
+   return true;
 }
 
 static VkPipelineLayout vk_pipeline_layout_create(VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
@@ -1534,11 +1533,15 @@ static bool vk_buffers_create(vk_context* context, arena scratch)
    return true;
 }
 
-// TODO: Wide
-static void vk_pipelines_create(vk_context* context, arena scratch)
+static bool vk_pipelines_create(vk_context* context, arena scratch)
 {
-   VkDescriptorSetLayout non_rtx_set_layout = vk_pipeline_set_layout_create(context, false);
-   VkDescriptorSetLayout rtx_set_layout = vk_pipeline_set_layout_create(context, true);
+   VkDescriptorSetLayout non_rtx_set_layout = 0;
+   VkDescriptorSetLayout rtx_set_layout = 0;
+
+   if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context, false))
+      return false;
+   if(!vk_pipeline_set_layout_create(&rtx_set_layout, context, true))
+      return false;
 
    array(VkDescriptorSetLayout) set_layouts = {&scratch};
    // set 0 for vertex SSBO, set 1 for bindless textures
@@ -1546,6 +1549,7 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
 	if(context->textures.count > 0)
 		array_push(set_layouts) = context->texture_descriptor.layout;
 
+   // wide
    VkPipelineLayout non_rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, false);
    set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0
    VkPipelineLayout rtx_pipeline_layout = vk_pipeline_layout_create(context->devices.logical, set_layouts.data, set_layouts.count, true);
@@ -1556,16 +1560,22 @@ static void vk_pipelines_create(vk_context* context, arena scratch)
    VkPipelineCache cache = 0; // TODO: enable
 
    vk_shader_modules gm = spv_hash_lookup(&context->shader_table, "graphics");
+   // wide
    context->non_rtx_pipeline = vk_graphics_pipeline_create(context, cache, &gm);
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_table, "meshlet");
+   // wide
    context->rtx_pipeline = vk_mesh_pipeline_create(context, cache, &mm);
 
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, "axis");
+   // wide
    context->axis_pipeline = vk_axis_pipeline_create(context, cache, &am);
 
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, "frustum");
+   // wide
    context->frustum_pipeline = vk_graphics_pipeline_create(context, cache, &fm);
+
+   return true;
 }
 
 bool vk_initialize(hw* hw)
@@ -1683,7 +1693,11 @@ bool vk_initialize(hw* hw)
    }
 
    // TODO: wide contract for this
-   vk_pipelines_create(context, *context->storage);
+   if(!vk_pipelines_create(context, *context->storage))
+   {
+      printf("Could not create all the pipelines\n");
+      return false;
+   }
 
    vk_textures_log(context);
 
