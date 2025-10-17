@@ -864,6 +864,7 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
+// TODO: split this into rendering and presenting
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
