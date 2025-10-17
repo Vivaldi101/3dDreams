@@ -1,17 +1,12 @@
 @echo off
 
-REM Check for argument
 IF "%1"=="" (
     echo "Usage: %0 d|r"
     exit /b 1
 )
 
-REM Root of project (folder containing this batch file)
 SET ROOT=%~dp0
 
-REM -----------------------------
-REM Project paths and libraries
-REM -----------------------------
 set WIN32_LIBS=kernel32.lib user32.lib gdi32.lib
 set VULKAN_LIB=vulkan-1.lib
 set VULKAN_INC=%VULKAN_SDK%\Include
@@ -21,11 +16,7 @@ set IGNORE_WARNINGS=-wd4127 -wd4706 -wd4100 -wd4996 -wd4505 -wd4201
 
 IF NOT EXIST %ROOT%..\build mkdir %ROOT%..\build
 pushd %ROOT%..\build
-REM del /Q/F/S *.* > nul
 
-REM -----------------------------
-REM Choose build type
-REM -----------------------------
 IF /I "%1"=="d" (
     echo Building DEBUG version...
     cl -MT -nologo -Od -Oi -Zi -FC -W3 /std:clatest /D_DEBUG %IGNORE_WARNINGS% ^
@@ -44,9 +35,6 @@ IF /I "%1"=="r" (
     popd
 )
 
-REM -----------------------------
-REM Error reporting
-REM -----------------------------
 IF %ERRORLEVEL% EQU 0 (
     echo Success!
 ) ELSE (
