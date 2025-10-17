@@ -867,8 +867,36 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
 // TODO: split this into rendering and presenting
 static void vk_present(hw* hw, vk_context* context, app_state* state)
 {
+   VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+   present_info.swapchainCount = 1;
+   present_info.pSwapchains = &context->swapchain_surface.handle;
+   present_info.pImageIndices = &context->image_index;
+   present_info.waitSemaphoreCount = 1;
+   present_info.pWaitSemaphores = &context->image_done_semaphore;
+
+   VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
+
+   if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
+      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
+
+   if(present_result != VK_SUCCESS)
+      return;
+
+   // wait until all queue ops are done
+   // essentialy run gpu and cpu in sync (60 FPS usually)
+   // TODO: This is bad way to do sync but who cares for now
+   vk_assert(vkDeviceWaitIdle(context->devices.logical));
+
+   u64 query_results[2];
+   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
+}
+
+static void vk_render(hw* hw, vk_context* context, app_state* state)
+{
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->devices.logical, context->swapchain_surface.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
+
+   context->image_index = image_index;
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
       vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
@@ -1058,31 +1086,6 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    submit_info.pSignalSemaphores = &context->image_done_semaphore;
 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
-
-   VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
-   present_info.swapchainCount = 1;
-   present_info.pSwapchains = &context->swapchain_surface.handle;
-
-   present_info.pImageIndices = &image_index;
-
-   present_info.waitSemaphoreCount = 1;
-   present_info.pWaitSemaphores = &context->image_done_semaphore;
-
-   VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
-
-   if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
-
-   if(present_result != VK_SUCCESS)
-      return;
-
-   // wait until all queue ops are done
-   // essentialy run gpu and cpu in sync (60 FPS usually)
-   // TODO: This is bad way to do sync but who cares for now
-   vk_assert(vkDeviceWaitIdle(context->devices.logical));
-
-   u64 query_results[2];
-   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 
 #if 0
    f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
@@ -1585,6 +1588,7 @@ bool vk_initialize(hw* hw)
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
+   hw->renderer.frame_render = vk_render;
    hw->renderer.frame_present = vk_present;
    hw->renderer.frame_resize = vk_resize;
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;

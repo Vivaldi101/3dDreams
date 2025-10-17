@@ -108,7 +108,7 @@ static void hw_frame_sync(hw* hw, f64 frame_delta)
    }
 }
 
-static void hw_frame_render(hw* hw)
+static void hw_frame_present(hw* hw)
 {
    void** renderers = hw->renderer.backends;
    const u32 renderer_index = hw->renderer.renderer_index;
@@ -121,6 +121,22 @@ static void hw_frame_render(hw* hw)
 
    pre(renderer_index < RENDERER_COUNT);
    hw->renderer.frame_present(hw, renderers[renderer_index], &hw->state);
+
+}
+
+static void hw_frame_render(hw* hw)
+{
+   void** renderers = hw->renderer.backends;
+   const u32 renderer_index = hw->renderer.renderer_index;
+
+   if(!hw->renderer.frame_render)
+      return;
+
+   if(hw->renderer.window.width == 0 || hw->renderer.window.height == 0)
+      return;
+
+   pre(renderer_index < RENDERER_COUNT);
+   hw->renderer.frame_render(hw, renderers[renderer_index], &hw->state);
 }
 
 static void hw_log(hw* hw, s8 message, ...)
@@ -156,6 +172,8 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
       hw_frame_sync(hw, 0.01666666666666666666666666666667 / 1);
 
       i64 end = clock_query_counter();
+
+      hw_frame_present(hw);
 
       hw->state.frame_delta_in_seconds = clock_seconds_elapsed(begin, end);
 

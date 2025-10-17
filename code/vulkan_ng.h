@@ -168,6 +168,7 @@ align_struct vk_context
 
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;
+   u32 image_index;
 
    VkQueue graphics_queue;
    VkCommandPool command_pool;

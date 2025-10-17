@@ -37,6 +37,7 @@ align_struct hw_window
 align_struct hw_renderer
 {
    void* backends[RENDERER_COUNT];
+   void(*frame_render)(struct hw* hw, void* context, app_state* state);
    void(*frame_present)(struct hw* hw, void* context, app_state* state);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
    void(*frame_wait)(void* renderer);
