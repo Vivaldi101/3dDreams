@@ -36,7 +36,13 @@ IF /I "%1"=="r" (
 )
 
 IF %ERRORLEVEL% EQU 0 (
-    echo Success!
+    echo Build succeeded!
+    REM Update ctags and cscope in code folder
+
+    pushd %ROOT%
+    ctags -R .
+    cscope -R -b
+    popd
 ) ELSE (
     echo Build failed with error %ERRORLEVEL%
 )
