@@ -685,21 +685,29 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
 static void vk_swapchain_destroy(vk_context* context)
 {
    vkDeviceWaitIdle(context->devices.logical);
-   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
-   {
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
-   }
+
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
+
+   for (u32 i = 0; i < context->swapchain_images.depths.count; ++i)
+   {
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
+      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i].handle, 0);
+      vkFreeMemory(context->devices.logical, context->swapchain_images.depths.data[i].memory, 0);
+   }
+
+   for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
 
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
 }
 
 // TODO: break into separate routines
 // TODO: wide contract
-static void vk_swapchain_update(vk_context* context, arena scratch)
+static void vk_swapchain_update(vk_context* context)
 {
+   arena scratch = *context->storage;
+
    VkImage* swapchain_images = push(&scratch, VkImage, context->swapchain_surface.image_count);
 
    vk_assert(vkGetSwapchainImagesKHR(context->devices.logical, context->swapchain_surface.handle, &context->swapchain_surface.image_count, swapchain_images));
@@ -746,7 +754,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
 
    vk_swapchain_destroy(context);
    context->swapchain_surface = vk_swapchain_surface_create(context, width, height);
-   vk_swapchain_update(context, *context->storage);
+   vk_swapchain_update(context);
 
    printf("Viewport resized: [%u %u]\n", width, height);
 }
