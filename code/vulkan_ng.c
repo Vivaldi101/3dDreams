@@ -333,7 +333,7 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
       vkGetPhysicalDeviceProperties(devs[i], &props);
 
       // match version
-      if(props.apiVersion < VK_VERSION_1_1)
+      if(props.apiVersion < VK_API_VERSION_1_3)
          continue;
 
       // timestamps
