@@ -257,6 +257,8 @@ static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* co
    if (success)
       vk_buffer_upload(context, transform_buffer, &scratch_buffer, draws, sizeof(struct mesh_draw) * context->mesh_instances.count);
 
+   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+
    return success;
 }
 
@@ -297,6 +299,8 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
 
       if (success)
          vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->mesh_instances.count);
+
+      vk_buffer_destroy(context->devices.logical, &scratch_buffer);
    }
    else
    {
@@ -322,6 +326,8 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       success &= vk_buffer_create_and_bind(indirect_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
       if (success)
          vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->mesh_instances.count);
+
+      vk_buffer_destroy(context->devices.logical, &scratch_buffer);
    }
 
    return success;

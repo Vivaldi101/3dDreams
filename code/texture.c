@@ -152,6 +152,8 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
       array_add(context->textures, tex);
    }
 
+   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+
    stbi_image_free(tex_pixels);
 }
 
