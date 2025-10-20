@@ -387,7 +387,8 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
          return i;
    }
 
-   return (u32)-1;
+   // try to use the first as a last fallback
+   return 0;
 }
 
 static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
