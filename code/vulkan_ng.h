@@ -55,12 +55,17 @@ align_struct vk_swapchain_surface
    VkSwapchainKHR handle;
 } vk_swapchain_surface;
 
+align_struct vk_image
+{
+   VkImage handle;
+   VkImageView view;
+   VkDeviceMemory memory;
+} vk_image;
+
 align_struct vk_swapchain_images
 {
-   array(VkImage) images;
-   array(VkImage) depths;
-   array(VkImageView) image_views;
-   array(VkImageView) depth_views;
+   array(vk_image) images;
+   array(vk_image) depths;
 } vk_swapchain_images;
 
 align_struct vk_buffer
@@ -82,13 +87,6 @@ align_struct vk_meshlet
    vk_buffer buffer;
    u32 count;
 } vk_meshlet;
-
-align_struct vk_image
-{
-   VkImage handle;
-   VkImageView view;
-   VkDeviceMemory memory;
-} vk_image;
 
 typedef struct meshlet meshlet;
 align_struct vk_meshlet_buffer
@@ -153,18 +151,19 @@ align_struct vk_context
    array(vk_mesh_draw) mesh_draws;
    array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;
+   array(VkDescriptorSetLayout) set_layouts;
+   array(VkDescriptorSetLayout) rtx_set_layouts;
 
    VkInstance instance;
-   VkPhysicalDevice physical_device;
    vk_devce devices;
 
-   VkDevice logical_device;
    VkSurfaceKHR surface;
    u32 query_pool_size;
 
    VkAllocationCallbacks allocator;
 
    vk_descriptor texture_descriptor;
+   VkDescriptorPool descriptor_pool;
 
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;
@@ -199,6 +198,10 @@ align_struct vk_context
    f32 time_period;
 
    bool rtx_supported;
+
+#ifdef _DEBUG
+   VkDebugUtilsMessengerEXT messenger;
+#endif
 } vk_context;
 
 // vk_initialize => vk_uninitialize

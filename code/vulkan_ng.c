@@ -391,24 +391,6 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
    return 0;
 }
 
-static u32 vk_mesh_shader_max_tasks(VkPhysicalDevice physical_device)
-{
-   assert(vk_valid_handle(physical_device));
-
-   VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_props = {0};
-   mesh_shader_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT;
-
-   VkPhysicalDeviceProperties2 device_props2 = {0};
-   device_props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-   device_props2.pNext = &mesh_shader_props;
-
-   vkGetPhysicalDeviceProperties2(physical_device, &device_props2);
-
-   u32 max_mesh_tasks = mesh_shader_props.maxMeshWorkGroupInvocations;
-
-   return max_mesh_tasks;
-}
-
 static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scratch)
 {
    assert(vk_valid_handle(context->devices.physical));
@@ -705,8 +687,8 @@ static void vk_swapchain_destroy(vk_context* context)
    vkDeviceWaitIdle(context->devices.logical);
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.image_views.data[i], 0);
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.depth_views.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
    }
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
@@ -714,21 +696,26 @@ static void vk_swapchain_destroy(vk_context* context)
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
 }
 
-// TODO: Break into separate routines
-static void vk_swapchain_update(vk_context* context)
+// TODO: break into separate routines
+// TODO: wide contract
+static void vk_swapchain_update(vk_context* context, arena scratch)
 {
-   vk_assert(vkGetSwapchainImagesKHR(context->devices.logical, context->swapchain_surface.handle, &context->swapchain_surface.image_count, context->swapchain_images.images.data));
+   VkImage* swapchain_images = push(&scratch, VkImage, context->swapchain_surface.image_count);
+
+   vk_assert(vkGetSwapchainImagesKHR(context->devices.logical, context->swapchain_surface.handle, &context->swapchain_surface.image_count, swapchain_images));
 
    VkExtent3D depth_extent = {context->swapchain_surface.image_width, context->swapchain_surface.image_height, 1};
 
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
-      context->swapchain_images.depths.data[i] = vk_depth_image_create(context, VK_FORMAT_D32_SFLOAT, depth_extent);
+      context->swapchain_images.images.data[i].handle = swapchain_images[i];
 
-      context->swapchain_images.image_views.data[i] = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i], VK_IMAGE_ASPECT_COLOR_BIT);
-      context->swapchain_images.depth_views.data[i] = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths.data[i], VK_IMAGE_ASPECT_DEPTH_BIT);
+      vk_depth_image_create(&context->swapchain_images.depths.data[i], context, VK_FORMAT_D32_SFLOAT, depth_extent); // TDOO: Return false here if fail
 
-      VkImageView attachments[2] = {context->swapchain_images.image_views.data[i], context->swapchain_images.depth_views.data[i]};
+      context->swapchain_images.images.data[i].view = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i].handle, VK_IMAGE_ASPECT_COLOR_BIT);
+      context->swapchain_images.depths.data[i].view = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths.data[i].handle, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+      VkImageView attachments[2] = {context->swapchain_images.images.data[i].view, context->swapchain_images.depths.data[i].view};
 
       VkFramebuffer fb = vk_framebuffer_create(context->devices.logical, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
       context->framebuffers.data[i] = fb;
@@ -759,7 +746,7 @@ static void vk_resize(hw* hw, u32 width, u32 height)
 
    vk_swapchain_destroy(context);
    context->swapchain_surface = vk_swapchain_surface_create(context, width, height);
-   vk_swapchain_update(context);
+   vk_swapchain_update(context, *context->storage);
 
    printf("Viewport resized: [%u %u]\n", width, height);
 }
@@ -949,12 +936,12 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    renderpass_info.clearValueCount = 2;
    renderpass_info.pClearValues = clear;
 
-   VkImage color_image = context->swapchain_images.images.data[image_index];
+   VkImage color_image = context->swapchain_images.images.data[image_index].handle;
    VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
       VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-   VkImage depth_image = context->swapchain_images.depths.data[image_index];
+   VkImage depth_image = context->swapchain_images.depths.data[image_index].handle;
    VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
       VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
@@ -1515,7 +1502,7 @@ static bool vk_buffers_create(vk_context* context, arena scratch)
    return true;
 }
 
-static bool vk_pipelines_create(vk_context* context, arena scratch)
+static bool vk_pipelines_create(vk_context* context)
 {
    VkDescriptorSetLayout non_rtx_set_layout = 0;
    VkDescriptorSetLayout rtx_set_layout = 0;
@@ -1525,21 +1512,25 @@ static bool vk_pipelines_create(vk_context* context, arena scratch)
    if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
       return false;
 
-   array(VkDescriptorSetLayout) set_layouts = {&scratch};
+   context->set_layouts.arena = context->storage;
+   context->rtx_set_layouts.arena = context->storage;
+
    // set 0 for vertex SSBO, set 1 for bindless textures
-   array_push(set_layouts) = non_rtx_set_layout;
+   array_push(context->set_layouts) = non_rtx_set_layout;
 	if(context->textures.count > 0)
-		array_push(set_layouts) = context->texture_descriptor.layout;
+		array_push(context->set_layouts) = context->texture_descriptor.layout;
+
+   array_push(context->rtx_set_layouts) = rtx_set_layout;
+	if(context->textures.count > 0)
+		array_push(context->rtx_set_layouts) = context->texture_descriptor.layout;
 
    VkPipelineLayout non_rtx_pipeline_layout = 0;
    VkPipelineLayout rtx_pipeline_layout = 0;
 
-   if(!vk_pipeline_layout_create(&non_rtx_pipeline_layout, context->devices.logical, set_layouts.data, set_layouts.count, false))
+   if(!vk_pipeline_layout_create(&non_rtx_pipeline_layout, context->devices.logical, context->set_layouts.data, context->set_layouts.count, false))
       return false;
 
-   set_layouts.data[0] = rtx_set_layout; // create mesh shader layout next for set 0
-
-   if(!vk_pipeline_layout_create(&rtx_pipeline_layout, context->devices.logical, set_layouts.data, set_layouts.count, true))
+   if(!vk_pipeline_layout_create(&rtx_pipeline_layout, context->devices.logical, context->rtx_set_layouts.data, context->rtx_set_layouts.count, true))
       return false;
 
    context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
@@ -1618,10 +1609,11 @@ bool vk_initialize(hw* hw)
       messenger_info.pUserData = hw;
 
       VkDebugUtilsMessengerEXT messenger;
-
       VkResult debug_result = vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger);
       if(!vk_valid(volk_result))
          return false;
+
+      context->messenger = messenger;
    }
 #endif
 
@@ -1651,25 +1643,15 @@ bool vk_initialize(hw* hw)
    context->swapchain_images.images.arena = context->storage;
    array_resize(context->swapchain_images.images, context->swapchain_surface.image_count);
 
+   // depths
    context->swapchain_images.depths.arena = context->storage;
    array_resize(context->swapchain_images.depths, context->swapchain_surface.image_count);
-
-   // color views
-   context->swapchain_images.image_views.arena = context->storage;
-   array_resize(context->swapchain_images.image_views, context->swapchain_surface.image_count);
-
-   // depth views
-   context->swapchain_images.depth_views.arena = context->storage;
-   array_resize(context->swapchain_images.depth_views, context->swapchain_surface.image_count);
 
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
       array_add(context->framebuffers, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.images, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.depths, VK_NULL_HANDLE);
-
-      array_add(context->swapchain_images.image_views, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.depth_views, VK_NULL_HANDLE);
+      array_add(context->swapchain_images.images, (vk_image){});
+      array_add(context->swapchain_images.depths, (vk_image){});
    }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
@@ -1695,7 +1677,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(!vk_pipelines_create(context, *context->storage))
+   if(!vk_pipelines_create(context))
    {
       printf("Could not create all the pipelines\n");
       return false;
@@ -1716,6 +1698,7 @@ void vk_uninitialize(hw* hw)
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
 
+   // TODO: iterate buffer objects here
    vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
    vk_buffer ib = *buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
    vk_buffer mb = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
@@ -1726,9 +1709,24 @@ void vk_uninitialize(hw* hw)
 
    vkDeviceWaitIdle(context->devices.logical);
 
+   // TODO: Fix this - currently both rtx and non rtx layouts have 1 bind to same bindless texture descriptors
+   // TODO: Either duplicate it to both sets or remove it from both entirely and have it separate
+   for (u32 i = 0; i < context->set_layouts.count; ++i)
+      vkDestroyDescriptorSetLayout(context->devices.logical, context->set_layouts.data[i], 0);
+   for (u32 i = 0; i < context->rtx_set_layouts.count; ++i)
+      if (i != 1)
+         vkDestroyDescriptorSetLayout(context->devices.logical, context->rtx_set_layouts.data[i], 0);
+
+   vkDestroyDescriptorPool(context->devices.logical, context->descriptor_pool, 0);
+
    vkDestroyPipeline(context->devices.logical, context->axis_pipeline, 0);
    vkDestroyPipeline(context->devices.logical, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->devices.logical, context->non_rtx_pipeline, 0);
+   vkDestroyPipeline(context->devices.logical, context->rtx_pipeline, 0);
+
+
+   vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, 0);
+   vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, 0);
 
    vkDestroyShaderModule(context->devices.logical, mm.ms, 0);
    vkDestroyShaderModule(context->devices.logical, mm.fs, 0);
@@ -1745,21 +1743,13 @@ void vk_uninitialize(hw* hw)
    vkDestroyCommandPool(context->devices.logical, context->command_pool, 0);
    vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
 
-   vkDestroyBuffer(context->devices.logical, ib.handle, 0);
-   vkDestroyBuffer(context->devices.logical, vb.handle, 0);
-   vkDestroyBuffer(context->devices.logical, mb.handle, 0);
+   vk_buffer_destroy(context->devices.logical, &ib);
+   vk_buffer_destroy(context->devices.logical, &vb);
+   vk_buffer_destroy(context->devices.logical, &mb);
 
-   vkFreeMemory(context->devices.logical, ib.memory, 0);
-   vkFreeMemory(context->devices.logical, vb.memory, 0);
-   vkFreeMemory(context->devices.logical, mb.memory, 0);
-
-   vkDestroyBuffer(context->devices.logical, indirect.handle, 0);
-   vkDestroyBuffer(context->devices.logical, indirect_rtx.handle, 0);
-   vkDestroyBuffer(context->devices.logical, transform.handle, 0);
-
-   vkFreeMemory(context->devices.logical, indirect.memory, 0);
-   vkFreeMemory(context->devices.logical, indirect_rtx.memory, 0);
-   vkFreeMemory(context->devices.logical, transform.memory, 0);
+   vk_buffer_destroy(context->devices.logical, &indirect);
+   vk_buffer_destroy(context->devices.logical, &indirect_rtx);
+   vk_buffer_destroy(context->devices.logical, &transform);
 
    vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
    vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);
@@ -1775,15 +1765,21 @@ void vk_uninitialize(hw* hw)
       vkFreeMemory(context->devices.logical, context->textures.data[i].image.memory, 0);
    }
 
-   for(u32 i = 0; i < context->swapchain_images.image_views.count; ++i)
+   for (u32 i = 0; i < context->swapchain_images.depths.count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.image_views.data[i], 0);
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.depth_views.data[i], 0);
-      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i], 0);
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
+      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i].handle, 0);
+      vkFreeMemory(context->devices.logical, context->swapchain_images.depths.data[i].memory, 0);
    }
 
+   for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
+      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
+
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
+   vkDestroySurfaceKHR(context->instance, context->surface, 0);
 
    vkDestroyDevice(context->devices.logical, 0);
+   vkDestroyDebugUtilsMessengerEXT(context->instance, context->messenger, 0);
+
    vkDestroyInstance(context->instance, 0);
 }

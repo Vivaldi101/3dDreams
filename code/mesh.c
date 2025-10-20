@@ -388,11 +388,12 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
 			 .pImageInfo = image_infos.data,
 		};
 
-		vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
-
 		descriptor->set = descriptor_set;
 		descriptor->layout = descriptor_set_layout;
+		context->descriptor_pool = descriptor_pool;
 
+      vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
+      vkDestroySampler(context->devices.logical, immutable_sampler, 0);
 	}
 
    return true;

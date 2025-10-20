@@ -5,6 +5,7 @@
 
 #include "../extern/stb_image.h"
 
+// TODO: wide contract
 static VkImageView vk_image_view_create(vk_context* context, VkFormat format, VkImage image, VkImageAspectFlags aspect_mask)
 {
    VkImageView image_view = 0;
@@ -23,10 +24,8 @@ static VkImageView vk_image_view_create(vk_context* context, VkFormat format, Vk
    return image_view;
 }
 
-static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
+static bool vk_image_create(vk_image* image, vk_context* context, VkFormat format, VkExtent3D extent, VkImageUsageFlags usage)
 {
-   VkImage result = 0;
-
    VkImageCreateInfo image_info = {0};
    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
    image_info.imageType = VK_IMAGE_TYPE_2D; 
@@ -42,11 +41,11 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
 
-   if(vkCreateImage(context->devices.logical, &image_info, 0, &result) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
+   if(vkCreateImage(context->devices.logical, &image_info, 0, &image->handle) != VK_SUCCESS)
+      return false;
 
    VkMemoryRequirements memory_requirements;
-   vkGetImageMemoryRequirements(context->devices.logical, result, &memory_requirements);
+   vkGetImageMemoryRequirements(context->devices.logical, image->handle, &memory_requirements);
 
    VkMemoryAllocateInfo alloc_info = {0};
    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -65,23 +64,25 @@ static VkImage vk_image_create(vk_context* context, VkFormat format, VkExtent3D 
       }
 
    if(memory_type_index == VK_MAX_MEMORY_TYPES)
-      return VK_NULL_HANDLE;
+      return false;
 
    alloc_info.memoryTypeIndex = memory_type_index;
 
    VkDeviceMemory memory;
    if(vkAllocateMemory(context->devices.logical, &alloc_info, 0, &memory) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
+      return false;
 
-   if(vkBindImageMemory(context->devices.logical, result, memory, 0) != VK_SUCCESS)
-      return VK_NULL_HANDLE;
+   image->memory = memory;
 
-   return result;
+   if(vkBindImageMemory(context->devices.logical, image->handle, memory, 0) != VK_SUCCESS)
+      return false;
+
+   return true;
 }
 
-static VkImage vk_depth_image_create(vk_context* context, VkFormat format, VkExtent3D extent)
+static bool vk_depth_image_create(vk_image* image, vk_context* context, VkFormat format, VkExtent3D extent)
 {
-   return vk_image_create(context, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
+   return vk_image_create(image, context, format, extent, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
 static size vk_texture_size_blocked(u32 w, u32 h, u32 levels, u32 block_size)
@@ -96,6 +97,7 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
    return vk_texture_size_blocked(w, h, levels, 0);
 }
 
+// TODO: wide contract
 static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 {
    u8* gltf_end = gltf_path.data + gltf_path.len;
@@ -129,9 +131,11 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
-   // TODO: narrow contract
-   VkImage image = vk_image_create(context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage);
-   VkImageView image_view = vk_image_view_create(context, format, image, VK_IMAGE_ASPECT_COLOR_BIT);
+   vk_image image = {0};
+   if(!vk_image_create(&image, context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage))
+      return;  // false
+
+   VkImageView image_view = vk_image_view_create(context, format, image.handle, VK_IMAGE_ASPECT_COLOR_BIT);
 
    // TODO: enable for mip textures
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
@@ -142,11 +146,12 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // TODO: narrow
-   if(vk_valid_handle(image))
+   if(vk_valid_handle(image.handle))
    {
-      vk_buffer_to_image_upload(context, scratch_buffer, image, extents, tex_pixels, scratch_buffer.size);
+      vk_buffer_to_image_upload(context, scratch_buffer, image.handle, extents, tex_pixels, scratch_buffer.size);
 
-      tex.image.handle = image;
+      tex.image.handle = image.handle;
+      tex.image.memory = image.memory;
       tex.image.view = image_view;
 
       array_add(context->textures, tex);
