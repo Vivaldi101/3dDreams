@@ -1471,11 +1471,13 @@ VkInstance vk_instance_create(arena scratch)
    return instance;
 }
 
-static bool vk_buffers_create(vk_context* context, arena scratch)
+static bool vk_buffers_create(vk_context* context)
 {
    vk_buffer indirect_buffer = { 0 };
    vk_buffer indirect_rtx_buffer = { 0 };
    vk_buffer world_transform = { 0 };
+
+   arena scratch = *context->storage;
 
    // TODO: pass devices
    if(!buffer_indirect_create(&indirect_buffer, context, scratch, false))
@@ -1672,13 +1674,13 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(!vk_buffers_create(context, *context->storage))
+   if(!vk_buffers_create(context))
    {
       printf("Could not create all the buffer objects\n");
       return false;
    }
 
-   if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, *context->storage, 1 << 16))
+   if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, 1 << 16))
       return false;
 
    if(!vk_pipelines_create(context))

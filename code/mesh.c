@@ -266,8 +266,10 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, vk_device* device, arena scratch, u32 max_descriptor_count)
+static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, vk_device* device, u32 max_descriptor_count)
 {
+   arena scratch = *context->storage;
+
    // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =
    {
