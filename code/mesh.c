@@ -266,7 +266,7 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, arena scratch, u32 max_descriptor_count)
+static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, vk_device* device, arena scratch, u32 max_descriptor_count)
 {
    // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =
@@ -285,7 +285,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkDescriptorPool descriptor_pool = 0;
-   if(!vk_valid(vkCreateDescriptorPool(context->devices.logical, &pool_info, 0, &descriptor_pool)))
+   if(!vk_valid(vkCreateDescriptorPool(device->logical, &pool_info, 0, &descriptor_pool)))
       return false;
 
    VkSamplerCreateInfo sampler_info =
@@ -309,7 +309,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkSampler immutable_sampler;
-   if(!vk_valid(vkCreateSampler(context->devices.logical, &sampler_info, 0, &immutable_sampler)))
+   if(!vk_valid(vkCreateSampler(device->logical, &sampler_info, 0, &immutable_sampler)))
       return false;
 
    // variable and partially bound descriptor arrays
@@ -342,7 +342,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkDescriptorSetLayout descriptor_set_layout = 0;
-   if (!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, 0, &descriptor_set_layout)))
+   if (!vk_valid(vkCreateDescriptorSetLayout(device->logical, &layout_info, 0, &descriptor_set_layout)))
       return false;
 
 	if(context->textures.count > 0)
@@ -364,7 +364,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
 		};
 
 		VkDescriptorSet descriptor_set;
-      if(!vk_valid(vkAllocateDescriptorSets(context->devices.logical, &alloc_info, &descriptor_set)))
+      if(!vk_valid(vkAllocateDescriptorSets(device->logical, &alloc_info, &descriptor_set)))
          return false;
 
 		array(VkDescriptorImageInfo) image_infos = {&scratch};
@@ -390,7 +390,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
 
 		descriptor->set = descriptor_set;
 		descriptor->layout = descriptor_set_layout;
-		context->descriptor_pool = descriptor_pool;
+		descriptor->descriptor_pool = descriptor_pool;
 
       vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
       vkDestroySampler(context->devices.logical, immutable_sampler, 0);

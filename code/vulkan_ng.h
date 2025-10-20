@@ -121,6 +121,7 @@ align_struct vk_texture
 
 align_struct vk_descriptor
 {
+   VkDescriptorPool descriptor_pool;
    VkDescriptorSet set;
    VkDescriptorSetLayout layout;
 } vk_descriptor;
@@ -143,7 +144,7 @@ align_struct vk_device
 {
    VkPhysicalDevice physical;
    VkDevice logical;
-} vk_devce;
+} vk_device;
 
 align_struct vk_context
 {
@@ -151,11 +152,12 @@ align_struct vk_context
    array(vk_mesh_draw) mesh_draws;
    array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;
-   array(VkDescriptorSetLayout) set_layouts;
-   array(VkDescriptorSetLayout) rtx_set_layouts;
+
+   VkDescriptorSetLayout non_rtx_set_layout;
+   VkDescriptorSetLayout rtx_set_layout;
 
    VkInstance instance;
-   vk_devce devices;
+   vk_device devices;
 
    VkSurfaceKHR surface;
    u32 query_pool_size;
@@ -163,7 +165,6 @@ align_struct vk_context
    VkAllocationCallbacks allocator;
 
    vk_descriptor texture_descriptor;
-   VkDescriptorPool descriptor_pool;
 
    VkSemaphore image_ready_semaphore;
    VkSemaphore image_done_semaphore;

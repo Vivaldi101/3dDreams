@@ -1495,10 +1495,6 @@ static bool vk_buffers_create(vk_context* context, arena scratch)
 
    buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
 
-   // TODO: pass devices and textures
-   if(!texture_descriptor_create(&context->texture_descriptor, context, scratch, 1 << 16))
-      return false;
-
    return true;
 }
 
@@ -1512,26 +1508,31 @@ static bool vk_pipelines_create(vk_context* context)
    if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
       return false;
 
-   context->set_layouts.arena = context->storage;
-   context->rtx_set_layouts.arena = context->storage;
-
-   // set 0 for vertex SSBO, set 1 for bindless textures
-   array_push(context->set_layouts) = non_rtx_set_layout;
-	if(context->textures.count > 0)
-		array_push(context->set_layouts) = context->texture_descriptor.layout;
-
-   array_push(context->rtx_set_layouts) = rtx_set_layout;
-	if(context->textures.count > 0)
-		array_push(context->rtx_set_layouts) = context->texture_descriptor.layout;
-
    VkPipelineLayout non_rtx_pipeline_layout = 0;
    VkPipelineLayout rtx_pipeline_layout = 0;
 
-   if(!vk_pipeline_layout_create(&non_rtx_pipeline_layout, context->devices.logical, context->set_layouts.data, context->set_layouts.count, false))
+   // set 0 for vertex SSBO, set 1 for bindless textures
+   arena scratch = *context->storage;
+   array(VkDescriptorSetLayout) set_layouts = {&scratch};
+   array_push(set_layouts) = non_rtx_set_layout;
+
+	if(context->textures.count > 0)
+		array_push(set_layouts) = context->texture_descriptor.layout;
+
+   if(!vk_pipeline_layout_create(&non_rtx_pipeline_layout, context->devices.logical, set_layouts.data, set_layouts.count, false))
       return false;
 
-   if(!vk_pipeline_layout_create(&rtx_pipeline_layout, context->devices.logical, context->rtx_set_layouts.data, context->rtx_set_layouts.count, true))
+   array(VkDescriptorSetLayout) rtx_set_layouts = {&scratch};
+   array_push(rtx_set_layouts) = rtx_set_layout;
+
+	if(context->textures.count > 0)
+		array_push(rtx_set_layouts) = context->texture_descriptor.layout;
+
+   if(!vk_pipeline_layout_create(&rtx_pipeline_layout, context->devices.logical, rtx_set_layouts.data, rtx_set_layouts.count, true))
       return false;
+
+   context->non_rtx_set_layout = non_rtx_set_layout;
+   context->rtx_set_layout = rtx_set_layout;
 
    context->non_rtx_pipeline_layout = non_rtx_pipeline_layout;
    context->rtx_pipeline_layout = rtx_pipeline_layout;
@@ -1677,6 +1678,9 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
+   if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, *context->storage, 1 << 16))
+      return false;
+
    if(!vk_pipelines_create(context))
    {
       printf("Could not create all the pipelines\n");
@@ -1709,21 +1713,16 @@ void vk_uninitialize(hw* hw)
 
    vkDeviceWaitIdle(context->devices.logical);
 
-   // TODO: Fix this - currently both rtx and non rtx layouts have 1 bind to same bindless texture descriptors
-   // TODO: Either duplicate it to both sets or remove it from both entirely and have it separate
-   for (u32 i = 0; i < context->set_layouts.count; ++i)
-      vkDestroyDescriptorSetLayout(context->devices.logical, context->set_layouts.data[i], 0);
-   for (u32 i = 0; i < context->rtx_set_layouts.count; ++i)
-      if (i != 1)
-         vkDestroyDescriptorSetLayout(context->devices.logical, context->rtx_set_layouts.data[i], 0);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->non_rtx_set_layout, 0);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->rtx_set_layout, 0);
 
-   vkDestroyDescriptorPool(context->devices.logical, context->descriptor_pool, 0);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->texture_descriptor.layout, 0);
+   vkDestroyDescriptorPool(context->devices.logical, context->texture_descriptor.descriptor_pool, 0);
 
    vkDestroyPipeline(context->devices.logical, context->axis_pipeline, 0);
    vkDestroyPipeline(context->devices.logical, context->frustum_pipeline, 0);
    vkDestroyPipeline(context->devices.logical, context->non_rtx_pipeline, 0);
    vkDestroyPipeline(context->devices.logical, context->rtx_pipeline, 0);
-
 
    vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, 0);
    vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, 0);
