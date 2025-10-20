@@ -1779,7 +1779,9 @@ void vk_uninitialize(hw* hw)
    vkDestroySurfaceKHR(context->instance, context->surface, 0);
 
    vkDestroyDevice(context->devices.logical, 0);
+#if _DEBUG
    vkDestroyDebugUtilsMessengerEXT(context->instance, context->messenger, 0);
+#endif
 
    vkDestroyInstance(context->instance, 0);
 }
