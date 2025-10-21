@@ -1,4 +1,4 @@
-Vulkan renderer with mesh shading written in C23 with minimal library dependencies (cgltf, volk, stb image)
+Vulkan renderer with mesh shading written in C23 with minimal library dependencies (cgltf, volk, stb image) written from scratch.
 
 Orbit camera usage: left-click to orbit eye, right-click to pan, wheel to zoom in and out.
 
