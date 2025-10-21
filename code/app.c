@@ -129,7 +129,10 @@ void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude,
 static void app_input_handle(app_state* state)
 {
    app_camera_update(state);
+   state->draw_axis = false;
 
+   if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
+      state->draw_axis = true;
    if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;

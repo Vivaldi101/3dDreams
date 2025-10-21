@@ -62,6 +62,7 @@ align_struct app_state
    f64 frame_delta_in_seconds;
    bool rtx_enabled;
    bool is_fullscreen;
+   bool draw_axis;
 } app_state;
 
 void app_start(int argc, const char** argv, struct hw* hw);

@@ -52,10 +52,9 @@ static void win32_window_title(hw* hw, s8 message, ...)
 static bool win32_platform_loop()
 {
    MSG msg;
-   if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+   while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
    {
-      if(msg.message == WM_QUIT)
-         return false;
+      if(msg.message == WM_QUIT) return false;
       TranslateMessage(&msg);
       DispatchMessage(&msg);
    }
@@ -171,6 +170,7 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          break;
 
       // TODO: hash table for keys
+      case WM_SYSKEYDOWN:
       case WM_KEYDOWN:
       {
          u32 vkcode = (u32)wparam;
@@ -181,6 +181,7 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
          return 0;
       }
+      case WM_SYSKEYUP:
       case WM_KEYUP:
       {
          u32 vkcode = (u32)wparam;

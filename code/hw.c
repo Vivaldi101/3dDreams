@@ -179,7 +179,7 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
       begin = end;
 
-      hw->window_title(hw, s8("FPS: %u"), (u32)((1.f/hw->state.frame_delta_in_seconds)+.5f));
+      hw->window_title(hw, s8("FPS: %u; 'A': world axis"), (u32)((1.f/hw->state.frame_delta_in_seconds)+.5f));
    }
 }
 
