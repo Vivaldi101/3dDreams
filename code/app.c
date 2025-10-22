@@ -154,19 +154,19 @@ static void app_input_handle(app_state* state)
    }
 }
 
-void app_start(int argc, const char** argv, hw* hw)
+void app_start(hw* hw)
 {
-   assert(implies(argc > 0, argv[argc - 1]));
-   assert(hw);
-
-	int w = 800, h = 600;
+   int w = 800, h = 600;
 	int x = 100, y = 100;
+   const char* win_name = "Foo";
 
-   hw_window_open(hw, "Vulkan App", x, y, w, h);
+   if(!hw_window_open(hw, win_name, x, y, w, h))
+   {
+      printf("Could not open window: %s\n", win_name);
+      return;
+   }
 
    hw->state.asset_file = s8("lantern/lantern.gltf");
-   //hw->state.asset_file = s8("damagedhelmet/damagedhelmet.gltf");
-   //hw->state.asset_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
 
    if(!vk_initialize(hw))
    {

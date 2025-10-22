@@ -4,8 +4,6 @@
 #include "math.h"
 #include "vulkan_ng.h"
 
-#define MAX_ARGV 32
-
 static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
 {
    assert(instance);
@@ -29,14 +27,20 @@ static VkSurfaceKHR window_surface_create(void* instance, void* window_handle)
    return surface;
 }
 
-void hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)
+bool hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)
 {
    hw->renderer.window.handle = hw->renderer.window.open(title, x, y, w, h);
    hw->renderer.window.width = w;
    hw->renderer.window.height = h;
 
-   inv(hw->renderer.window.handle);
-   SetWindowLongPtr(hw->renderer.window.handle, GWLP_USERDATA, (LONG_PTR)hw);
+   if(!hw->renderer.window.handle)
+      return false;
+
+   SetLastError(0);
+   if(!SetWindowLongPtrA(hw->renderer.window.handle, GWLP_USERDATA, (LONG_PTR)hw))
+      return GetLastError() == 0;
+
+   return true;
 }
 
 void hw_window_close(hw* hw)
@@ -183,6 +187,9 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    }
 }
 
+#if 0
+
+#define MAX_ARGV 32
 static int cmd_get_arg_count(char* cmd)
 {
 	int count = *cmd ? 1 : 0;
@@ -200,7 +207,6 @@ static int cmd_get_arg_count(char* cmd)
    return count;
 }
 
-#if 0
 static char** cmd_parse(arena* storage, char* cmd, int* argc)
 {
 	*argc = cmd_get_arg_count(cmd);

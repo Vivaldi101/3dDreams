@@ -214,10 +214,9 @@ static HWND win32_window_open(const char* title, int x, int y, int width, int he
    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
    wc.hbrBackground = NULL;
    wc.lpszMenuName = NULL;
-   wc.lpszClassName = title;
+   wc.lpszClassName = "classname";
 
-   if(!RegisterClass(&wc))
-      return 0;
+   RegisterClass(&wc);
 
    dwStyle = WS_OVERLAPPEDWINDOW;
    dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
@@ -232,9 +231,6 @@ static HWND win32_window_open(const char* title, int x, int y, int width, int he
    result = CreateWindowEx(dwExStyle,
       wc.lpszClassName, title, WS_CLIPSIBLINGS | WS_CLIPCHILDREN | dwStyle,
       winrect.left, winrect.top, winrect.right - winrect.left, winrect.bottom - winrect.top, NULL, NULL, wc.hInstance, NULL);
-
-   if(!result)
-      return 0;
 
    ShowWindow(result, SW_SHOW);
    SetForegroundWindow(result);
@@ -340,7 +336,7 @@ int main(int argc, char** argv)
    void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
 
-   arena base_arena = {};
+   arena base_arena = {0};
    base_arena.end = base;
 
    size initial_arena_size = KB(256);
@@ -362,9 +358,11 @@ int main(int argc, char** argv)
 
    hw.log = win32_log;
 
-   app_start(argc, argv, &hw);
+   app_start(&hw);
 
    bool gr = global_free(base, 0, MEM_RELEASE);
+
+   // should always be valid
    assert(gr);
 
    return 0;

@@ -69,7 +69,7 @@ align_struct hw
    bool finished;
 } hw;
 
-void hw_window_open(hw* hw, const char *title, int x, int y, int width, int height);
+bool hw_window_open(hw* hw, const char *title, int x, int y, int width, int height);
 void hw_window_close(hw* hw);
 
 void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, struct app_state* state), void (*app_input_function)(struct app_state* state));
