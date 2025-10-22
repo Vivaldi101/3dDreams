@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <string.h>
 #include <assert.h>
 
 typedef uint8_t         u8;
@@ -31,7 +32,7 @@ typedef struct
 
 static bool s8_is_same(s8 a, s8 b)
 {
-   return strcmp(a.data, b.data);
+   return strcmp(s8_data(a), s8_data(b));
 }
 
 // TODO: Should really be just strncmp this too
@@ -84,7 +85,7 @@ static s8 s8_slice(s8 str, size beg, size end)
 #define implies(p, q) (!(p) || (q))
 
 #define custom_alignment 64
-static_assert(custom_alignment == 64);
+static_assert(custom_alignment == 64, "");
 
 #define align_struct __declspec(align(custom_alignment)) typedef struct
 #define align_union __declspec(align(custom_alignment)) typedef union

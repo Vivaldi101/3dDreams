@@ -205,7 +205,7 @@ align_struct vk_context
 #endif
 } vk_context;
 
-// vk_initialize => vk_uninitialize
+typedef struct hw hw;
 bool vk_initialize(hw* hw);
 void vk_uninitialize(hw* hw);
 

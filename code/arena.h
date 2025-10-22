@@ -1,11 +1,9 @@
 ﻿#if !defined(_ARENA_H)
 #define _ARENA_H
 
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdint.h>
-
 #include "common.h"
+
+#include <Windows.h>
 
 #define arena_iterate(a, s, type, var, code_block) \
 do { \

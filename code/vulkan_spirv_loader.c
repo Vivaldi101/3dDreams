@@ -1,4 +1,5 @@
 #include "arena.h"
+#include "vulkan_ng.h"
 
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
@@ -37,7 +38,7 @@ static s8 win32_module_path(arena* a)
 
    for (;;)
    {
-      dir_path_len = GetModuleFileName(NULL, buffer, MAX_PATH);
+      dir_path_len = GetModuleFileName(NULL, (char*)buffer, MAX_PATH);
       if(dir_path_len == 0)
          return s8("");
 
