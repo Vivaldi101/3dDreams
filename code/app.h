@@ -65,7 +65,8 @@ align_struct app_state
    bool draw_axis;
 } app_state;
 
-void app_start(int argc, const char** argv, struct hw* hw);
+typedef struct hw hw;
+void app_start(int argc, const char** argv, hw* hw);
 void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude, f32 azimuth);
 
 #endif
