@@ -235,15 +235,17 @@ static bool vk_assets_read(vk_context* context, s8 asset_file)
    return success;
 }
 
-static VkResult vk_create_debugutils_messenger_ext(VkInstance instance,
-                                      const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                      const VkAllocationCallbacks* pAllocator,
-                                      VkDebugUtilsMessengerEXT* pDebugMessenger)
+static bool vk_create_debugutils_messenger_ext(VkDebugUtilsMessengerEXT* debug_messenger, VkInstance instance,
+                                                   VkDebugUtilsMessengerCreateInfoEXT* create_info)
 {
    PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
    if(!func)
-      return VK_ERROR_EXTENSION_NOT_PRESENT;
-   return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+      return false;
+
+   if(!vk_valid(func(instance, create_info, 0, debug_messenger)))
+      return false;
+
+   return true;
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
@@ -1444,17 +1446,15 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-VkInstance vk_instance_create(arena scratch)
+bool vk_instance_create(VkInstance* instance, arena scratch)
 {
-   VkInstance instance = 0;
-
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
-      return 0;
+      return false;
 
    VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count);
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
-      return 0;
+      return false;
 
    const char** ext_names = push(&scratch, const char*, ext_count);
 
@@ -1477,9 +1477,10 @@ VkInstance vk_instance_create(arena scratch)
       instance_info.ppEnabledLayerNames = validation_layers;
    }
 #endif
-   vk_assert(vkCreateInstance(&instance_info, 0, &instance));
+   if(!vk_valid(vkCreateInstance(&instance_info, 0, instance)))
+      return false;
 
-   return instance;
+   return true;
 }
 
 static bool vk_buffers_create(vk_context* context)
@@ -1601,8 +1602,8 @@ bool vk_initialize(hw* hw)
 
    context->storage = &hw->vk_storage;
 
-   VkInstance instance = vk_instance_create(*context->storage);
-   if(!instance)
+   VkInstance instance = 0;
+   if(!vk_instance_create(&instance, *context->storage))
       return false;
 
    volkLoadInstance(instance);
@@ -1622,10 +1623,12 @@ bool vk_initialize(hw* hw)
 
       messenger_info.pUserData = hw;
 
-      VkDebugUtilsMessengerEXT messenger;
-      VkResult debug_result = vk_create_debugutils_messenger_ext(instance, &messenger_info, 0, &messenger);
-      if(!vk_valid(volk_result))
+      VkDebugUtilsMessengerEXT messenger = 0;
+      if(!vk_create_debugutils_messenger_ext(&messenger, instance, &messenger_info))
+      {
+         printf("Could not create debug messenger");
          return false;
+      }
 
       context->messenger = messenger;
    }
@@ -1635,7 +1638,7 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   // TODO: wide contracts
+   // TODO: wide contracts for all these
    context->devices.physical = vk_physical_device_select(hw, context, *context->storage);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
@@ -1692,7 +1695,10 @@ bool vk_initialize(hw* hw)
    }
 
    if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, 1 << 16))
+   {
+      printf("Could not create bindless textures\n");
       return false;
+   }
 
    if(!vk_pipelines_create(context))
    {
