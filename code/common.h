@@ -30,9 +30,14 @@ typedef struct
    size len;
 } s8;
 
+static int s8_compare(s8 a, s8 b)
+{
+   return strcmp(s8_data(a), s8_data(b));
+}
+
 static bool s8_equals(s8 a, s8 b)
 {
-   return strcmp(s8_data(a), s8_data(b)) == 0;
+   return s8_compare(a, b) == 0;
 }
 
 // TODO: Should really be just strncmp this too
