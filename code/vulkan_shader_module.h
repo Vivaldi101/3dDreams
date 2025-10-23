@@ -1,18 +1,16 @@
 #if !defined(_VULKAN_SHADER_MODULE_H)
 #define _VULKAN_SHADER_MODULE_H
 
-#include "vulkan_ng.h"
+#include "common.h"
 
-// TODO: Use s8 for keys
-
-align_struct
+align_struct vk_shader_modules
 {
    VkShaderModule vs;
    VkShaderModule fs;
    VkShaderModule ms;
 } vk_shader_modules;
 
-align_struct
+align_struct spv_hash_table
 {
    vk_shader_modules* values;
    const char** keys;

@@ -1,9 +1,3 @@
-#include "arena.h"
-#include "common.h"
-#include "math.h"
-#include "vulkan_ng.h"
-
-// TODO: extract out win32 shit out to platform layer
 #include "win32_file_io.c"
 
 #include "vulkan_spirv_loader.c"
