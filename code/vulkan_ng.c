@@ -92,8 +92,7 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
 
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
-   assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
-
+   assert(s8_equals(s8_slice(gltf_path, gltf_path.len - s8(".gltf").len, gltf_path.len), s8(".gltf")));
    return gltf_load(context, gltf_path);
 }
 

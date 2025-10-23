@@ -56,11 +56,7 @@ static size s8_is_substr_count(s8 str, s8 sub)
 
 static s8 s8_slice(s8 str, size beg, size end)
 {
-   if(end - beg > str.len)
-      return str;
-   if(beg == 0 && end == 0)
-      return str;
-
+   assert(0 <= end - beg);
    assert(end - beg <= str.len);
 
    return (s8){str.data + beg, end - beg};
