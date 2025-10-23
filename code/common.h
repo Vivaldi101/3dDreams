@@ -32,7 +32,7 @@ typedef struct
 
 static bool s8_equals(s8 a, s8 b)
 {
-   return strcmp(s8_data(a), s8_data(b));
+   return strcmp(s8_data(a), s8_data(b)) == 0;
 }
 
 // TODO: Should really be just strncmp this too
