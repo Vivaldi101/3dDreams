@@ -264,11 +264,11 @@ static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* co
 
 // TODO: no bool params
 // TODO: pass the devices struct
-static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool rtx_supported)
+static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool mesh_shading_supported)
 {
    bool success = false;
 
-   if(!rtx_supported)
+   if(!mesh_shading_supported)
    {
       VkDrawIndexedIndirectCommand* draw_commands = push(&scratch, VkDrawIndexedIndirectCommand, context->mesh_instances.count);
 

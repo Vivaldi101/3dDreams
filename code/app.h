@@ -62,8 +62,8 @@ align_struct app_state
    f64 frame_delta_in_seconds;
    bool is_fullscreen;
    bool is_raytracing;
+   bool is_mesh_shading;
    bool draw_axis;
-   bool mesh_shading_enabled;
 } app_state;
 
 typedef struct hw hw;

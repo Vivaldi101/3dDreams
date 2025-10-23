@@ -141,7 +141,7 @@ static void app_input_handle(app_state* state)
    if(state->input.key == 'M' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
-      state->mesh_shading_enabled = !state->mesh_shading_enabled;
+      state->is_mesh_shading = !state->is_mesh_shading;
    }
    if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
    {

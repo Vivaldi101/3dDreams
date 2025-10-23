@@ -319,7 +319,7 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
    assert(vk_valid_handle(context->instance));
 
    VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {0};
-   VkPhysicalDevice fallback_gpu = 0;
+   u32 fallback_gpu = 0;
    u32 dev_count = array_count(devs);
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
 
@@ -337,32 +337,40 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
          continue;
 
       // dedicated gpu
-      if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+      if(!props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+         continue;
+
+      fallback_gpu = i;
+      context->time_period = props.limits.timestampPeriod;
+      u32 extension_count = 0;
+      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+
+      VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
+      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
+
+      for(u32 j = 0; j < extension_count; ++j)
       {
-         context->time_period = props.limits.timestampPeriod;
-         u32 extension_count = 0;
-         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+         s8 e = s8(extensions[j].extensionName);
+         printf("Available Vulkan device extension[%u]: %s\n", j, s8_data(e));
 
-         VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
-         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
-
-         for(u32 j = 0; j < extension_count; ++j)
+         if(s8_equals(e, s8(VK_EXT_MESH_SHADER_EXTENSION_NAME)))
          {
-            printf("Available Vulkan device extension[%u]: %s\n", j, extensions[j].extensionName);
-            if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
-            {
-               context->rtx_supported = true;
-               return devs[i];
-            }
+            printf("Mesh shading supported\n");
+            context->mesh_shading_supported = true;
          }
 
-         // use fallback as the first discrete gpu
-         fallback_gpu = devs[i];
-         break;
+         if(s8_equals(e, s8(VK_KHR_RAY_QUERY_EXTENSION_NAME)))
+         {
+            printf("Ray tracing supported\n");
+            context->raytracing_supported = true;
+         }
+
+         if(context->raytracing_supported && context->mesh_shading_supported)
+            return devs[i];
       }
    }
 
-   return fallback_gpu;
+   return devs[fallback_gpu];
 }
 
 static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
@@ -405,7 +413,7 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
-   if(context->rtx_supported)
+   if(context->mesh_shading_supported)
    {
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
@@ -434,7 +442,7 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
 
    VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
 
-   if(context->rtx_supported)
+   if(context->mesh_shading_supported)
    {
       features_frag_shading.pNext = &features_mesh_shader;
       features_mesh_shader.meshShader = true;
@@ -976,7 +984,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
-   if(state->mesh_shading_enabled)
+   if(state->is_mesh_shading)
    {
       VkPipeline pipeline = context->rtx_pipeline;
       VkPipelineLayout pipeline_layout = context->rtx_pipeline_layout;
@@ -1098,7 +1106,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       // TODO: this should really be in app.c
       if(hw->timer.time() - timer > 100)
       {
-         if(hw->state.mesh_shading_enabled)
+         if(hw->state.is_mesh_shading)
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
@@ -1112,10 +1120,10 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 }
 
 // TODO: pass amount of bindings to create here
-static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool rtx_supported)
+static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool mesh_shading_supported)
 {
    // TODO: cleanup
-   if(rtx_supported)
+   if(mesh_shading_supported)
    {
       VkDescriptorSetLayoutBinding bindings[3] = {0};
       bindings[0].binding = 0;
@@ -1168,12 +1176,12 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
    return true;
 }
 
-static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
+static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool mesh_shading_supported)
 {
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
 
    VkPushConstantRange push_constants = {0};
-   if(rtx_supported)
+   if(mesh_shading_supported)
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
    else
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;

@@ -198,7 +198,8 @@ align_struct vk_context
    u32 queue_family_index;
    f32 time_period;
 
-   bool rtx_supported;
+   bool mesh_shading_supported;
+   bool raytracing_supported;
 
 #ifdef _DEBUG
    VkDebugUtilsMessengerEXT messenger;

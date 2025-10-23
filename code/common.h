@@ -30,7 +30,7 @@ typedef struct
    size len;
 } s8;
 
-static bool s8_is_same(s8 a, s8 b)
+static bool s8_equals(s8 a, s8 b)
 {
    return strcmp(s8_data(a), s8_data(b));
 }
