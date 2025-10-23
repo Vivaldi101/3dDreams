@@ -285,7 +285,7 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    return formats.data[0].format;
 }
 
-static vk_swapchain_surface vk_window_swapchain_surface(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
@@ -550,7 +550,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
    swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
 
