@@ -976,7 +976,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    // TODO: Currently this is broken
    // TODO: Handle multi-meshes in the mesh shader
-   if(state->rtx_enabled)
+   if(state->mesh_shading_enabled)
    {
       VkPipeline pipeline = context->rtx_pipeline;
       VkPipelineLayout pipeline_layout = context->rtx_pipeline_layout;
@@ -1098,7 +1098,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       // TODO: this should really be in app.c
       if(hw->timer.time() - timer > 100)
       {
-         if(hw->state.rtx_enabled)
+         if(hw->state.mesh_shading_enabled)
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
          else
             hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);

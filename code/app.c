@@ -131,12 +131,17 @@ static void app_input_handle(app_state* state)
    app_camera_update(state);
    state->draw_axis = false;
 
-   if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
-      state->draw_axis = true;
    if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
-      state->rtx_enabled = !state->rtx_enabled;
+      state->is_raytracing = !state->is_raytracing;
+   }
+   if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
+      state->draw_axis = true;
+   if(state->input.key == 'M' && state->input.key_state == KEY_STATE_UP)
+   {
+      state->input.key_state = 0;
+      state->mesh_shading_enabled = !state->mesh_shading_enabled;
    }
    if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
    {

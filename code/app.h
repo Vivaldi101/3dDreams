@@ -60,9 +60,10 @@ align_struct app_state
    app_camera camera;
    s8 asset_file;  // TODO: for testing
    f64 frame_delta_in_seconds;
-   bool rtx_enabled;
    bool is_fullscreen;
+   bool is_raytracing;
    bool draw_axis;
+   bool mesh_shading_enabled;
 } app_state;
 
 typedef struct hw hw;
