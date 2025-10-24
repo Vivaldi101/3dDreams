@@ -353,19 +353,18 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
          printf("Available Vulkan device extension[%u]: %s\n", j, s8_data(e));
 
          if(s8_equals(e, s8(VK_EXT_MESH_SHADER_EXTENSION_NAME)))
-         {
-            printf("Mesh shading supported\n");
             context->mesh_shading_supported = true;
-         }
 
          if(s8_equals(e, s8(VK_KHR_RAY_QUERY_EXTENSION_NAME)))
-         {
-            printf("Ray tracing supported\n");
             context->raytracing_supported = true;
-         }
 
          if(context->raytracing_supported && context->mesh_shading_supported)
+         {
+            printf("Ray tracing supported\n");
+            printf("Mesh shading supported\n");
+
             return devs[i];
+         }
       }
    }
 

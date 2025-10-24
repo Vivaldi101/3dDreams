@@ -23,50 +23,6 @@ typedef size_t          usize;
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
 
-// string view
-typedef struct
-{
-   u8* data;
-   size len;
-} s8;
-
-static int s8_compare(s8 a, s8 b)
-{
-   return strcmp(s8_data(a), s8_data(b));
-}
-
-static bool s8_equals(s8 a, s8 b)
-{
-   return s8_compare(a, b) == 0;
-}
-
-// TODO: Should really be just strncmp this too
-static bool s8_is_substr(s8 str, s8 sub)
-{
-   for(size i = 0; i < str.len; ++i)
-      if (!strcmp((char*)str.data + i, (char*)sub.data))
-         return true;
-
-   return false;
-}
-
-static size s8_is_substr_count(s8 str, s8 sub)
-{
-   for(size i = 0; i < str.len; ++i)
-      if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
-         return i;
-
-   return -1;
-}
-
-static s8 s8_slice(s8 str, size beg, size end)
-{
-   assert(0 <= end - beg);
-   assert(end - beg <= str.len);
-
-   return (s8){str.data + beg, end - beg};
-}
-
 #ifdef _DEBUG
 #define pre(p)  {if(!(p))hw_message_box(p)}
 #define post(p) {if(!(p))hw_message_box(p)}
@@ -117,5 +73,48 @@ static_assert(custom_alignment == 64, "");
 
 #define page_size (4096)
 #define align_page_size (4096 -1)
+
+typedef struct s8
+{
+   u8* data;
+   size len;
+} s8;
+
+static int s8_compare(s8 a, s8 b)
+{
+   return strcmp(s8_data(a), s8_data(b));
+}
+
+static bool s8_equals(s8 a, s8 b)
+{
+   return s8_compare(a, b) == 0;
+}
+
+// TODO: Should really be just strncmp this too
+static bool s8_is_substr(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strcmp((char*)str.data + i, (char*)sub.data))
+         return true;
+
+   return false;
+}
+
+static size s8_is_substr_count(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
+         return i;
+
+   return -1;
+}
+
+static s8 s8_slice(s8 str, size beg, size end)
+{
+   assert(0 <= end - beg);
+   assert(end - beg <= str.len);
+
+   return (s8){str.data + beg, end - beg};
+}
 
 #endif
