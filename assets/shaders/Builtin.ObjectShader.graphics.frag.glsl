@@ -47,11 +47,9 @@ void main()
        vec3 emissive = vec3(0.0);
 
        if(draw.albedo != -1)
-         //final = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
          albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
    
        if(draw.emissive != -1)
-         //final += texture(textures[draw.emissive], in_uv).rgb;
          emissive = texture(textures[draw.emissive], in_uv).rgb;
 
        float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 1, 0))), 0.0);

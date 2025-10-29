@@ -1,8 +1,6 @@
 #if !defined(_MESH_H)
 #define _MESH_H
 
-#include "../../code/math.h"
-
 struct vertex
 {
    float vx, vy, vz;    // pos
