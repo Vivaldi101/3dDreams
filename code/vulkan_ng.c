@@ -313,15 +313,16 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, Vk
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, arena scratch)
+static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context)
 {
-   assert(vk_valid_handle(context->instance));
+   u32 dev_count = 0;
+   vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, 0));
 
-   VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {0};
-   u32 fallback_gpu = 0;
-   u32 dev_count = array_count(devs);
+   arena scratch = *context->storage;
+   VkPhysicalDevice* devs = push(&scratch, VkPhysicalDevice, dev_count);
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
 
+   u32 fallback_gpu = 0;
    for(u32 i = 0; i < dev_count; ++i)
    {
       VkPhysicalDeviceProperties props;
@@ -1644,8 +1645,9 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   // TODO: wide contracts for all these
-   context->devices.physical = vk_physical_device_select(hw, context, *context->storage);
+   // TODO: wide contracts for all these since vk_initialize is wide
+   // TODO: should pass the scratch arenas instead of the context
+   context->devices.physical = vk_physical_device_select(hw, context);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
    context->devices.logical = vk_logical_device_create(hw, context, *context->storage);

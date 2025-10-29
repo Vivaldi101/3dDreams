@@ -44,7 +44,7 @@
 #endif
 
 // TODO: Remove these and use arena arrays
-enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
+enum { OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
 
 align_struct vk_swapchain_surface
 {
