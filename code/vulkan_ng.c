@@ -416,6 +416,12 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
+   if(context->raytracing_supported)
+   {
+      array_push(extensions) = s8(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+   }
 
    VkPhysicalDeviceFeatures2 features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
