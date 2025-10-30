@@ -185,6 +185,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\assets\shaders\mesh.h" />
     <ClInclude Include="..\code\app.h" />
     <ClInclude Include="..\code\arena.h" />
     <ClInclude Include="..\code\common.h" />
@@ -203,6 +204,15 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.mesh.glsl" />
+    <None Include="..\assets\shaders\common.glsl" />
     <None Include="..\code\build.bat" />
   </ItemGroup>
   <ItemGroup>
