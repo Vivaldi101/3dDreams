@@ -454,10 +454,25 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
 
    if(context->mesh_shading_supported)
    {
-      features_frag_shading.pNext = &features_mesh_shader;
+      features_mesh_shader.pNext = features.pNext;
+      features.pNext = &features_mesh_shader;
+
       features_mesh_shader.meshShader = true;
       features_mesh_shader.taskShader = true;
       features_mesh_shader.multiviewMeshShader = true;
+   }
+
+   VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+   VkPhysicalDeviceRayQueryFeaturesKHR ray_query = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+
+   if(context->raytracing_supported)
+   {
+      ray_query.pNext = &acceleration_features;
+      acceleration_features.pNext = features.pNext;
+      features.pNext = &ray_query;
+
+      ray_query.rayQuery = true;
+      acceleration_features.accelerationStructure = true;
    }
 
    vkGetPhysicalDeviceFeatures2(context->devices.physical, &features);
