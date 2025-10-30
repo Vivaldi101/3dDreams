@@ -17,8 +17,8 @@ typedef float           f32;
 typedef double          f64;
 typedef uintptr_t       uptr;
 typedef unsigned char   byte;
-typedef ptrdiff_t       size;
 typedef size_t          usize;
+typedef usize           size;
 
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
@@ -106,7 +106,7 @@ static size s8_is_substr_count(s8 str, s8 sub)
       if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
          return i;
 
-   return -1;
+   return (size)-1;
 }
 
 static s8 s8_slice(s8 str, size beg, size end)

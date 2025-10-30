@@ -93,7 +93,7 @@ static arena arena_new(arena* base, size cap)
 static void arena_expand(arena* a, size new_cap)
 {
    assert(new_cap > 0);
-   assert((uintptr_t)a->end <= ((1ull << 48)-1) - page_size);
+   assert((uptr)a->end <= ((1ull << 48)-1) - page_size);
 
    arena new_arena = arena_new(a, new_cap);
    assert(new_arena.beg == a->end);
@@ -107,7 +107,7 @@ static void arena_expand(arena* a, size new_cap)
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    // align allocation to next aligned boundary
-   void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
+   void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
 
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
