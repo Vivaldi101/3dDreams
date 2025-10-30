@@ -10,6 +10,8 @@
 
 static void app_frame(arena scratch, app_state* state)
 {
+   (void)scratch;
+   (void)state;
    // per app frame drawing
 }
 

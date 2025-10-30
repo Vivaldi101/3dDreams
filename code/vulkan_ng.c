@@ -8,6 +8,9 @@
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
+   (void)obj_filename;
+   (void)is_mtl;
+
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
    arena file_read = {0};
 
@@ -247,7 +250,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* user_data)
 {
-   hw* h = (hw*)user_data;
+   (void)severity_flags;
+   (void)type;
+   (void)user_data;
 #if _DEBUG
    printf("VALIDATION LAYER MESSAGE: %s\n", data->pMessage);
 #endif
@@ -313,7 +318,7 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, Vk
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context)
+static VkPhysicalDevice vk_physical_device_select(vk_context* context)
 {
    u32 dev_count = 0;
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, 0));
@@ -394,7 +399,7 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
    return 0;
 }
 
-static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scratch)
+static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
 {
    assert(vk_valid_handle(context->devices.physical));
    f32 queue_prio = 1.0f;
@@ -816,7 +821,7 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
    return result;
 }
 
-static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, u32 binding, VkDescriptorBufferInfo* buffer_info)
+static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorBufferInfo* buffer_info)
 {
    VkWriteDescriptorSet result = {0};
 
@@ -839,14 +844,14 @@ static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratc
    {
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
 
-      VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos[i]);
+      VkWriteDescriptorSet set = cmd_write_descriptor_create(bindings[i].binding, &infos[i]);
       write_set[i] = set;
    }
 
    vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_set);
 }
 
-static void cmd_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
+static void cmd_bind_index_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset)
 {
    vkCmdBindIndexBuffer(command_buffer, buffer, offset, VK_INDEX_TYPE_UINT32);
 }
@@ -869,8 +874,7 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
-// TODO: split this into rendering and presenting
-static void vk_present(hw* hw, vk_context* context, app_state* state)
+static void vk_present(hw* hw, vk_context* context)
 {
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
@@ -927,8 +931,6 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
    vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
-   const f32 ar = (f32)context->swapchain_surface.image_width / context->swapchain_surface.image_height;
-
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
@@ -943,7 +945,6 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    //mvp.world = mat4_identity();
    mvp.meshlet_offset = 0;
 
-   const f32 c = 255.0f;
    VkClearValue clear[2] = {0};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
    //clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
@@ -1022,7 +1023,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
       if (buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
-         cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0, VK_INDEX_TYPE_UINT32);
+         cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
       // TODO: Compress drawing to pass scratch
       arena scratch = *context->storage;
@@ -1594,7 +1595,6 @@ static bool vk_pipelines_create(vk_context* context)
 
 bool vk_initialize(hw* hw)
 {
-   VkResult volk_result = volkInitialize();
    if (!vk_valid(volkInitialize()))
       return false;
 
@@ -1647,10 +1647,10 @@ bool vk_initialize(hw* hw)
 
    // TODO: wide contracts for all these since vk_initialize is wide
    // TODO: should pass the scratch arenas instead of the context
-   context->devices.physical = vk_physical_device_select(hw, context);
+   context->devices.physical = vk_physical_device_select(context);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
-   context->devices.logical = vk_logical_device_create(hw, context, *context->storage);
+   context->devices.logical = vk_logical_device_create(context, *context->storage);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(context);

@@ -106,6 +106,8 @@ static void arena_expand(arena* a, size new_cap)
 
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
+   (void)flag;
+
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
 

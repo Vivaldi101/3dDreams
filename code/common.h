@@ -90,7 +90,6 @@ static bool s8_equals(s8 a, s8 b)
    return s8_compare(a, b) == 0;
 }
 
-// TODO: Should really be just strncmp this too
 static bool s8_is_substr(s8 str, s8 sub)
 {
    for(size i = 0; i < str.len; ++i)

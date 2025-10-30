@@ -124,7 +124,7 @@ static void hw_frame_present(hw* hw)
       return;
 
    pre(renderer_index < RENDERER_COUNT);
-   hw->renderer.frame_present(hw, renderers[renderer_index], &hw->state);
+   hw->renderer.frame_present(hw, renderers[renderer_index]);
 
 }
 

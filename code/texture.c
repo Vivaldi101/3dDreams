@@ -87,6 +87,10 @@ static bool vk_depth_image_create(vk_image* image, vk_context* context, VkFormat
 
 static size vk_texture_size_blocked(u32 w, u32 h, u32 levels, u32 block_size)
 {
+   (void)w;
+   (void)h;
+   (void)levels;
+   (void)block_size;
    size result = 0;
 
    return result;

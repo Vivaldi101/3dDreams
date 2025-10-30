@@ -527,7 +527,6 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       }
 
       // load indices
-      cgltf_accessor* accessor = prim->indices;
       usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
       indices.count += index_count;
 

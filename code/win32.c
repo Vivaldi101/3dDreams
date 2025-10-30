@@ -8,7 +8,7 @@
 
 static void win32_log(s8 format, ...)
 {
-   static char temp[1 << 12] = {};
+   static char temp[1 << 12] = {0};
    assert(strlen((const char*)format.data)+1 <= array_count(temp));
 
    va_list args;
@@ -327,6 +327,8 @@ static void arena_free(arena* a)
 
 int main(int argc, char** argv)
 {
+   (void)argc;
+   (void)argv;
    hw hw = {0};
 
    hw_virtual_memory_init();
