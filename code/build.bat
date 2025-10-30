@@ -40,7 +40,8 @@ IF %ERRORLEVEL% EQU 0 (
     REM Update ctags and cscope in code folder
 
     pushd %ROOT%
-    ctags -R .
+    REM ctags -R --languages=C,C++ --c++-kinds=+p --fields=+iaS --extras=+q .
+    ctags -R --languages=C,C++ --fields=+iaS --extras=+q .
     cscope -R -b
     popd
 ) ELSE (
