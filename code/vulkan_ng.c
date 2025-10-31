@@ -401,16 +401,6 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
 
 static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
 {
-   assert(vk_valid_handle(context->devices.physical));
-   f32 queue_prio = 1.0f;
-
-   VkDeviceQueueCreateInfo queue_info = {vk_info(DEVICE_QUEUE)};
-   queue_info.queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
-   queue_info.queueCount = 1;
-   queue_info.pQueuePriorities = &queue_prio;
-
-   VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
-
    array(s8) extensions = {&scratch};
 
    array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -495,8 +485,18 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
       printf("Using Vulkan device extension[%u]: %s\n", i, extension_names[i]);
    }
 
+   enum { queue_count = 1 };
+   f32 priorities[queue_count] = {1.0f};
+   VkDeviceQueueCreateInfo queue_info[queue_count] = {vk_info(DEVICE_QUEUE)};
+
+   queue_info[0].queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
+   queue_info[0].queueCount = queue_count;
+   queue_info[0].pQueuePriorities = priorities;
+
+   VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
+
    ldev_info.queueCreateInfoCount = 1;
-   ldev_info.pQueueCreateInfos = &queue_info;
+   ldev_info.pQueueCreateInfos = queue_info;
    ldev_info.enabledExtensionCount = (u32)extensions.count;
    ldev_info.ppEnabledExtensionNames = extension_names;
    ldev_info.pNext = &features;
