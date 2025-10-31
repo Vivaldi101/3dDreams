@@ -1,3 +1,5 @@
+#include "priority_queue.h"
+
 #include "win32_file_io.c"
 
 #include "vulkan_spirv_loader.c"

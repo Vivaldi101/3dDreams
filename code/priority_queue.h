@@ -3,14 +3,15 @@
 
 #include "common.h"
 
-typedef struct priority_queue_node
+align_struct priority_queue_node
 {
    usize index;
    void* element;
 } priority_queue_node;
 
 #define priority_queue_type priority_queue_node
-#define priority_queue_max_count 4096
+
+enum { priority_queue_max_count = 4096 };
 
 #define priority_queue_lc(i) (2*(i))+1
 #define priority_queue_rc(i) (2*(i))+2
@@ -21,7 +22,7 @@ typedef enum priority_queue_criteria
    PRIORITY_QUEUE_CRITERIA_MAX, PRIORITY_QUEUE_CRITERIA_MIN
 } priority_queue_criteria;
 
-typedef struct priority_queue
+align_struct priority_queue
 {
    priority_queue_type elements[priority_queue_max_count];
    priority_queue_criteria criteria;
