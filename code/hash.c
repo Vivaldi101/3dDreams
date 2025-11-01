@@ -118,7 +118,7 @@ static hash_value hash_lookup(index_hash_table* table, hash_key_obj key)
    return ~0u;
 }
 
-static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
+static vk_shader_module spv_hash_lookup(spv_hash_table* table, const char* key)
 {
    u32 index = hash(key) % table->max_count;
    u32 old_index = index;
@@ -134,7 +134,7 @@ static vk_shader_modules spv_hash_lookup(spv_hash_table* table, const char* key)
    if(table->keys[index] && strcmp(table->keys[index], key) == 0)
       return table->values[index];
 
-   return (vk_shader_modules){};
+   return (vk_shader_module){};
 }
 
 static void spv_hash_log(spv_hash_table* table)
@@ -147,17 +147,15 @@ static void spv_hash_log(spv_hash_table* table)
       if(table->keys[index])
       {
          const char* name = table->keys[index];
-         VkShaderModule vs = table->values[index].vs;
-         VkShaderModule fs = table->values[index].fs;
-         VkShaderModule ms = table->values[index].ms;
-         printf("Shader module(vs, fs, ms) '%s': \t(%p, %p, %p)\n", name, vs, fs, ms);
+         VkShaderModule module = table->values[index].module;
+         printf("Shader module '%s': \t'%p'\n", name, module);
          ++count;
       }
       index = (index + 1) % table->max_count;
    }
 }
 
-static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_modules value)
+static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_module value)
 {
    if(table->count == table->max_count)
       return;
@@ -169,7 +167,7 @@ static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_mo
       if(strcmp(table->keys[index], key) > 0)
       {
          const char* tmp_key = table->keys[index];
-         vk_shader_modules tmp_value = table->values[index];
+         vk_shader_module tmp_value = table->values[index];
 
          table->keys[index] = key;
          table->values[index] = value;
@@ -191,3 +189,18 @@ static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_mo
    table->count++;
 }
 
+static void spv_hash_function(vk_context* context, spv_hash_table* table, void(*p)(vk_device* devices, vk_shader_module shader))
+{
+   u32 index = 0;
+   u32 count = 0;
+
+   while(count != table->count)
+   {
+      if(table->keys[index])
+      {
+         p(&context->devices, table->values[index]);
+         ++count;
+      }
+      index = (index + 1) % table->max_count;
+   }
+}

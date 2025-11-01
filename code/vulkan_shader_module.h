@@ -3,14 +3,6 @@
 
 #include "common.h"
 
-// TODO: remove this and use vk_shader_module
-align_struct vk_shader_modules
-{
-   VkShaderModule vs;
-   VkShaderModule fs;
-   VkShaderModule ms;
-} vk_shader_modules;
-
 align_struct vk_shader_module
 {
    VkShaderModule module;
@@ -19,7 +11,7 @@ align_struct vk_shader_module
 
 align_struct spv_hash_table
 {
-   vk_shader_modules* values;
+   vk_shader_module* values;
    const char** keys;
    size max_count;
    size count;
