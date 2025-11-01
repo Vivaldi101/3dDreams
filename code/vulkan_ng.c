@@ -1082,8 +1082,8 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    }
 
    // draw frustum
-   //vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
-   //vkCmdDraw(command_buffer, 12, 1, 0, 0);
+   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->frustum_pipeline);
+   vkCmdDraw(command_buffer, 12, 1, 0, 0);
 
    if(state->draw_axis)
    {
@@ -1228,28 +1228,30 @@ static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical
    return true;
 }
 
-// TODO: Cleanup these pipelines
-static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static VkPipelineShaderStageCreateInfo vk_shader_stage_create_info(vk_shader_module shader_module)
+{
+   assert(shader_module.module);
+   assert(shader_module.stage);
+
+   VkPipelineShaderStageCreateInfo result =
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = shader_module.stage,
+      .module = shader_module.module,
+      .pName = "main"
+   };
+
+   return result;
+}
+
+static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
    arena scratch = *context->storage;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_MESH_BIT_EXT,
-      .module = shaders->ms,
-      .pName = "main"
-   };
-
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = shaders->fs,
-      .pName = "main",
-   };
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
    pipeline_info.stageCount = (u32)stages.count;
@@ -1325,27 +1327,14 @@ static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
    arena scratch = *context->storage;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_VERTEX_BIT,
-      .module = shaders->vs,
-      .pName = "main"
-   };
-
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = shaders->fs,
-      .pName = "main",
-   };
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
    pipeline_info.stageCount = (u32)stages.count;
@@ -1421,27 +1410,14 @@ static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* contex
    return true;
 }
 
-static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
    arena scratch = *context->storage;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_VERTEX_BIT,
-      .module = shaders->vs,
-      .pName = "main"
-   };
-
-   array_push(stages) = (VkPipelineShaderStageCreateInfo)
-   {
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-      .module = shaders->fs,
-      .pName = "main",
-   };
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
    pipeline_info.stageCount = (u32)stages.count;
@@ -1613,27 +1589,55 @@ static bool vk_pipelines_create(vk_context* context)
    VkPipeline frustum = 0;
    VkPipeline mesh = 0;
 
+   enum {shader_module_count = 2};
+   vk_shader_module shader_modules[shader_module_count] = {0};
+
    // TODO: static global const char* names for shader modules
    vk_shader_modules gm = spv_hash_lookup(&context->shader_table, graphics_module_name);
 
-   if (!vk_graphics_pipeline_create(&graphics, context, cache, &gm))
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].module = gm.vs;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].module = gm.fs;
+
+   if (!vk_graphics_pipeline_create(&graphics, context, cache, shader_modules, shader_module_count))
       return false;
    context->non_rtx_pipeline = graphics;
 
    vk_shader_modules mm = spv_hash_lookup(&context->shader_table, meshlet_module_name);
 
-   if(!vk_mesh_pipeline_create(&mesh, context, cache, &mm))
+   shader_modules[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+   shader_modules[0].module = mm.ms;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].module = mm.fs;
+
+   if(!vk_mesh_pipeline_create(&mesh, context, cache, shader_modules, shader_module_count))
       return false;
    context->rtx_pipeline = mesh;
 
    vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
 
-   if(!vk_axis_pipeline_create(&axis, context, cache, &am))
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].module = am.vs;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].module = am.fs;
+
+   if(!vk_axis_pipeline_create(&axis, context, cache, shader_modules, shader_module_count))
       return false;
    context->axis_pipeline = axis;
 
    vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
-   if (!vk_graphics_pipeline_create(&frustum, context, cache, &fm))
+
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].module = fm.vs;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].module = fm.fs;
+
+   if (!vk_graphics_pipeline_create(&frustum, context, cache, shader_modules, shader_module_count))
       return false;
    context->frustum_pipeline = frustum;
 

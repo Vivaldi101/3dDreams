@@ -3,13 +3,19 @@
 
 #include "common.h"
 
-// TODO: cleanup this
+// TODO: remove this and use vk_shader_module
 align_struct vk_shader_modules
 {
    VkShaderModule vs;
    VkShaderModule fs;
    VkShaderModule ms;
 } vk_shader_modules;
+
+align_struct vk_shader_module
+{
+   VkShaderModule module;
+   VkShaderStageFlagBits stage;
+} vk_shader_module;
 
 align_struct spv_hash_table
 {
