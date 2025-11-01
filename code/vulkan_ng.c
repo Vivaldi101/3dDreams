@@ -192,11 +192,11 @@ static bool spirv_initialize(vk_context* context)
          // TODO: use s8 equals
          if(strncmp(shader_name + i, meshlet_module_name, strlen(meshlet_module_name)) == 0)
          {
-            vk_shader_module ms = vk_shader_load(context->devices.logical, *context->storage, *p);
-            if (ms.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
-               spv_hash_insert(table, meshlet_module_name"_ms", ms);
-            else if (ms.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
-               spv_hash_insert(table, meshlet_module_name"_fs", ms);
+            vk_shader_module mm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            if (mm.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
+               spv_hash_insert(table, meshlet_module_name"_ms", mm);
+            else if (mm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+               spv_hash_insert(table, meshlet_module_name"_fs", mm);
             break;
          }
          if(strncmp(shader_name + i, graphics_module_name, strlen(graphics_module_name)) == 0)
