@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+// TODO: cleanup this
 align_struct vk_shader_modules
 {
    VkShaderModule vs;

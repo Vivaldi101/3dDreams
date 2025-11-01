@@ -43,9 +43,6 @@
 #define vk_assert(v) (v)
 #endif
 
-// TODO: Remove these and use arena arrays
-enum { OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
-
 align_struct vk_swapchain_surface
 {
    u32 image_width;

@@ -1231,20 +1231,29 @@ static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical
 // TODO: Cleanup these pipelines
 static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-   stages[0].module = shaders->ms;
-   stages[0].pName = "main";
+   arena scratch = *context->storage;
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
+
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+      .module = shaders->ms,
+      .pName = "main"
+   };
+
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = shaders->fs,
+      .pName = "main",
+   };
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
@@ -1318,20 +1327,29 @@ static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, V
 
 static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
-   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   stages[0].module = shaders->vs;
-   stages[0].pName = "main";
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   arena scratch = *context->storage;
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
+
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = shaders->vs,
+      .pName = "main"
+   };
+
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = shaders->fs,
+      .pName = "main",
+   };
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
@@ -1405,21 +1423,29 @@ static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* contex
 
 static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
+   arena scratch = *context->storage;
 
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   stages[0].module = shaders->vs;
-   stages[0].pName = "main";
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = shaders->vs,
+      .pName = "main"
+   };
+
+   array_push(stages) = (VkPipelineShaderStageCreateInfo)
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = shaders->fs,
+      .pName = "main",
+   };
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
