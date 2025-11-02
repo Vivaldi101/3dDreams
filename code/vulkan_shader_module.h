@@ -5,9 +5,15 @@
 
 align_struct vk_shader_module
 {
-   VkShaderModule module;
+   VkShaderModule handle;
    VkShaderStageFlagBits stage;
 } vk_shader_module;
+
+align_struct vk_shader_module_name
+{
+   vk_shader_module module;
+   const char* name;
+} vk_shader_module_name;
 
 align_struct spv_hash_table
 {

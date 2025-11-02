@@ -141,15 +141,15 @@ static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, c
    switch(shader_stage)
    {
       case VK_SHADER_STAGE_MESH_BIT_EXT:
-         result.module = module;
+         result.handle = module;
          result.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
          break;
       case VK_SHADER_STAGE_VERTEX_BIT:
-         result.module = module;
+         result.handle = module;
          result.stage = VK_SHADER_STAGE_VERTEX_BIT;
          break;
       case VK_SHADER_STAGE_FRAGMENT_BIT:
-         result.module = module;
+         result.handle = module;
          result.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
          break;
       default: break;
@@ -1245,14 +1245,14 @@ static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical
 
 static VkPipelineShaderStageCreateInfo vk_shader_stage_create_info(vk_shader_module shader_module)
 {
-   assert(shader_module.module);
+   assert(shader_module.handle);
    assert(shader_module.stage);
 
    VkPipelineShaderStageCreateInfo result =
    {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .stage = shader_module.stage,
-      .module = shader_module.module,
+      .module = shader_module.handle,
       .pName = "main"
    };
 
@@ -1611,10 +1611,10 @@ static bool vk_pipelines_create(vk_context* context)
    vk_shader_module gm_fs = spv_hash_lookup(&context->shader_table, graphics_module_name"_fs");
 
    shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   shader_modules[0].module = gm_vs.module;
+   shader_modules[0].handle = gm_vs.handle;
 
    shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   shader_modules[1].module = gm_fs.module;
+   shader_modules[1].handle = gm_fs.handle;
 
    if (!vk_graphics_pipeline_create(&graphics, context, cache, shader_modules, shader_module_count))
       return false;
@@ -1624,10 +1624,10 @@ static bool vk_pipelines_create(vk_context* context)
    vk_shader_module mm_fs = spv_hash_lookup(&context->shader_table, meshlet_module_name"_fs");
 
    shader_modules[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-   shader_modules[0].module = mm_ms.module;
+   shader_modules[0].handle = mm_ms.handle;
 
    shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   shader_modules[1].module = mm_fs.module;
+   shader_modules[1].handle = mm_fs.handle;
 
    if(!vk_mesh_pipeline_create(&mesh, context, cache, shader_modules, shader_module_count))
       return false;
@@ -1637,10 +1637,10 @@ static bool vk_pipelines_create(vk_context* context)
    vk_shader_module am_fs = spv_hash_lookup(&context->shader_table, axis_module_name"_fs");
 
    shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   shader_modules[0].module = am_vs.module;
+   shader_modules[0].handle = am_vs.handle;
 
    shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   shader_modules[1].module = am_fs.module;
+   shader_modules[1].handle = am_fs.handle;
 
    if(!vk_axis_pipeline_create(&axis, context, cache, shader_modules, shader_module_count))
       return false;
@@ -1650,10 +1650,10 @@ static bool vk_pipelines_create(vk_context* context)
    vk_shader_module fm_fs = spv_hash_lookup(&context->shader_table, frustum_module_name"_fs");
 
    shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   shader_modules[0].module = fm_vs.module;
+   shader_modules[0].handle = fm_vs.handle;
 
    shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   shader_modules[1].module = fm_fs.module;
+   shader_modules[1].handle = fm_fs.handle;
 
    if (!vk_graphics_pipeline_create(&frustum, context, cache, shader_modules, shader_module_count))
       return false;
@@ -1794,12 +1794,11 @@ typedef struct ctx_shader_destroy
    vk_device* devices;
 } ctx_shader_destroy;
 
-static void vk_shader_module_destroy(void* ctx, const char* module_name, vk_shader_module module)
+static void vk_shader_module_destroy(void* ctx, vk_shader_module_name shader_module)
 {
-   (void)module_name;
    ctx_shader_destroy* p = (ctx_shader_destroy*)ctx;
 
-   vkDestroyShaderModule(p->devices->logical, module.module, 0);
+   vkDestroyShaderModule(p->devices->logical, shader_module.module.handle, 0);
 }
 
 void vk_uninitialize(hw* hw)
