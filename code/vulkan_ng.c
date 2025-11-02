@@ -103,7 +103,7 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
 
 static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name)
 {
-   vk_shader_module result = {};
+   vk_shader_module result = {0};
 
    s8 exe_dir = vk_exe_directory(&scratch);
 
@@ -270,6 +270,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
    (void)user_data;
 #if _DEBUG
    printf("VALIDATION LAYER MESSAGE: %s\n", data->pMessage);
+#else
+   (void)data;
 #endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
@@ -1742,8 +1744,8 @@ bool vk_initialize(hw* hw)
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
       array_add(context->framebuffers, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.images, (vk_image){});
-      array_add(context->swapchain_images.depths, (vk_image){});
+      array_add(context->swapchain_images.images, (vk_image){0});
+      array_add(context->swapchain_images.depths, (vk_image){0});
    }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
@@ -1782,14 +1784,22 @@ bool vk_initialize(hw* hw)
    }
 
    vk_textures_log(context);
-   spv_hash_log(&context->shader_table);
+   spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
 
    return true;
 }
 
-static void vk_shader_module_destroy(vk_device* devices, vk_shader_module module)
+typedef struct ctx_shader_destroy
 {
-   vkDestroyShaderModule(devices->logical, module.module, 0);
+   vk_device* devices;
+} ctx_shader_destroy;
+
+static void vk_shader_module_destroy(void* ctx, const char* module_name, vk_shader_module module)
+{
+   (void)module_name;
+   ctx_shader_destroy* p = (ctx_shader_destroy*)ctx;
+
+   vkDestroyShaderModule(p->devices->logical, module.module, 0);
 }
 
 void vk_uninitialize(hw* hw)
@@ -1797,7 +1807,7 @@ void vk_uninitialize(hw* hw)
    // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
 
-   spv_hash_function(context, &context->shader_table, vk_shader_module_destroy);
+   spv_hash_function(&context->shader_table, vk_shader_module_destroy, &(ctx_shader_destroy){&context->devices});
 
    // TODO: iterate buffer objects here
    vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);

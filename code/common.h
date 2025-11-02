@@ -28,9 +28,9 @@ typedef usize           size;
 #define post(p) {if(!(p))hw_message_box(p)}
 #define inv(p)  {if(!(p))hw_message_box(p)}
 #else
-#define pre(p)
-#define post(p)
-#define inv(p)
+#define pre(p) (void)(p)
+#define post(p) (void)(p)
+#define inv(p) (void)(p)
 #endif
 
 #define fault(p)  {hw_message_box(p); __debugbreak();}

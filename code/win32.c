@@ -364,8 +364,8 @@ int main(int argc, char** argv)
 
    bool gr = global_free(base, 0, MEM_RELEASE);
 
-   // should always be valid
-   assert(gr);
+   // must always be valid
+   post(gr);
 
    return 0;
 }

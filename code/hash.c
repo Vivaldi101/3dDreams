@@ -134,25 +134,13 @@ static vk_shader_module spv_hash_lookup(spv_hash_table* table, const char* key)
    if(table->keys[index] && strcmp(table->keys[index], key) == 0)
       return table->values[index];
 
-   return (vk_shader_module){};
+   return (vk_shader_module){0};
 }
 
-static void spv_hash_log(spv_hash_table* table)
+static void spv_hash_log_module_name(void* ctx, const char* module_name, vk_shader_module module)
 {
-   u32 index = 0;
-   u32 count = 0;
-
-   while(count != table->count)
-   {
-      if(table->keys[index])
-      {
-         const char* name = table->keys[index];
-         VkShaderModule module = table->values[index].module;
-         printf("Shader module '%s': \t'%p'\n", name, module);
-         ++count;
-      }
-      index = (index + 1) % table->max_count;
-   }
+   (void)ctx;
+   printf("Shader module '%s': \t'%p'\n", module_name, module.module);
 }
 
 static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_module value)
@@ -189,7 +177,7 @@ static void spv_hash_insert(spv_hash_table* table, const char* key, vk_shader_mo
    table->count++;
 }
 
-static void spv_hash_function(vk_context* context, spv_hash_table* table, void(*p)(vk_device* devices, vk_shader_module shader))
+static void spv_hash_function(spv_hash_table* table, void(*p)(void* ctx, const char* module_name, vk_shader_module module), void* ctx)
 {
    u32 index = 0;
    u32 count = 0;
@@ -198,7 +186,7 @@ static void spv_hash_function(vk_context* context, spv_hash_table* table, void(*
    {
       if(table->keys[index])
       {
-         p(&context->devices, table->values[index]);
+         p(ctx, table->keys[index], table->values[index]);
          ++count;
       }
       index = (index + 1) % table->max_count;
