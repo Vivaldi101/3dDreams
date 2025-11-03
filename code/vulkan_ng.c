@@ -1784,7 +1784,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   rt_blas_build(*context->storage, &context->geometry, &context->devices);
+   rt_blas_build(*context->storage, &context->buffer_table, &context->geometry, &context->devices);
 
    vk_textures_log(context);
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);

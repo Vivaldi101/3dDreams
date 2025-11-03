@@ -32,7 +32,7 @@ do { \
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
 
-typedef struct arena
+align_struct arena
 {
    void* beg;
    void* end;  // one past the end
@@ -42,7 +42,7 @@ typedef struct arena
 #define array(T) struct { arena* arena; size count; T* data; }
 #define array_fixed(t, T, s, a) array(T) t = {&a}; array_resize(t, s)
 
-typedef struct array
+align_struct array
 {
    arena* arena;
    size count;
