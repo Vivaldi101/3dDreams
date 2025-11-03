@@ -47,7 +47,6 @@ static_assert(custom_alignment == 64, "");
 #define align_struct __declspec(align(custom_alignment)) typedef struct
 #define align_union __declspec(align(custom_alignment)) typedef union
 
-#define array_clear(a) memset((a), 0, array_count(a)*sizeof(*(a)))
 #define array_count(a) sizeof((a)) / sizeof((a)[0])
 
 #define defer(start, end) \

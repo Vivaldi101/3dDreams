@@ -40,7 +40,9 @@ align_struct arena
 
 // TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
 #define array(T) struct { arena* arena; size count; T* data; }
-#define array_fixed(t, T, s, a) array(T) t = {&a}; array_resize(t, s)
+
+#define array_clear(a, s) memset((a).data, 0, s*sizeof(typeof(*(a).data)))
+#define array_fixed(t, T, s, a) array(T) (t) = {&(a)}; array_resize((t), (s)); array_clear((t), (s))
 
 align_struct array
 {
