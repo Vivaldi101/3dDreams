@@ -7,6 +7,7 @@
 #include "texture.c"
 #include "buffer.c"
 #include "mesh.c"
+#include "rt.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
@@ -1049,7 +1050,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
 
       if (buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
-         vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -1082,7 +1083,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
       if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
-         vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+         vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -1782,6 +1783,8 @@ bool vk_initialize(hw* hw)
       printf("Could not create all the pipelines\n");
       return false;
    }
+
+   rt_blas_build(*context->storage, &context->geometry, &context->devices);
 
    vk_textures_log(context);
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);

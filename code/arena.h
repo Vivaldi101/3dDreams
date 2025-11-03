@@ -32,11 +32,6 @@ do { \
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
 
-enum
-{
-   FIXED_ARRAY_PUSH_FLAG = 1 << 0,
-};
-
 typedef struct arena
 {
    void* beg;
@@ -44,8 +39,8 @@ typedef struct arena
 } arena;
 
 // TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
-
 #define array(T) struct { arena* arena; size count; T* data; }
+#define array_fixed(t, T, s, a) array(T) t = {&a}; array_resize(t, s)
 
 typedef struct array
 {

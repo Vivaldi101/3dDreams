@@ -209,18 +209,18 @@ static int cmd_get_arg_count(char* cmd)
 
 static char** cmd_parse(arena* storage, char* cmd, int* argc)
 {
-	*argc = cmd_get_arg_count(cmd);
+   *argc = cmd_get_arg_count(cmd);
    char* arg_start = cmd;
 
    arena_result result = arena_alloc(*storage, sizeof(cmd), *argc);
    for(size i = 0; i < result.count; ++i)
    {
       char* arg_end = strchr(arg_start, ' ');
-		((char**)result.data)[i] = arg_start;
+      ((char**)result.data)[i] = arg_start;
 
-		if(!arg_end)
-			break;
-		*arg_end = 0;	// cut it
+      if(!arg_end)
+         break;
+      *arg_end = 0;	// cut it
       arg_start = arg_end + 1;
    }
 

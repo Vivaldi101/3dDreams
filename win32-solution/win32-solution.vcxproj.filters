@@ -49,6 +49,9 @@
     <ClCompile Include="..\code\win32_file_io.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\code\rt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\code\app.h">

@@ -125,13 +125,13 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 {
    vk_buffer_objects result = {0};
 
-   context->mesh_draws.arena = context->storage;
+   context->geometry.mesh_draws.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_draws, 1);
+   array_resize(context->geometry.mesh_draws, 1);
 
-   context->mesh_instances.arena = context->storage;
+   context->geometry.mesh_instances.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_instances, 1);
+   array_resize(context->geometry.mesh_instances, 1);
 
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -237,11 +237,11 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 
    vk_mesh_draw md = {0};
    md.index_count = index_count;
-   array_add(context->mesh_draws, md);
+   array_add(context->geometry.mesh_draws, md);
 
    vk_mesh_instance mi = {0};
    mi.mesh_index = 0;   // single mesh
-   array_add(context->mesh_instances, mi);
+   array_add(context->geometry.mesh_instances, mi);
 
    vk_buffer_destroy(context->devices.logical, &scratch_buffer);
 
@@ -435,12 +435,12 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    array_resize(indices, gltf_index_count(data));
 
    // preallocate meshes
-   context->mesh_draws.arena = context->storage;
-   array_resize(context->mesh_draws, data->meshes_count);
+   context->geometry.mesh_draws.arena = context->storage;
+   array_resize(context->geometry.mesh_draws, data->meshes_count);
 
    // preallocate instances
-   context->mesh_instances.arena = context->storage;
-   array_resize(context->mesh_instances, data->nodes_count);
+   context->geometry.mesh_instances.arena = context->storage;
+   array_resize(context->geometry.mesh_instances, data->nodes_count);
 
    // preallocate textures
    context->textures.arena = context->storage;
@@ -536,7 +536,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       md.index_offset = index_offset;
       md.vertex_offset = vertex_offset;
 
-      array_add(context->mesh_draws, md);
+      array_add(context->geometry.mesh_draws, md);
 
       index_offset += index_count;
       vertex_offset += vertex_count;
@@ -590,7 +590,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
          mi.ao = (u32)ao_index;
          mi.emissive = (u32)emissive_index;
 
-         array_add(context->mesh_instances, mi);
+         array_add(context->geometry.mesh_instances, mi);
       }
    }
 

@@ -93,7 +93,7 @@ align_struct vk_meshlet_buffer
 
 align_struct vk_mesh_instance
 {
-   u32 mesh_index;  // which mesh this instance draws
+   u32 mesh_index;  // which vk_mesh_draw this instance draws
    u32 albedo; 
    u32 normal;
    u32 ao; 
@@ -143,12 +143,18 @@ align_struct vk_device
    VkDevice logical;
 } vk_device;
 
+align_struct vk_geometry
+{
+   array(vk_mesh_draw) mesh_draws;
+   array(vk_mesh_instance) mesh_instances;
+} vk_geometry; 
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
-   array(vk_mesh_draw) mesh_draws;
-   array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;
+
+   vk_geometry geometry;
 
    VkDescriptorSetLayout non_rtx_set_layout;
    VkDescriptorSetLayout rtx_set_layout;
