@@ -28,7 +28,7 @@
     <ClCompile Include="..\code\hw_arena.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\code\mesh.c">
+    <ClCompile Include="..\code\gltf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\code\soft.c">

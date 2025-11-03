@@ -6,7 +6,7 @@
 #include "hash.c"
 #include "texture.c"
 #include "buffer.c"
-#include "mesh.c"
+#include "gltf.c"
 #include "rt.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)

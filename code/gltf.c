@@ -530,11 +530,12 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
       indices.count += index_count;
 
-      // mesh offsets
+      // add this mesh geometry
       vk_mesh_draw md = {0};
       md.index_count = index_count;
       md.index_offset = index_offset;
       md.vertex_offset = vertex_offset;
+      md.vertex_count = vertex_count;
 
       array_add(context->geometry.mesh_draws, md);
 
