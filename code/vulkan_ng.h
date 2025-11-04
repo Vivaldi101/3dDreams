@@ -150,12 +150,18 @@ align_struct vk_geometry
    array(vk_mesh_instance) mesh_instances;
 } vk_geometry; 
 
+align_struct vk_blas
+{
+   array(VkAccelerationStructureKHR) blases;
+} vk_blas; 
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
 
    vk_geometry geometry;
+   vk_blas blas;
 
    VkDescriptorSetLayout non_rtx_set_layout;
    VkDescriptorSetLayout rtx_set_layout;

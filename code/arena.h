@@ -28,6 +28,9 @@ do { \
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
 #define array_resize(a, s)  (a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);
 
+#define array_set(arr, a)  (arr).arena = a
+#define array_set_size(arr, a, s)  array_set(arr, a); array_resize(arr, s)
+
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
@@ -104,6 +107,10 @@ static void arena_expand(arena* a, size new_cap)
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
    (void)flag;
+   assert(a);
+   assert(alloc_size > 0);
+   assert(align > 0);
+   assert(count > 0);
 
    // align allocation to next aligned boundary
    void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));

@@ -1772,6 +1772,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
+   // TODO: pass just context and max_descriptor_count 
    if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, 1 << 16))
    {
       printf("Could not create bindless textures\n");
@@ -1784,8 +1785,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   vk_buffer blas_buffer = {};
-   if(!rt_blas_buffer_create(*context->storage, &blas_buffer, &context->geometry, &context->devices))
+   if(!rt_blas_buffer_create(context))
    {
       printf("Could not create bottom level acceleration structure for ray tracing\n");
       return false;
