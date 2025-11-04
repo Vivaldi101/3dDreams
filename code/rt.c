@@ -14,7 +14,7 @@ static void rt_blas_build(arena scratch, vk_buffer_hash_table* buffer_hash, vk_g
 
       VkAccelerationStructureGeometryKHR* ags = acceleration_geometries.data + i;
 
-      // static assert the vertex format
+      // vertex format must match VK_FORMAT_R32G32B32_SFLOAT
       static_assert(offsetof(vertex, vz) == offsetof(vertex, vx) + sizeof(float)*2);
 
       ags->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
