@@ -147,7 +147,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
    vk_buffer scratch_buffer = {.size = tex_size};
-   vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
    // TODO: narrow
    if(vk_valid_handle(image.handle))
@@ -161,7 +161,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
       array_add(context->textures, tex);
    }
 
-   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    stbi_image_free(tex_pixels);
 }

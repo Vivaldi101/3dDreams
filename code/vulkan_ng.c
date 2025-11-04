@@ -1784,7 +1784,12 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   rt_blas_build(*context->storage, &context->buffer_table, &context->geometry, &context->devices);
+   //array_fixed(acceleration_structures, VkAccelerationStructureKHR, geometry_count, scratch);
+   if(!rt_blas_build(*context->storage, &context->geometry, &context->devices))
+   {
+      printf("Could not build BLAS for ray tracing\n");
+      return false;
+   }
 
    vk_textures_log(context);
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
@@ -1839,13 +1844,13 @@ void vk_uninitialize(hw* hw)
    vkDestroyCommandPool(context->devices.logical, context->command_pool, 0);
    vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
 
-   vk_buffer_destroy(context->devices.logical, &ib);
-   vk_buffer_destroy(context->devices.logical, &vb);
-   vk_buffer_destroy(context->devices.logical, &mb);
+   vk_buffer_destroy(&context->devices, &ib);
+   vk_buffer_destroy(&context->devices, &vb);
+   vk_buffer_destroy(&context->devices, &mb);
 
-   vk_buffer_destroy(context->devices.logical, &indirect);
-   vk_buffer_destroy(context->devices.logical, &indirect_rtx);
-   vk_buffer_destroy(context->devices.logical, &transform);
+   vk_buffer_destroy(&context->devices, &indirect);
+   vk_buffer_destroy(&context->devices, &indirect_rtx);
+   vk_buffer_destroy(&context->devices, &transform);
 
    vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
    vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);

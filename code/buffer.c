@@ -62,25 +62,25 @@ static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDev
    return true;
 }
 
-static bool vk_buffer_create_and_bind(vk_buffer* buffer, VkDevice logical_device, VkBufferUsageFlags usage, VkPhysicalDevice physical_device, VkMemoryPropertyFlags memory_flags)
+static bool vk_buffer_create_and_bind(vk_buffer* buffer, vk_device* device, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 {
-   if (!vk_buffer_allocate(buffer, logical_device, physical_device, usage, memory_flags))
+   if (!vk_buffer_allocate(buffer, device->logical, device->physical, usage, memory_flags))
       return false;
 
-   if(!vk_valid((vkBindBufferMemory(logical_device, buffer->handle, buffer->memory, 0))))
+   if(!vk_valid((vkBindBufferMemory(device->logical, buffer->handle, buffer->memory, 0))))
       return false;
 
    if(memory_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-      if(!vk_valid((vkMapMemory(logical_device, buffer->memory, 0, buffer->size, 0, &buffer->data))))
+      if(!vk_valid((vkMapMemory(device->logical, buffer->memory, 0, buffer->size, 0, &buffer->data))))
          return false;
 
-   return buffer;
+   return true;
 }
 
-static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer)
+static void vk_buffer_destroy(vk_device* device, vk_buffer* buffer)
 {
-   vkFreeMemory(device, buffer->memory, 0);
-   vkDestroyBuffer(device, buffer->handle, 0);
+   vkFreeMemory(device->logical, buffer->memory, 0);
+   vkDestroyBuffer(device->logical, buffer->handle, 0);
 }
 
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize dev_size)
@@ -247,17 +247,15 @@ static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* co
 
    size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(struct mesh_draw);
 
-   VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
    vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-   success = vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
    transform_buffer->size = scratch_buffer_size;
-   success &= vk_buffer_create_and_bind(transform_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   success &= vk_buffer_create_and_bind(transform_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
    if (success)
       vk_buffer_upload(context, transform_buffer, &scratch_buffer, draws, sizeof(struct mesh_draw) * context->geometry.mesh_instances.count);
 
-   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    return success;
 }
@@ -292,15 +290,15 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand);
 
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      success = vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
       indirect_buffer->size = scratch_buffer_size;
-      success &= vk_buffer_create_and_bind(indirect_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      success &= vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
       if (success)
          vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->geometry.mesh_instances.count);
 
-      vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+      vk_buffer_destroy(&context->devices, &scratch_buffer);
    }
    else
    {
@@ -321,13 +319,13 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
 
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      success = vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+      success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
       indirect_buffer->size = scratch_buffer_size;
-      success &= vk_buffer_create_and_bind(indirect_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      success &= vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
       if (success)
          vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
 
-      vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+      vk_buffer_destroy(&context->devices, &scratch_buffer);
    }
 
    return success;

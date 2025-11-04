@@ -622,31 +622,31 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    usize scratch_buffer_size = max(mb.size, max(vb.size, ib.size));
    vk_buffer scratch_buffer = { .size = scratch_buffer_size };
 
-   if(!vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   if(!vk_buffer_create_and_bind(&vb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+   if(!vk_buffer_create_and_bind(&vb, &context->devices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    // vertex data
    vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
    buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
 
-   if (!vk_buffer_create_and_bind(&mb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+   if (!vk_buffer_create_and_bind(&mb, &context->devices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    // meshlet data
    vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
    buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
 
-   if (!vk_buffer_create_and_bind(&ib, context->devices.logical, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+   if (!vk_buffer_create_and_bind(&ib, &context->devices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    // index data
    vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
    buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
 
-   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    return true;
 }
