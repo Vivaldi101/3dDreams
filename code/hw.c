@@ -159,7 +159,10 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    vec3 origin = {0, 0, 0};
    app_camera_reset(&hw->state.camera, origin, 50.f, altitude, azimuth);
 
+   i64 fps_log_counter = (i64)(clock_time_to_counter(.5f) + .5f);
+
    i64 begin = clock_query_counter();
+   i64 fps_counter = begin;
    for (;;)
    {
       if (!hw->platform_loop())
@@ -181,9 +184,15 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
       hw->state.frame_delta_in_seconds = clock_seconds_elapsed(begin, end);
 
+      fps_counter += (end - begin);
+
       begin = end;
 
-      hw->window_title(hw, s8("FPS: %u; 'A': world axis"), (u32)((1.f/hw->state.frame_delta_in_seconds)+.5f));
+      if(fps_counter >= fps_log_counter)
+      {
+         hw->window_title(hw, s8("FPS: %u; 'A': world axis"), (u32)((1.f / hw->state.frame_delta_in_seconds) + .5f));
+         fps_counter= 0;
+      }
    }
 }
 

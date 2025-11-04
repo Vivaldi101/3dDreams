@@ -165,7 +165,7 @@ void app_start(hw* hw)
 {
    int w = 800, h = 600;
 	int x = 100, y = 100;
-   const char* win_name = "Foo";
+   const char* win_name = "";
 
    if(!hw_window_open(hw, win_name, x, y, w, h))
    {
