@@ -1784,10 +1784,10 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   //array_fixed(acceleration_structures, VkAccelerationStructureKHR, geometry_count, scratch);
-   if(!rt_blas_build(*context->storage, &context->geometry, &context->devices))
+   vk_buffer blas_buffer = {};
+   if(!rt_blas_buffer_create(*context->storage, &blas_buffer, &context->geometry, &context->devices))
    {
-      printf("Could not build BLAS for ray tracing\n");
+      printf("Could not create bottom level acceleration structure for ray tracing\n");
       return false;
    }
 

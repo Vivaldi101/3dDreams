@@ -1,6 +1,6 @@
 #include "vulkan_ng.h"
 
-static bool rt_blas_build(arena scratch, vk_geometry* geometry, vk_device* devices)
+static bool rt_blas_buffer_create(arena scratch, vk_buffer* blas_buffer, vk_geometry* geometry, vk_device* devices)
 {
    const size geometry_count = geometry->mesh_draws.count;
    const size alignment = 256;
@@ -61,9 +61,9 @@ static bool rt_blas_build(arena scratch, vk_geometry* geometry, vk_device* devic
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(devices->physical, &memory_props);
 
-   vk_buffer blas_buffer = {.size = total_acceleration_size};
+   blas_buffer->size = total_acceleration_size;
 
-   if(!vk_buffer_create_and_bind(&blas_buffer, devices,
+   if(!vk_buffer_create_and_bind(blas_buffer, devices,
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
