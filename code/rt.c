@@ -19,6 +19,9 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    array_fixed(acceleration_sizes, size, geometry_count, scratch);
 
+   array_fixed(build_ranges, VkAccelerationStructureBuildRangeInfoKHR, geometry_count, scratch);
+   array_fixed(build_range_ptrs, VkAccelerationStructureBuildRangeInfoKHR*, geometry_count, scratch);
+
    vk_buffer* ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
    vk_buffer* vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
 
@@ -68,6 +71,7 @@ static bool rt_blas_buffer_create(vk_context* context)
       array_add(acceleration_offsets, total_acceleration_size);
       array_add(scratch_offsets, total_scratch_size);
       array_add(acceleration_sizes, size_info.accelerationStructureSize);
+      array_add(build_infos, build_info);
 
       total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment-1) & ~(alignment-1);
       total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment-1) & ~(alignment-1);
@@ -88,7 +92,10 @@ static bool rt_blas_buffer_create(vk_context* context)
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
-   array_set_size(context->blas.blases, context->storage, geometry_count);
+   VkDeviceAddress scratch_address = buffer_device_address(&scratch_buffer, devices);
+
+   vk_blas* blas = &context->blas;
+   array_set_size(blas->blases, &scratch, geometry_count);
 
    for(size i = 0; i < geometry_count; ++i)
    {
@@ -102,9 +109,32 @@ static bool rt_blas_buffer_create(vk_context* context)
       info.size = acceleration_sizes.data[i];
       info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, &context->blas.blases.data[i])))
+      if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, context->blas.blases.data + i)))
          return false;
+
+      build_infos.data[i].dstAccelerationStructure = blas->blases.data[i];
+      build_infos.data[i].scratchData.deviceAddress = scratch_address + scratch_offsets.data[i];
+
+      build_ranges.data[i].primitiveCount = primitive_count.data[i];
+      build_range_ptrs.data[i] = build_ranges.data + i;
    }
+
+   vk_assert(vkResetCommandPool(devices->logical, context->command_pool, 0));
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   vk_assert(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info));
+
+   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)build_infos.count, build_infos.data, build_range_ptrs.data);
+
+   vk_assert(vkEndCommandBuffer(context->command_buffer));
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &context->command_buffer;
+
+   vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
    if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
       return false;
