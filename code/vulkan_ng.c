@@ -1772,8 +1772,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   // TODO: pass just context and max_descriptor_count 
-   if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, 1 << 16))
+   if(!texture_descriptor_create(context, 1 << 16))
    {
       printf("Could not create bindless textures\n");
       return false;
