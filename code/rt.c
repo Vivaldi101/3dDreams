@@ -85,7 +85,7 @@ static bool rt_blas_buffer_create(vk_context* context)
    vk_buffer scratch_buffer = {.size = total_scratch_size};
 
    if(!vk_buffer_create_and_bind(&scratch_buffer, devices,
-      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    array_set_size(context->blas.blases, context->storage, geometry_count);
@@ -105,6 +105,9 @@ static bool rt_blas_buffer_create(vk_context* context)
       if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, &context->blas.blases.data[i])))
          return false;
    }
+
+   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
+      return false;
 
    vk_buffer_destroy(devices, &scratch_buffer);
 
