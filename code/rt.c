@@ -17,6 +17,8 @@ static bool rt_blas_buffer_create(vk_context* context)
    array_fixed(acceleration_offsets, size, geometry_count, scratch);
    array_fixed(scratch_offsets, size, geometry_count, scratch);
 
+   array_fixed(acceleration_sizes, size, geometry_count, scratch);
+
    for(size i = 0; i < geometry_count; ++i)
    {
       vk_mesh_draw* draw = context->geometry.mesh_draws.data + i;
@@ -53,11 +55,12 @@ static bool rt_blas_buffer_create(vk_context* context)
                                               VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                               &build_info, primitive_count.data + i, &size_info);
 
-      total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment-1) & ~(alignment-1);
-      total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment-1) & ~(alignment-1);
-
       array_add(acceleration_offsets, total_acceleration_size);
       array_add(scratch_offsets, total_scratch_size);
+      array_add(acceleration_sizes, size_info.accelerationStructureSize);
+
+      total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment-1) & ~(alignment-1);
+      total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment-1) & ~(alignment-1);
    }
 
    VkPhysicalDeviceMemoryProperties memory_props;
@@ -79,8 +82,14 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    for(size i = 0; i < geometry_count; ++i)
    {
-      VkAccelerationStructureKHR ac = 0;
-      array_add(context->blas.blases, ac);
+      VkAccelerationStructureCreateInfoKHR info = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+      info.buffer = blas_buffer.handle;
+      info.offset = acceleration_offsets.data[i];
+      info.size = acceleration_sizes.data[i];
+      info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+
+      if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, &context->blas.blases.data[i])))
+         return false;
    }
 
    vk_buffer_destroy(&context->devices, &scratch_buffer);

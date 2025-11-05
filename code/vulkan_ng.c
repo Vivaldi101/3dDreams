@@ -1778,6 +1778,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
+   // TODO: remove vk_* prefix
    if(!vk_pipelines_create(context))
    {
       printf("Could not create all the pipelines\n");
