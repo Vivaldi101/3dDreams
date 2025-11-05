@@ -83,10 +83,15 @@ static bool rt_blas_buffer_create(vk_context* context)
    for(size i = 0; i < geometry_count; ++i)
    {
       VkAccelerationStructureCreateInfoKHR info = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+
+      assert(blas_buffer.size >= info.size + info.offset);
+      assert((info.offset & 0xff) == 0);
+
       info.buffer = blas_buffer.handle;
       info.offset = acceleration_offsets.data[i];
       info.size = acceleration_sizes.data[i];
       info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+
 
       if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, &context->blas.blases.data[i])))
          return false;
