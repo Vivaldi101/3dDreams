@@ -225,6 +225,7 @@ static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(vk_device* device, vk_buffer* buffer);
 // TODO: pass the size for the buffer to be created instead of embedding it inside the buffer
+// TODO: (vk_buffer* buffer, size buffer_size, vk_device* device, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
 static bool vk_buffer_create_and_bind(vk_buffer* buffer, vk_device* device, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 #endif

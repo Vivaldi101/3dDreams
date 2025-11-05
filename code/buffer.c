@@ -48,9 +48,13 @@ static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDev
 
    assert(i != memory_properties.memoryTypeCount);
 
+   VkMemoryAllocateFlagsInfo allocate_flags_info = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+   allocate_flags_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
    VkMemoryAllocateInfo allocate_info = {vk_info_allocate(MEMORY)};
    allocate_info.allocationSize = memory_reqs.size;
    allocate_info.memoryTypeIndex = memory_index;
+   allocate_info.pNext = &allocate_flags_info;
 
    vkAllocateMemory(device, &allocate_info, 0, &buffer->memory);
 
@@ -386,21 +390,33 @@ static vk_buffer* buffer_hash_lookup(vk_buffer_hash_table* table, const char* ke
 
 static void buffer_hash_clear(vk_buffer_hash_table* table)
 {
-   assert(table);
-
    memset(table->values, 0, table->max_count * sizeof(*table->values));
    memset(table->keys, 0, table->max_count * sizeof(*table->keys));
 }
 
 static vk_buffer_hash_table buffer_hash_create(size max_count, arena* a)
 {
-   assert(a);
-
    vk_buffer_hash_table result = {0};
 
    result.max_count = max_count;
    result.keys = push(a, typeof(*result.keys), max_count);
    result.values = push(a, typeof(*result.values), max_count);
+
+   return result;
+}
+
+static VkDeviceAddress buffer_device_address(vk_buffer* buffer, vk_device* devices)
+{
+   assert(buffer->handle);
+
+   VkDeviceAddress result = 0;
+   VkBufferDeviceAddressInfo info = {VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+
+   info.buffer = buffer->handle;
+
+   result = vkGetBufferDeviceAddress(devices->logical, &info);
+
+   assert(result);
 
    return result;
 }

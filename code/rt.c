@@ -19,6 +19,13 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    array_fixed(acceleration_sizes, size, geometry_count, scratch);
 
+   vk_buffer* ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
+   vk_buffer* vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+
+   vk_device* devices = &context->devices;
+   VkDeviceAddress ib_address = buffer_device_address(ib, devices);
+   VkDeviceAddress vb_address = buffer_device_address(vb, devices);
+
    for(size i = 0; i < geometry_count; ++i)
    {
       vk_mesh_draw* draw = context->geometry.mesh_draws.data + i;
@@ -37,6 +44,8 @@ static bool rt_blas_buffer_create(vk_context* context)
       ag->geometry.triangles.vertexStride = sizeof(vertex);
       ag->geometry.triangles.maxVertex = (u32)draw->vertex_count;
       ag->geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+      ag->geometry.triangles.vertexData.deviceAddress = vb_address + (draw->vertex_offset * sizeof(vertex));
+      ag->geometry.triangles.indexData.deviceAddress = ib_address + (draw->index_offset * sizeof(u32));
 
       VkAccelerationStructureBuildGeometryInfoKHR build_info =
       {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
@@ -49,6 +58,7 @@ static bool rt_blas_buffer_create(vk_context* context)
       VkAccelerationStructureBuildSizesInfoKHR size_info =
       {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
 
+      assert((draw->index_count % 3) == 0);
       array_add(primitive_count, (u32)draw->index_count / 3);   // triangles
 
       vkGetAccelerationStructureBuildSizesKHR(context->devices.logical,
@@ -68,13 +78,13 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    vk_buffer blas_buffer = {.size = total_acceleration_size};
 
-   if(!vk_buffer_create_and_bind(&blas_buffer, &context->devices,
+   if(!vk_buffer_create_and_bind(&blas_buffer, devices,
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    vk_buffer scratch_buffer = {.size = total_scratch_size};
 
-   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices,
+   if(!vk_buffer_create_and_bind(&scratch_buffer, devices,
       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
@@ -92,12 +102,11 @@ static bool rt_blas_buffer_create(vk_context* context)
       info.size = acceleration_sizes.data[i];
       info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 
-
       if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, &context->blas.blases.data[i])))
          return false;
    }
 
-   vk_buffer_destroy(&context->devices, &scratch_buffer);
+   vk_buffer_destroy(devices, &scratch_buffer);
 
    printf("Ray tracing acceleration structure size: \t%zu KB\n", total_acceleration_size / (1024));
    printf("Ray tracing build scratch size: \t\t%zu KB\n", total_scratch_size / (1024));
