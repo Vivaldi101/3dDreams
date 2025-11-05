@@ -10,10 +10,10 @@
 
 vec3 quad[4] = vec3[]
 (
-    vec3(-999.0f, 0.0f, -999.0f),  // top-left
-    vec3(-999.0f, 0.0f,  999.0f),  // bottom-left
-    vec3(999.0f,  0.0f,   -999.0f), // top-right
-    vec3(999.0f,  0.0f,   999.0f)   // bottom-right
+    vec3(-100.0f, 0.25f, -100.0f),  // top-left
+    vec3(-100.0f, 0.25f,  100.0f),  // bottom-left
+    vec3(100.0f,  0.25f,   -100.0f), // top-right
+    vec3(100.0f,  0.25f,   100.0f)   // bottom-right
 );
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
