@@ -181,6 +181,8 @@ void app_start(hw* hw)
       return;
    }
 
+   printf("Vulkan backend initialized!\n");
+
    hw_event_loop_start(hw, app_frame, app_input_handle);
    vk_uninitialize(hw);
 

@@ -75,7 +75,7 @@ static bool rt_blas_buffer_create(vk_context* context)
    vk_buffer scratch_buffer = {.size = total_scratch_size};
 
    if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices,
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    array_set_size(context->blas.blases, context->storage, geometry_count);

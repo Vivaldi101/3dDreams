@@ -458,6 +458,7 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
    features12.descriptorBindingSampledImageUpdateAfterBind = true;
    features12.descriptorBindingUpdateUnusedWhilePending = true;
    features12.descriptorBindingPartiallyBound = true;
+   features12.bufferDeviceAddress = true;
 
    features_multiview.multiview = true;
 
