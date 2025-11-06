@@ -8,22 +8,27 @@ static bool rt_blas_buffer_create(vk_context* context)
    size total_acceleration_size = 0;
    size total_scratch_size = 0;
 
-   arena scratch = *context->storage;
+   arena s = *context->storage;
 
    vk_blas* blas = &context->blas;
-   array_set_size(blas->blases, geometry_count, &scratch);
+   array_set_size(blas->blases, geometry_count, &s);
 
-   array_fixed(primitive_count, u32, geometry_count, scratch);
-   array_fixed(acceleration_geometries, VkAccelerationStructureGeometryKHR, geometry_count, scratch);
-   array_fixed(build_infos, VkAccelerationStructureBuildGeometryInfoKHR, geometry_count, scratch);
-
-   array_fixed(acceleration_offsets, size, geometry_count, scratch);
-   array_fixed(scratch_offsets, size, geometry_count, scratch);
-
-   array_fixed(acceleration_sizes, size, geometry_count, scratch);
-
-   array_fixed(build_ranges, VkAccelerationStructureBuildRangeInfoKHR, geometry_count, scratch);
-   array_fixed(build_range_ptrs, VkAccelerationStructureBuildRangeInfoKHR*, geometry_count, scratch);
+   u32* primitive_count =
+      push(&s, u32, geometry_count);   // triangles
+   VkAccelerationStructureGeometryKHR* acceleration_geometries =
+      push(&s, typeof(*acceleration_geometries), geometry_count);
+   VkAccelerationStructureBuildGeometryInfoKHR* build_infos =
+      push(&s, typeof(*build_infos), geometry_count);
+   size* acceleration_offsets =
+      push(&s, size, geometry_count);
+   size* scratch_offsets =
+      push(&s, size, geometry_count);
+   size* acceleration_sizes =
+      push(&s, size, geometry_count);
+   VkAccelerationStructureBuildRangeInfoKHR* build_ranges =
+      push(&s, typeof(*build_ranges), geometry_count);
+   VkAccelerationStructureBuildRangeInfoKHR** build_range_ptrs =
+      push(&s, typeof(*build_range_ptrs), geometry_count);
 
    vk_buffer* ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
    vk_buffer* vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
@@ -36,7 +41,7 @@ static bool rt_blas_buffer_create(vk_context* context)
    {
       vk_mesh_draw* draw = context->geometry.mesh_draws.data + i;
 
-      VkAccelerationStructureGeometryKHR* ag = acceleration_geometries.data + i;
+      VkAccelerationStructureGeometryKHR* ag = acceleration_geometries + i;
 
       // vertex format must match VK_FORMAT_R32G32B32_SFLOAT
       static_assert(offsetof(vertex, vz) == offsetof(vertex, vx) + sizeof(float)*2);
@@ -65,16 +70,16 @@ static bool rt_blas_buffer_create(vk_context* context)
       {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
 
       assert((draw->index_count % 3) == 0);
-      array_add(primitive_count, (u32)draw->index_count / 3);   // triangles
+      primitive_count[i] = (u32)draw->index_count / 3;   // triangles
 
       vkGetAccelerationStructureBuildSizesKHR(context->devices.logical,
                                               VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-                                              &build_info, primitive_count.data + i, &size_info);
+                                              &build_info, primitive_count + i, &size_info);
 
-      array_add(acceleration_offsets, total_acceleration_size);
-      array_add(scratch_offsets, total_scratch_size);
-      array_add(acceleration_sizes, size_info.accelerationStructureSize);
-      array_add(build_infos, build_info);
+      acceleration_offsets[i] = total_acceleration_size;
+      scratch_offsets[i] = total_scratch_size;
+      acceleration_sizes[i] = size_info.accelerationStructureSize;
+      build_infos[i] = build_info;
 
       total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment-1) & ~(alignment-1);
       total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment-1) & ~(alignment-1);
@@ -105,18 +110,18 @@ static bool rt_blas_buffer_create(vk_context* context)
       assert((info.offset & 0xff) == 0);
 
       info.buffer = blas_buffer.handle;
-      info.offset = acceleration_offsets.data[i];
-      info.size = acceleration_sizes.data[i];
+      info.offset = acceleration_offsets[i];
+      info.size = acceleration_sizes[i];
       info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 
       if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, context->blas.blases.data + i)))
          return false;
 
-      build_infos.data[i].dstAccelerationStructure = blas->blases.data[i];
-      build_infos.data[i].scratchData.deviceAddress = scratch_address + scratch_offsets.data[i];
+      build_infos[i].dstAccelerationStructure = blas->blases.data[i];
+      build_infos[i].scratchData.deviceAddress = scratch_address + scratch_offsets[i];
 
-      build_ranges.data[i].primitiveCount = primitive_count.data[i];
-      build_range_ptrs.data[i] = build_ranges.data + i;
+      build_ranges[i].primitiveCount = primitive_count[i];
+      build_range_ptrs[i] = build_ranges + i;
    }
 
    vk_assert(vkResetCommandPool(devices->logical, context->command_pool, 0));
@@ -126,7 +131,7 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    vk_assert(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info));
 
-   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)build_infos.count, build_infos.data, build_range_ptrs.data);
+   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
 
    vk_assert(vkEndCommandBuffer(context->command_buffer));
 
