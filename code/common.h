@@ -69,7 +69,7 @@ static_assert(custom_alignment == 64, "");
 #define PI 3.14159265358979323846f
 
 #define pointer_clear(p, s) memset((p), 0, (s))
-#define struct_clear(s) static_assert(sizeof(*(s)) != sizeof(void*)); pointer_clear((s), sizeof(*s))
+#define struct_clear(s) {static_assert(sizeof(*(s)) != sizeof(void*)); pointer_clear((s), sizeof(*s));}
 
 #define page_size (4096)
 #define align_page_size (4096 -1)

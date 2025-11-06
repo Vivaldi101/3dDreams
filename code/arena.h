@@ -26,10 +26,10 @@ do { \
 #define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 // Adds to preallocated storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
-#define array_resize(a, s)  (a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);
+#define array_resize(a, s)  {(a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);};
 
 #define array_set(arr, a)  (arr).arena = a
-#define array_set_size(arr, s, a)  array_set((arr), (a)); array_resize((arr), (s)); array_clear((arr), (s))
+#define array_set_size(arr, s, a)  {array_set((arr), (a)); array_resize((arr), (s)); array_clear((arr), (s));}
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
@@ -45,7 +45,7 @@ align_struct arena
 #define array(T) struct { arena* arena; size count; T* data; }
 
 #define array_clear(a, s) memset((a).data, 0, s*sizeof(typeof(*(a).data)))
-#define array_fixed(t, T, s, a) array(T) (t) = {&(a)}; array_resize((t), (s)); array_clear((t), (s))
+#define array_fixed(t, T, s, a) array(T) (t) = {&(a)}; {array_resize((t), (s)); array_clear((t), (s));}
 
 align_struct array
 {
