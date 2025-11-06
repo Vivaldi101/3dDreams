@@ -142,7 +142,8 @@ static bool rt_blas_create(vk_context* context)
 
    arena s = *context->storage;
 
-   VkAccelerationStructureCreateInfoKHR* infos = push(&s, typeof(*infos), geometry_count);
+   VkAccelerationStructureCreateInfoKHR* infos =
+      push(&s, typeof(*infos), geometry_count);
 
    if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
       return false;
@@ -150,7 +151,8 @@ static bool rt_blas_create(vk_context* context)
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info));
+   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
+      return false;
 
    if(!rt_blas_geometry_build(s, cmd, devices, geometry, &context->buffer_table))
       return false;
