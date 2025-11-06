@@ -80,7 +80,7 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
          }
 
          // begin another meshlet
-         struct_clear(ml);
+         struct_clear(&ml);
       }
 
       assert(i0 < vertex_count);

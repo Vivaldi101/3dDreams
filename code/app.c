@@ -114,7 +114,7 @@ void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude,
    f32 y = radius * sinf(altitude) + origin.y;
    vec3 eye = {x, y, z};
 
-   memset(camera, 0, sizeof(app_camera));
+   struct_clear(camera);
 
    camera->origin = origin;
    camera->eye = eye;
