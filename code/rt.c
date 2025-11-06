@@ -1,30 +1,22 @@
 #include "vulkan_ng.h"
 
-static bool rt_blas_buffer_create(vk_context* context)
+static bool rt_blas_geometry_build(arena s, VkCommandBuffer command_buffer, vk_device* devices, vk_geometry* geometry, vk_buffer_hash_table* buffer_table)
 {
-   const size geometry_count = context->geometry.mesh_draws.count;
+   const size geometry_count = geometry->mesh_draws.count;
    const size alignment = 256;
 
    size total_acceleration_size = 0;
    size total_scratch_size = 0;
 
-   arena s = *context->storage;
-
-   vk_blas* blas = &context->blas;
-   array_set_size(blas->blases, geometry_count, &s);
-
    VkAccelerationStructureGeometryKHR* acceleration_geometries =
       push(&s, typeof(*acceleration_geometries), geometry_count);
+
    VkAccelerationStructureBuildGeometryInfoKHR* build_infos =
       push(&s, typeof(*build_infos), geometry_count);
-
    VkAccelerationStructureBuildRangeInfoKHR* build_ranges =
       push(&s, typeof(*build_ranges), geometry_count);
    VkAccelerationStructureBuildRangeInfoKHR** build_range_ptrs =
       push(&s, typeof(*build_range_ptrs), geometry_count);
-
-   u32* primitive_count =
-      push(&s, u32, geometry_count);   // triangles
    size* acceleration_offsets =
       push(&s, size, geometry_count);
    size* scratch_offsets =
@@ -32,21 +24,26 @@ static bool rt_blas_buffer_create(vk_context* context)
    size* acceleration_sizes =
       push(&s, size, geometry_count);
 
-   vk_buffer* ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
-   vk_buffer* vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+   VkAccelerationStructureKHR* blas =
+      push(&s, typeof(*blas), geometry_count);
 
-   vk_device* devices = &context->devices;
+   vk_buffer* ib = buffer_hash_lookup(buffer_table, ib_buffer_name);
+   vk_buffer* vb = buffer_hash_lookup(buffer_table, vb_buffer_name);
+
    VkDeviceAddress ib_address = buffer_device_address(ib, devices);
    VkDeviceAddress vb_address = buffer_device_address(vb, devices);
 
    for(size i = 0; i < geometry_count; ++i)
    {
-      vk_mesh_draw* draw = context->geometry.mesh_draws.data + i;
+      vk_mesh_draw* draw = geometry->mesh_draws.data + i;
+
+      VkAccelerationStructureBuildSizesInfoKHR size_info =
+      {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
 
       VkAccelerationStructureGeometryKHR* ag = acceleration_geometries + i;
 
       // vertex format must match VK_FORMAT_R32G32B32_SFLOAT
-      static_assert(offsetof(vertex, vz) == offsetof(vertex, vx) + sizeof(float)*2);
+      static_assert(offsetof(vertex, vz) == offsetof(vertex, vx) + sizeof(float) * 2);
 
       ag->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
       ag->geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
@@ -68,27 +65,19 @@ static bool rt_blas_buffer_create(vk_context* context)
       build_info.geometryCount = 1;
       build_info.pGeometries = ag;
 
-      VkAccelerationStructureBuildSizesInfoKHR size_info =
-      {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
-
       assert((draw->index_count % 3) == 0);
-      primitive_count[i] = (u32)draw->index_count / 3;   // triangles
-
-      vkGetAccelerationStructureBuildSizesKHR(context->devices.logical,
+      u32 max_primitive_count = (u32)draw->index_count / 3;
+      vkGetAccelerationStructureBuildSizesKHR(devices->logical,
                                               VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-                                              &build_info, primitive_count + i, &size_info);
+                                              &build_info, &max_primitive_count, &size_info);
 
       acceleration_offsets[i] = total_acceleration_size;
       scratch_offsets[i] = total_scratch_size;
       acceleration_sizes[i] = size_info.accelerationStructureSize;
-      build_infos[i] = build_info;
 
-      total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment-1) & ~(alignment-1);
-      total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment-1) & ~(alignment-1);
+      total_acceleration_size = (total_acceleration_size + size_info.accelerationStructureSize + alignment - 1) & ~(alignment - 1);
+      total_scratch_size = (total_scratch_size + size_info.buildScratchSize + alignment - 1) & ~(alignment - 1);
    }
-
-   VkPhysicalDeviceMemoryProperties memory_props;
-   vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
 
    vk_buffer blas_buffer = {.size = total_acceleration_size};
 
@@ -104,52 +93,80 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    VkDeviceAddress scratch_address = buffer_device_address(&scratch_buffer, devices);
 
+   printf("Ray tracing acceleration structure size: \t%zu KB\n", total_acceleration_size / 1024);
+   printf("Ray tracing build scratch size: \t\t%zu KB\n", total_scratch_size / 1024);
+
    for(size i = 0; i < geometry_count; ++i)
    {
-      VkAccelerationStructureCreateInfoKHR info = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+      vk_mesh_draw* draw = geometry->mesh_draws.data + i;
 
-      assert(blas_buffer.size >= info.size + info.offset);
-      assert((info.offset & 0xff) == 0);
+      VkAccelerationStructureCreateInfoKHR* info = push(&s, typeof(*info));
 
-      info.buffer = blas_buffer.handle;
-      info.offset = acceleration_offsets[i];
-      info.size = acceleration_sizes[i];
-      info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+      info->sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+      info->buffer = blas_buffer.handle;
+      info->offset = acceleration_offsets[i];
+      info->size = acceleration_sizes[i];
+      info->type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(context->devices.logical, &info, 0, context->blas.blases.data + i)))
+      assert(blas_buffer.size >= info->size + info->offset);
+      assert((info->offset & 0xff) == 0);
+
+      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, blas + i)))
          return false;
 
-      build_infos[i].dstAccelerationStructure = blas->blases.data[i];
+      u32 max_primitive_count = (u32)draw->index_count / 3;
+
+      build_infos[i].sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+      build_infos[i].type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+      build_infos[i].dstAccelerationStructure = blas[i];
       build_infos[i].scratchData.deviceAddress = scratch_address + scratch_offsets[i];
 
-      build_ranges[i].primitiveCount = primitive_count[i];
+      build_ranges[i].primitiveCount = max_primitive_count;
       build_range_ptrs[i] = build_ranges + i;
    }
 
-   vk_assert(vkResetCommandPool(devices->logical, context->command_pool, 0));
+   vkCmdBuildAccelerationStructuresKHR(command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
+
+   vk_buffer_destroy(devices, &scratch_buffer);
+
+   return true;
+}
+
+static bool rt_blas_create(vk_context* context)
+{
+   vk_geometry* geometry = &context->geometry;
+
+   const size geometry_count = geometry->mesh_draws.count;
+   vk_device* devices = &context->devices;
+   VkCommandBuffer cmd = context->command_buffer;
+
+   arena s = *context->storage;
+
+   VkAccelerationStructureCreateInfoKHR* infos = push(&s, typeof(*infos), geometry_count);
+
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+      return false;
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   vk_assert(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info));
+   vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info));
 
-   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
+   if(!rt_blas_geometry_build(s, cmd, devices, geometry, &context->buffer_table))
+      return false;
 
-   vk_assert(vkEndCommandBuffer(context->command_buffer));
+   if(!vk_valid(vkEndCommandBuffer(cmd)))
+      return false;
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.pCommandBuffers = &cmd;
 
-   vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
+   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
+      return false;
 
    if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
       return false;
-
-   vk_buffer_destroy(devices, &scratch_buffer);
-
-   printf("Ray tracing acceleration structure size: \t%zu KB\n", total_acceleration_size / (1024));
-   printf("Ray tracing build scratch size: \t\t%zu KB\n", total_scratch_size / (1024));
 
    return true;
 }

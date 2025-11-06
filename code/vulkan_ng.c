@@ -1786,7 +1786,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(!rt_blas_buffer_create(context))
+   if(!rt_blas_create(context))
    {
       printf("Could not create bottom level acceleration structure for ray tracing\n");
       return false;

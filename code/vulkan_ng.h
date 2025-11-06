@@ -150,6 +150,7 @@ align_struct vk_geometry
    array(vk_mesh_instance) mesh_instances;
 } vk_geometry; 
 
+// TODO: Remove?
 align_struct vk_blas
 {
    array(VkAccelerationStructureKHR) blases;
@@ -161,7 +162,6 @@ align_struct vk_context
    array(vk_texture) textures;
 
    vk_geometry geometry;
-   vk_blas blas;
 
    VkDescriptorSetLayout non_rtx_set_layout;
    VkDescriptorSetLayout rtx_set_layout;
