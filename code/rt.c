@@ -13,22 +13,24 @@ static bool rt_blas_buffer_create(vk_context* context)
    vk_blas* blas = &context->blas;
    array_set_size(blas->blases, geometry_count, &s);
 
-   u32* primitive_count =
-      push(&s, u32, geometry_count);   // triangles
    VkAccelerationStructureGeometryKHR* acceleration_geometries =
       push(&s, typeof(*acceleration_geometries), geometry_count);
    VkAccelerationStructureBuildGeometryInfoKHR* build_infos =
       push(&s, typeof(*build_infos), geometry_count);
+
+   VkAccelerationStructureBuildRangeInfoKHR* build_ranges =
+      push(&s, typeof(*build_ranges), geometry_count);
+   VkAccelerationStructureBuildRangeInfoKHR** build_range_ptrs =
+      push(&s, typeof(*build_range_ptrs), geometry_count);
+
+   u32* primitive_count =
+      push(&s, u32, geometry_count);   // triangles
    size* acceleration_offsets =
       push(&s, size, geometry_count);
    size* scratch_offsets =
       push(&s, size, geometry_count);
    size* acceleration_sizes =
       push(&s, size, geometry_count);
-   VkAccelerationStructureBuildRangeInfoKHR* build_ranges =
-      push(&s, typeof(*build_ranges), geometry_count);
-   VkAccelerationStructureBuildRangeInfoKHR** build_range_ptrs =
-      push(&s, typeof(*build_range_ptrs), geometry_count);
 
    vk_buffer* ib = buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
    vk_buffer* vb = buffer_hash_lookup(&context->buffer_table, vb_buffer_name);

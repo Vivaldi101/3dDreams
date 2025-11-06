@@ -429,6 +429,7 @@ int main(int argc, char** argv)
 
    app_start(&hw);
 
+   #if 0
    size sz = 10;
    arena_foo* foos = 0;
    if(arena_test_bool(&base_storage, &foos, sz))
@@ -438,6 +439,7 @@ int main(int argc, char** argv)
    foos = arena_test_result(&base_storage, sz);
    for(size i = 0; i < sz; ++i)
       printf("Foo: %d\n", foos[i].k);
+   #endif
 
    bool gr = global_free(base, 0, MEM_RELEASE);
 
