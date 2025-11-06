@@ -1036,6 +1036,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
+      // TODO: array(vk_buffer_binding) bbs = {context->storage};
       vk_buffer_binding bbs[3] = {0};
       bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
       bbs[0].binding = 0;
@@ -1064,8 +1065,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
          cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
       // TODO: Compress drawing to pass scratch
-      arena scratch = *context->storage;
-      array(vk_buffer_binding) bbs = {&scratch};
+      array(vk_buffer_binding) bbs = {context->storage};
 
       // TODO: Compress
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))

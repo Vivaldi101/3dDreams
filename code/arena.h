@@ -123,6 +123,8 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 
    a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
 
+   pointer_clear(p, count * alloc_size);
+
    return p;
 }
 
