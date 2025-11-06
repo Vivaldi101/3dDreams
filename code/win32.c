@@ -325,6 +325,53 @@ static void arena_free(arena* a)
    hw_virtual_memory_release(a->beg, arena_left(a));
 }
 
+align_struct scratch_foo
+{
+   size i, j;
+} scratch_foo;
+
+align_struct arena_foo
+{
+   size k;
+} arena_foo;
+
+static arena_foo* arena_test(arena* a, size sz)
+{
+   arena_foo* result = push(a, arena_foo, sz);
+
+   arena s = *a;
+   for(size i = 0; i < sz; ++i)
+   {
+      scratch_foo* foo = push(&s, scratch_foo);
+      foo->i = i;
+      foo->j = i+1;
+
+      result[i].k = foo->i + foo->j;
+      assert(result[i].k == foo->i + foo->j);
+   }
+   s = *a;
+   for(size i = 0; i < sz; ++i)
+   {
+      scratch_foo* foo = push(&s, scratch_foo);
+      foo->i = i;
+      foo->j = i+1;
+
+      foo->i = -(i64)result[i].k;
+      foo->j = -(i64)result[i].k;
+      result[i].k += foo->i + foo->j;
+      assert(result[i].k * 2 == foo->i + foo->j);
+
+      // wp(S, result[i].k*2 == foo->i + foo->j);
+      // wp(result[i].k = result[i].k + foo->i + foo->j, result[i].k*2 == foo->i + foo->j);
+
+      // wp((result[i].k + foo->i + foo->j)*2 == foo->i + foo->j);
+
+      // (result[i].k*2 + foo->i + foo->j == 0)
+   }
+
+   return result;
+}
+
 int main(int argc, char** argv)
 {
    (void)argc;
@@ -361,6 +408,12 @@ int main(int argc, char** argv)
    hw.log = win32_log;
 
    app_start(&hw);
+
+   size sz = 10;
+   arena_foo* foos = arena_test(&base_storage, sz);
+
+   for(size i = 0; i < sz; ++i)
+      printf("Foo: %d\n", foos[i].k);
 
    bool gr = global_free(base, 0, MEM_RELEASE);
 
