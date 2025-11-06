@@ -376,7 +376,6 @@ static arena_foo* arena_test(arena* a, size sz)
 
    arena s = *a;
    arena_test_compute1(s, result, sz);
-   s = *a;
    arena_test_compute2(s, result, sz);
 
    return result;
