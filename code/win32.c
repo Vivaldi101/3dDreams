@@ -335,11 +335,8 @@ align_struct arena_foo
    size k;
 } arena_foo;
 
-static arena_foo* arena_test(arena* a, size sz)
+static void arena_test_compute1(arena s, arena_foo* result, size sz)
 {
-   arena_foo* result = push(a, arena_foo, sz);
-
-   arena s = *a;
    for(size i = 0; i < sz; ++i)
    {
       scratch_foo* foo = push(&s, scratch_foo);
@@ -349,7 +346,10 @@ static arena_foo* arena_test(arena* a, size sz)
       result[i].k = foo->i + foo->j;
       assert(result[i].k == foo->i + foo->j);
    }
-   s = *a;
+}
+
+static void arena_test_compute2(arena s, arena_foo* result, size sz)
+{
    for(size i = 0; i < sz; ++i)
    {
       scratch_foo* foo = push(&s, scratch_foo);
@@ -368,6 +368,16 @@ static arena_foo* arena_test(arena* a, size sz)
 
       // (result[i].k*2 + foo->i + foo->j == 0)
    }
+}
+
+static arena_foo* arena_test(arena* a, size sz)
+{
+   arena_foo* result = push(a, arena_foo, sz);
+
+   arena s = *a;
+   arena_test_compute1(s, result, sz);
+   s = *a;
+   arena_test_compute2(s, result, sz);
 
    return result;
 }
