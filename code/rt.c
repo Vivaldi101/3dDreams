@@ -10,6 +10,9 @@ static bool rt_blas_buffer_create(vk_context* context)
 
    arena scratch = *context->storage;
 
+   vk_blas* blas = &context->blas;
+   array_set_size(blas->blases, geometry_count, &scratch);
+
    array_fixed(primitive_count, u32, geometry_count, scratch);
    array_fixed(acceleration_geometries, VkAccelerationStructureGeometryKHR, geometry_count, scratch);
    array_fixed(build_infos, VkAccelerationStructureBuildGeometryInfoKHR, geometry_count, scratch);
@@ -93,9 +96,6 @@ static bool rt_blas_buffer_create(vk_context* context)
       return false;
 
    VkDeviceAddress scratch_address = buffer_device_address(&scratch_buffer, devices);
-
-   vk_blas* blas = &context->blas;
-   array_set_size(blas->blases, &scratch, geometry_count);
 
    for(size i = 0; i < geometry_count; ++i)
    {
