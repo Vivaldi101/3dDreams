@@ -370,7 +370,18 @@ static void arena_test_compute2(arena s, arena_foo* result, size sz)
    }
 }
 
-static arena_foo* arena_test(arena* a, size sz)
+static bool arena_test_bool(arena* a, arena_foo** result, size sz)
+{
+   *result = push(a, arena_foo, sz);
+
+   arena s = *a;
+   arena_test_compute1(s, *result, sz);
+   arena_test_compute2(s, *result, sz);
+
+   return true;
+}
+
+static arena_foo* arena_test_result(arena* a, size sz)
 {
    arena_foo* result = push(a, arena_foo, sz);
 
@@ -419,8 +430,12 @@ int main(int argc, char** argv)
    app_start(&hw);
 
    size sz = 10;
-   arena_foo* foos = arena_test(&base_storage, sz);
+   arena_foo* foos = 0;
+   if(arena_test_bool(&base_storage, &foos, sz))
+      for(size i = 0; i < sz; ++i)
+         printf("Foo: %d\n", foos[i].k);
 
+   foos = arena_test_result(&base_storage, sz);
    for(size i = 0; i < sz; ++i)
       printf("Foo: %d\n", foos[i].k);
 
