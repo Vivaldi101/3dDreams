@@ -172,3 +172,9 @@ static bool rt_blas_create(vk_context* context)
 
    return true;
 }
+
+static bool rt_tlas_create(vk_context* context)
+{
+
+   return true;
+}

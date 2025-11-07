@@ -1786,10 +1786,19 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(!rt_blas_create(context))
+   if(context->raytracing_supported)
    {
-      printf("Could not create bottom level acceleration structure for ray tracing\n");
-      return false;
+      if(!rt_blas_create(context))
+      {
+         printf("Could not create bottom level acceleration structure for ray tracing\n");
+         return false;
+      }
+
+      if(!rt_tlas_create(context))
+      {
+         printf("Could not create top level acceleration structure for ray tracing\n");
+         return false;
+      }
    }
 
    vk_textures_log(context);
