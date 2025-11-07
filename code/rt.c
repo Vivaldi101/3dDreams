@@ -88,7 +88,7 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
    vk_buffer blas_buffer = {.size = total_acceleration_size};
 
    if(!vk_buffer_create_and_bind(&blas_buffer, devices,
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
    vk_buffer scratch_buffer = {.size = total_scratch_size};
@@ -99,8 +99,8 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
 
    VkDeviceAddress scratch_address = buffer_device_address(&scratch_buffer, devices);
 
-   printf("Ray tracing acceleration structure size: \t%zu KB\n", total_acceleration_size / 1024);
-   printf("Ray tracing build scratch size: \t\t%zu KB\n", total_scratch_size / 1024);
+   printf("BLAS Ray tracing acceleration structure size: \t%zu KB\n", total_acceleration_size / 1024);
+   printf("BLAS Ray tracing build scratch size: \t\t%zu KB\n", total_scratch_size / 1024);
 
    for(size i = 0; i < geometry_count; ++i)
    {
@@ -140,83 +140,137 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
    return true;
 }
 
-static bool rt_blas_create(vk_context* context)
-{
-   vk_device* devices = &context->devices;
-   VkCommandBuffer cmd = context->command_buffer;
-
-   arena* a = context->storage;
-
-   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
-      return false;
-
-   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
-   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
-      return false;
-
-   if(!rt_blas_geometry_build(a, context))
-      return false;
-
-   if(!vk_valid(vkEndCommandBuffer(cmd)))
-      return false;
-
-   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
-   submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &cmd;
-
-   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
-      return false;
-
-   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
-      return false;
-
-   return true;
-}
-
-static bool rt_tlas_create(vk_context* context)
+static bool rt_tlas_geometry_build(arena s, vk_context* context)
 {
    vk_geometry* geometry = &context->geometry;
-
    vk_device* devices = &context->devices;
-   VkCommandBuffer cmd = context->command_buffer;
+   const size draw_count = geometry->mesh_draws.count;
 
-   arena* a = context->storage;
+   VkDeviceAddress* blas_addresses =
+      push(&s, typeof(*blas_addresses), context->blases.count);
 
-   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+   vk_buffer instance_buffer = {.size = draw_count * sizeof(VkAccelerationStructureInstanceKHR)};
+
+   if(!vk_buffer_create_and_bind(&instance_buffer, devices,
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
-   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+   VkAccelerationStructureGeometryKHR ag = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+   ag.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+   ag.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+   ag.geometry.instances.data.deviceAddress = buffer_device_address(&instance_buffer, devices);
 
-   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
+   VkAccelerationStructureBuildGeometryInfoKHR build_info =
+   {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
+   build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+   build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+   build_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+   build_info.geometryCount = 1;
+   build_info.pGeometries = &ag;
+
+   VkAccelerationStructureBuildSizesInfoKHR size_info =
+   {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
+
+   vkGetAccelerationStructureBuildSizesKHR(devices->logical,
+                                           VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                                           &build_info, &(u32)draw_count, &size_info);
+
+   for(size i = 0; i < context->blases.count; ++i)
+   {
+      VkAccelerationStructureDeviceAddressInfoKHR info =
+      {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+      info.accelerationStructure = context->blases.data[i];
+
+      blas_addresses[i] = vkGetAccelerationStructureDeviceAddressKHR(devices->logical, &info);
+   }
+
+   for(size i = 0; i < draw_count; ++i)
+   {
+      VkAccelerationStructureInstanceKHR instance = {0};
+      instance.mask = 0xff;
+      instance.instanceCustomIndex = (u32)i;
+      //instance.transform = geometry->mesh_instances.data->world;   // TODO: This
+      instance.accelerationStructureReference = blas_addresses[i];
+
+      memcpy(instance_buffer.data, &instance, sizeof(instance));
+   }
+
+   vk_buffer tlas_buffer = {.size = size_info.accelerationStructureSize};
+
+   if(!vk_buffer_create_and_bind(&tlas_buffer, devices,
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR,
+      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
-   if(!rt_blas_geometry_build(a, context))
+   vk_buffer scratch_buffer = {.size = size_info.buildScratchSize};
+
+   if(!vk_buffer_create_and_bind(&scratch_buffer, devices,
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
-   if(!vk_valid(vkEndCommandBuffer(cmd)))
+   VkDeviceAddress scratch_address = buffer_device_address(&scratch_buffer, devices);
+
+   VkAccelerationStructureCreateInfoKHR info = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+
+   info.buffer = tlas_buffer.handle;
+   info.size = tlas_buffer.size;
+   info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+
+   VkAccelerationStructureKHR tlas = 0;
+   if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, &info, 0, &tlas)))
       return false;
 
-   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
-   submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &cmd;
+   build_info.dstAccelerationStructure = tlas;
+   build_info.scratchData.deviceAddress = scratch_address;
 
-   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
-      return false;
+   VkAccelerationStructureBuildRangeInfoKHR build_ranges = {};
+   build_ranges.primitiveCount = (u32)draw_count;
 
-   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
-      return false;
+   VkAccelerationStructureBuildRangeInfoKHR* build_range_ptrs = &build_ranges;
+
+   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, 1, &build_info, &build_range_ptrs);
+
+   printf("TLAS Ray tracing acceleration structure size: \t%zu bytes\n", size_info.accelerationStructureSize / 1);
+   printf("TLAS Ray tracing build scratch size: \t\t%zu bytes\n", size_info.buildScratchSize / 1);
 
    return true;
 }
 
 static bool rt_acceleration_structures_create(vk_context* context)
 {
-   if(!rt_blas_create(context))
+   vk_device* devices = &context->devices;
+   VkCommandBuffer cmd = context->command_buffer;
+
+   arena* a = context->storage;
+
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
       return false;
-   if(!rt_tlas_create(context))
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
+      return false;
+
+   if(!rt_blas_geometry_build(a, context))
+      return false;
+
+   arena s = *a;
+   if(!rt_tlas_geometry_build(s, context))
+      return false;
+
+   if(!vk_valid(vkEndCommandBuffer(cmd)))
+      return false;
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &cmd;
+
+   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
+      return false;
+
+   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
       return false;
 
    return true;
