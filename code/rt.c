@@ -1,12 +1,21 @@
 #include "vulkan_ng.h"
 
-static bool rt_blas_geometry_build(arena s, VkCommandBuffer command_buffer, vk_device* devices, vk_geometry* geometry, vk_buffer_hash_table* buffer_table)
+static bool rt_blas_geometry_build(arena* a, vk_context* context)
 {
+   vk_geometry* geometry = &context->geometry;
+   vk_device* devices = &context->devices;
+   vk_buffer_hash_table* buffer_table = &context->buffer_table;
+
    const size geometry_count = geometry->mesh_draws.count;
    const size alignment = 256;
 
    size total_acceleration_size = 0;
    size total_scratch_size = 0;
+
+   context->blases.arena = a;
+   array_resize(context->blases, geometry_count);
+
+   arena s = *a;
 
    VkAccelerationStructureGeometryKHR* acceleration_geometries =
       push(&s, typeof(*acceleration_geometries), geometry_count);
@@ -23,9 +32,6 @@ static bool rt_blas_geometry_build(arena s, VkCommandBuffer command_buffer, vk_d
       push(&s, size, geometry_count);
    size* acceleration_sizes =
       push(&s, size, geometry_count);
-
-   VkAccelerationStructureKHR* blas =
-      push(&s, typeof(*blas), geometry_count);
 
    vk_buffer* ib = buffer_hash_lookup(buffer_table, ib_buffer_name);
    vk_buffer* vb = buffer_hash_lookup(buffer_table, vb_buffer_name);
@@ -111,21 +117,23 @@ static bool rt_blas_geometry_build(arena s, VkCommandBuffer command_buffer, vk_d
       assert(blas_buffer.size >= info->size + info->offset);
       assert((info->offset & 0xff) == 0);
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, blas + i)))
+      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->blases.data + i)))
          return false;
+
+      context->blases.count++;
 
       u32 max_primitive_count = (u32)draw->index_count / 3;
 
       build_infos[i].sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
       build_infos[i].type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-      build_infos[i].dstAccelerationStructure = blas[i];
+      build_infos[i].dstAccelerationStructure = context->blases.data[i];
       build_infos[i].scratchData.deviceAddress = scratch_address + scratch_offsets[i];
 
       build_ranges[i].primitiveCount = max_primitive_count;
       build_range_ptrs[i] = build_ranges + i;
    }
 
-   vkCmdBuildAccelerationStructuresKHR(command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
+   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
 
    vk_buffer_destroy(devices, &scratch_buffer);
 
@@ -136,14 +144,10 @@ static bool rt_blas_create(vk_context* context)
 {
    vk_geometry* geometry = &context->geometry;
 
-   const size geometry_count = geometry->mesh_draws.count;
    vk_device* devices = &context->devices;
    VkCommandBuffer cmd = context->command_buffer;
 
-   arena s = *context->storage;
-
-   VkAccelerationStructureCreateInfoKHR* infos =
-      push(&s, typeof(*infos), geometry_count);
+   arena* a = context->storage;
 
    if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
       return false;
@@ -154,7 +158,7 @@ static bool rt_blas_create(vk_context* context)
    if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
       return false;
 
-   if(!rt_blas_geometry_build(s, cmd, devices, geometry, &context->buffer_table))
+   if(!rt_blas_geometry_build(a, context))
       return false;
 
    if(!vk_valid(vkEndCommandBuffer(cmd)))

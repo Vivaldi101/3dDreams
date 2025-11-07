@@ -150,16 +150,11 @@ align_struct vk_geometry
    array(vk_mesh_instance) mesh_instances;
 } vk_geometry; 
 
-// TODO: Remove?
-align_struct vk_blas
-{
-   array(VkAccelerationStructureKHR) blases;
-} vk_blas; 
-
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
+   array(VkAccelerationStructureKHR) blases;
 
    vk_geometry geometry;
 
