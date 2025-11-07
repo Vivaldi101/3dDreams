@@ -1,6 +1,6 @@
 #include "vulkan_ng.h"
 
-static bool rt_blas_geometry_build(arena* a, vk_context* context)
+static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationStructureKHR* blases)
 {
    vk_geometry* geometry = &context->geometry;
    vk_device* devices = &context->devices;
@@ -11,11 +11,6 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
 
    size total_acceleration_size = 0;
    size total_scratch_size = 0;
-
-   context->blases.arena = a;
-   array_resize(context->blases, geometry_count);
-
-   arena s = *a;
 
    VkAccelerationStructureGeometryKHR* acceleration_geometries =
       push(&s, typeof(*acceleration_geometries), geometry_count);
@@ -117,37 +112,59 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
       assert(blas_buffer.size >= info->size + info->offset);
       assert((info->offset & 0xff) == 0);
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->blases.data + i)))
+      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->blases + i)))
          return false;
 
-      context->blases.count++;
+      context->blas_count++;
 
       u32 max_primitive_count = (u32)draw->index_count / 3;
 
       build_infos[i].sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
       build_infos[i].type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-      build_infos[i].dstAccelerationStructure = context->blases.data[i];
+      build_infos[i].dstAccelerationStructure = blases[i];
       build_infos[i].scratchData.deviceAddress = scratch_address + scratch_offsets[i];
 
       build_ranges[i].primitiveCount = max_primitive_count;
       build_range_ptrs[i] = build_ranges + i;
    }
 
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+      return false;
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   if(!vk_valid(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info)))
+      return false;
+
    vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
+
+   if(!vk_valid(vkEndCommandBuffer(context->command_buffer)))
+      return false;
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &context->command_buffer;
+
+   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
+      return false;
+
+   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
+      return false;
 
    vk_buffer_destroy(devices, &scratch_buffer);
 
    return true;
 }
 
-static bool rt_tlas_geometry_build(arena s, vk_context* context)
+static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationStructureKHR* tlas)
 {
    vk_geometry* geometry = &context->geometry;
    vk_device* devices = &context->devices;
    const size draw_count = geometry->mesh_draws.count;
 
    VkDeviceAddress* blas_addresses =
-      push(&s, typeof(*blas_addresses), context->blases.count);
+      push(&s, typeof(*blas_addresses), context->blas_count);
 
    vk_buffer instance_buffer = {.size = draw_count * sizeof(VkAccelerationStructureInstanceKHR)};
 
@@ -176,11 +193,11 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context)
                                            VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                            &build_info, &(u32)draw_count, &size_info);
 
-   for(size i = 0; i < context->blases.count; ++i)
+   for(size i = 0; i < context->blas_count; ++i)
    {
       VkAccelerationStructureDeviceAddressInfoKHR info =
       {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-      info.accelerationStructure = context->blases.data[i];
+      info.accelerationStructure = context->blases[i];
 
       blas_addresses[i] = vkGetAccelerationStructureDeviceAddressKHR(devices->logical, &info);
    }
@@ -217,32 +234,16 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context)
    info.size = tlas_buffer.size;
    info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
-   VkAccelerationStructureKHR tlas = 0;
-   if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, &info, 0, &tlas)))
+   if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, &info, 0, tlas)))
       return false;
 
-   build_info.dstAccelerationStructure = tlas;
+   build_info.dstAccelerationStructure = *tlas;
    build_info.scratchData.deviceAddress = scratch_address;
 
-   VkAccelerationStructureBuildRangeInfoKHR build_ranges = {};
+   VkAccelerationStructureBuildRangeInfoKHR build_ranges = {0};
    build_ranges.primitiveCount = (u32)draw_count;
 
    VkAccelerationStructureBuildRangeInfoKHR* build_range_ptrs = &build_ranges;
-
-   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, 1, &build_info, &build_range_ptrs);
-
-   printf("TLAS Ray tracing acceleration structure size: \t%zu bytes\n", size_info.accelerationStructureSize / 1);
-   printf("TLAS Ray tracing build scratch size: \t\t%zu bytes\n", size_info.buildScratchSize / 1);
-
-   return true;
-}
-
-static bool rt_acceleration_structures_create(vk_context* context)
-{
-   vk_device* devices = &context->devices;
-   VkCommandBuffer cmd = context->command_buffer;
-
-   arena* a = context->storage;
 
    if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
       return false;
@@ -250,27 +251,50 @@ static bool rt_acceleration_structures_create(vk_context* context)
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
+   if(!vk_valid(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info)))
       return false;
 
-   if(!rt_blas_geometry_build(a, context))
-      return false;
+   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, 1, &build_info, &build_range_ptrs);
 
-   arena s = *a;
-   if(!rt_tlas_geometry_build(s, context))
-      return false;
+   printf("TLAS Ray tracing acceleration structure size: \t%zu bytes\n", size_info.accelerationStructureSize / 1);
+   printf("TLAS Ray tracing build scratch size: \t\t%zu bytes\n", size_info.buildScratchSize / 1);
 
-   if(!vk_valid(vkEndCommandBuffer(cmd)))
+   if(!vk_valid(vkEndCommandBuffer(context->command_buffer)))
       return false;
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &cmd;
+   submit_info.pCommandBuffers = &context->command_buffer;
 
    if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
       return false;
 
    if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
+      return false;
+
+   vk_buffer_destroy(devices, &instance_buffer);
+   vk_buffer_destroy(devices, &scratch_buffer);
+
+   return true;
+}
+
+static bool rt_acceleration_structures_create(vk_context* context)
+{
+   vk_device* devices = &context->devices;
+
+   arena* a = context->storage;
+
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+      return false;
+
+   context->blases =
+      push(a, typeof(*context->blases), context->geometry.mesh_draws.count);
+
+   arena s = *a;
+
+   if(!rt_blas_geometry_build(s, context, context->blases))
+      return false;
+   if(!rt_tlas_geometry_build(s, context, &context->tlas))
       return false;
 
    return true;

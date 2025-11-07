@@ -154,8 +154,11 @@ align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
-   array(VkAccelerationStructureKHR) blases;
+
+   // TODO: into vk_rt_as structure
+   VkAccelerationStructureKHR* blases;
    VkAccelerationStructureKHR tlas;
+   size blas_count;
 
    vk_geometry geometry;
 
