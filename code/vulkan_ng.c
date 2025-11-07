@@ -1788,15 +1788,9 @@ bool vk_initialize(hw* hw)
 
    if(context->raytracing_supported)
    {
-      if(!rt_blas_create(context))
+      if(!rt_acceleration_structures_create(context))
       {
-         printf("Could not create bottom level acceleration structure for ray tracing\n");
-         return false;
-      }
-
-      if(!rt_tlas_create(context))
-      {
-         printf("Could not create top level acceleration structure for ray tracing\n");
+         printf("Could not create acceleration structures for ray tracing\n");
          return false;
       }
    }

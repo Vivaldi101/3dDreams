@@ -142,8 +142,6 @@ static bool rt_blas_geometry_build(arena* a, vk_context* context)
 
 static bool rt_blas_create(vk_context* context)
 {
-   vk_geometry* geometry = &context->geometry;
-
    vk_device* devices = &context->devices;
    VkCommandBuffer cmd = context->command_buffer;
 
@@ -179,6 +177,47 @@ static bool rt_blas_create(vk_context* context)
 
 static bool rt_tlas_create(vk_context* context)
 {
+   vk_geometry* geometry = &context->geometry;
+
+   vk_device* devices = &context->devices;
+   VkCommandBuffer cmd = context->command_buffer;
+
+   arena* a = context->storage;
+
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+      return false;
+
+   VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
+   buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   if(!vk_valid(vkBeginCommandBuffer(cmd, &buffer_begin_info)))
+      return false;
+
+   if(!rt_blas_geometry_build(a, context))
+      return false;
+
+   if(!vk_valid(vkEndCommandBuffer(cmd)))
+      return false;
+
+   VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+   submit_info.commandBufferCount = 1;
+   submit_info.pCommandBuffers = &cmd;
+
+   if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
+      return false;
+
+   if(!vk_valid(vkDeviceWaitIdle(devices->logical)))
+      return false;
+
+   return true;
+}
+
+static bool rt_acceleration_structures_create(vk_context* context)
+{
+   if(!rt_blas_create(context))
+      return false;
+   if(!rt_tlas_create(context))
+      return false;
 
    return true;
 }
