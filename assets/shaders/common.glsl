@@ -12,4 +12,7 @@ layout(push_constant) uniform push_constants_block
     bool draw_ground_plane;
 } globals;
 
+#define RAYTRACE 1
+#define DEBUG 0
+
 #endif

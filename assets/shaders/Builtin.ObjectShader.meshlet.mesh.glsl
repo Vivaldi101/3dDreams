@@ -7,8 +7,6 @@
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_GOOGLE_include_directive: require
 
-#define DEBUG 1
-
 #include "mesh.h"
 #include "common.glsl"
 
