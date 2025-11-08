@@ -1,4 +1,5 @@
 #include "priority_queue.h"
+#include "vulkan_ng.h"
 
 #include "win32_file_io.c"
 
@@ -1800,11 +1801,6 @@ bool vk_initialize(hw* hw)
 
    return true;
 }
-
-typedef struct ctx_shader_destroy
-{
-   vk_device* devices;
-} ctx_shader_destroy;
 
 static void vk_shader_module_destroy(void* ctx, vk_shader_module_name shader_module)
 {

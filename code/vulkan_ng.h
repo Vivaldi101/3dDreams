@@ -144,6 +144,11 @@ align_struct vk_device
    VkDevice logical;
 } vk_device;
 
+align_struct ctx_shader_destroy
+{
+   vk_device* devices;
+} ctx_shader_destroy;
+
 align_struct vk_geometry
 {
    array(vk_mesh_draw) mesh_draws;
