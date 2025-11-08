@@ -1061,7 +1061,6 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-
       if (buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
          vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }

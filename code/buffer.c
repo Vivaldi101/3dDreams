@@ -235,8 +235,6 @@ static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from
 
 static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* context, arena scratch)
 {
-   bool success = false;
-
    struct mesh_draw* draws = push(&scratch, struct mesh_draw, context->geometry.mesh_instances.count);
 
    for(u32 i = 0; i < context->geometry.mesh_instances.count; ++i)
@@ -250,26 +248,26 @@ static bool buffer_transforms_create(vk_buffer* transform_buffer, vk_context* co
    }
 
    size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(struct mesh_draw);
-
    vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-   success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
    transform_buffer->size = scratch_buffer_size;
-   success &= vk_buffer_create_and_bind(transform_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-   if (success)
-      vk_buffer_upload(context, transform_buffer, &scratch_buffer, draws, sizeof(struct mesh_draw) * context->geometry.mesh_instances.count);
+   if(!vk_buffer_create_and_bind(transform_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
 
+   vk_buffer_upload(context, transform_buffer, &scratch_buffer, draws, sizeof(struct mesh_draw) * context->geometry.mesh_instances.count);
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
-   return success;
+   return true;
 }
 
 // TODO: no bool params
 // TODO: pass the devices struct
 static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* context, arena scratch, bool mesh_shading_supported)
 {
-   bool success = false;
-
    if(!mesh_shading_supported)
    {
       VkDrawIndexedIndirectCommand* draw_commands = push(&scratch, VkDrawIndexedIndirectCommand, context->geometry.mesh_instances.count);
@@ -292,16 +290,16 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       }
 
       size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawIndexedIndirectCommand);
-
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+      if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+         return false;
 
       indirect_buffer->size = scratch_buffer_size;
-      success &= vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      if(!vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+         return false;
 
-      if (success)
-         vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->geometry.mesh_instances.count);
-
+      vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawIndexedIndirectCommand) * context->geometry.mesh_instances.count);
       vk_buffer_destroy(&context->devices, &scratch_buffer);
    }
    else
@@ -321,18 +319,20 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       }
 
       size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
-
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
-      success = vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-      indirect_buffer->size = scratch_buffer_size;
-      success &= vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-      if (success)
-         vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
 
+      if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+         return false;
+
+      indirect_buffer->size = scratch_buffer_size;
+      if(!vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+         return false;
+
+      vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
       vk_buffer_destroy(&context->devices, &scratch_buffer);
    }
 
-   return success;
+   return true;
 }
 
 static void buffer_hash_insert(vk_buffer_hash_table* table, const char* key, vk_buffer value)
