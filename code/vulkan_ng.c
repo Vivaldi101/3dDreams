@@ -875,7 +875,7 @@ static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescripto
 
 static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
 {
-   VkWriteDescriptorSet* write_set = push(&scratch, VkWriteDescriptorSet, binding_count);
+   VkWriteDescriptorSet* write_sets = push(&scratch, VkWriteDescriptorSet, binding_count);
    VkDescriptorBufferInfo* infos = push(&scratch, VkDescriptorBufferInfo, binding_count);
 
    for(u32 i = 0; i < binding_count; ++i)
@@ -883,10 +883,10 @@ static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratc
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
 
       VkWriteDescriptorSet set = cmd_write_descriptor_create(bindings[i].binding, bindings[i].type, &infos[i]);
-      write_set[i] = set;
+      write_sets[i] = set;
    }
 
-   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_set);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_sets);
 }
 
 static void cmd_bind_index_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset)
