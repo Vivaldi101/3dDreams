@@ -1037,18 +1037,28 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
-      // TODO: array(vk_buffer_binding) bbs = {context->storage};
-      vk_buffer_binding bbs[3] = {0};
-      bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-      bbs[0].binding = 0;
+      arena s = *context->storage;
+      array(vk_buffer_binding) bbs = {&s};
 
-      bbs[1].buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
-      bbs[1].binding = 1;
+      if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+      }
 
-      bbs[2].buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
-      bbs[2].binding = 2;
+      if(buffer_hash_lookup(&context->buffer_table, mb_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+      }
 
-      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      if(buffer_hash_lookup(&context->buffer_table, transform_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+      }
+
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
 
@@ -1065,10 +1075,9 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if (buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
          cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
-      // TODO: Compress drawing to pass scratch
-      array(vk_buffer_binding) bbs = {context->storage};
+      arena s = *context->storage;
+      array(vk_buffer_binding) bbs = {&s};
 
-      // TODO: Compress
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
@@ -1081,7 +1090,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
          array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
       }
 
-      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs.data, (u32)bbs.count, 0);
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
       if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
@@ -1780,20 +1789,18 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   // TODO: remove vk_* prefix
-   if(!vk_pipelines_create(context))
-   {
-      printf("Could not create all the pipelines\n");
-      return false;
-   }
-
    if(context->raytracing_supported)
-   {
       if(!rt_acceleration_structures_create(context))
       {
          printf("Could not create acceleration structures for ray tracing\n");
          return false;
       }
+
+   // TODO: remove vk_* prefix
+   if(!vk_pipelines_create(context))
+   {
+      printf("Could not create all the pipelines\n");
+      return false;
    }
 
    vk_textures_log(context);
