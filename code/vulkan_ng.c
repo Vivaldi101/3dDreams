@@ -860,15 +860,14 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
    return result;
 }
 
-static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorBufferInfo* buffer_info)
+static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorType type, VkDescriptorBufferInfo* buffer_info)
 {
-   VkWriteDescriptorSet result = {0};
+   VkWriteDescriptorSet result = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
 
-   result.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
    result.dstBinding = binding;
    result.dstSet = VK_NULL_HANDLE;
    result.descriptorCount = 1;
-   result.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   result.descriptorType = type;
    result.pBufferInfo = buffer_info;
 
    return result;
@@ -883,7 +882,7 @@ static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratc
    {
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
 
-      VkWriteDescriptorSet set = cmd_write_descriptor_create(bindings[i].binding, &infos[i]);
+      VkWriteDescriptorSet set = cmd_write_descriptor_create(bindings[i].binding, bindings[i].type, &infos[i]);
       write_set[i] = set;
    }
 
@@ -1038,30 +1037,30 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_pipeline(command_buffer, pipeline);
 
       arena s = *context->storage;
-      array(vk_buffer_binding) bbs = {&s};
+      array(vk_buffer_binding) bindings = {&s};
 
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
       if(buffer_hash_lookup(&context->buffer_table, mb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
       if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 2 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
-      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-      if (buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
          vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
@@ -1071,28 +1070,28 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      if (buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
          cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
       arena s = *context->storage;
-      array(vk_buffer_binding) bbs = {&s};
+      array(vk_buffer_binding) bindings = {&s};
 
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
       if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
-      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
          vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);

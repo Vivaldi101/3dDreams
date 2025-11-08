@@ -77,6 +77,7 @@ align_struct vk_buffer_binding
 {
    vk_buffer buffer;
    u32 binding;
+   VkDescriptorType type;
 } vk_buffer_binding;
 
 align_struct vk_meshlet
