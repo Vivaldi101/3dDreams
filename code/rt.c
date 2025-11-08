@@ -207,7 +207,16 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
       VkAccelerationStructureInstanceKHR instance = {0};
       instance.mask = 0xff;
       instance.instanceCustomIndex = (u32)i;
-      //instance.transform = geometry->mesh_instances.data->world;   // TODO: This
+      mat4 wm = geometry->mesh_instances.data->world;
+      // TODO: transpose here
+      VkTransformMatrixKHR transform =
+      {{
+         { wm.data[0],  wm.data[4],  wm.data[8],  wm.data[12] },  // row 0
+         { wm.data[1],  wm.data[5],  wm.data[9],  wm.data[13] },  // row 1
+         { wm.data[2],  wm.data[6],  wm.data[10], wm.data[14] },  // row 2
+      }};
+
+      instance.transform = transform;
       instance.accelerationStructureReference = blas_addresses[i];
 
       memcpy(instance_buffer.data, &instance, sizeof(instance));
