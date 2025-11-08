@@ -7,7 +7,7 @@ static const char* mb_buffer_name = "mb";
 
 static const char* indirect_buffer_name = "indirect";
 static const char* indirect_rtx_buffer_name = "indirect_rtx";
-static const char* transform_buffer_name = "transform";
+static const char* mesh_draw_buffer_name = "mesh_draw";
 
 #define graphics_module_name "graphics"
 #define meshlet_module_name "meshlet"

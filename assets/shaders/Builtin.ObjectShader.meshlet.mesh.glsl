@@ -10,6 +10,11 @@
 #include "mesh.h"
 #include "common.glsl"
 
+#if RAYTRACE
+#extension GL_EXT_ray_query : require
+layout(binding = 2) uniform accelerationStructureEXT tlas;
+#endif
+
 // number of threads inside the work group
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 layout(triangles, max_vertices = 64, max_primitives = 127) out;

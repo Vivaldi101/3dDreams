@@ -8,11 +8,6 @@
 #include "mesh.h"
 #include "common.glsl"
 
-#if RAYTRACE
-#extension GL_EXT_ray_query : require
-layout(binding = 2) uniform accelerationStructureEXT tlas;
-#endif
-
 vec3 quad[4] = vec3[]
 (
     vec3(-100.0f, 0.25f, -100.0f),  // top-left

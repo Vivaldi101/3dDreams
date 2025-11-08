@@ -1049,13 +1049,13 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if(buffer_hash_lookup(&context->buffer_table, mb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
       }
 
-      if(buffer_hash_lookup(&context->buffer_table, transform_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
       {
-         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
+         array_push(bbs) = (vk_buffer_binding){ buffer, 2 };
       }
 
       cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bbs.data, (u32)bbs.count, 0);
@@ -1084,9 +1084,9 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
          array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
       }
 
-      if(buffer_hash_lookup(&context->buffer_table, transform_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
       {
-         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
          array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
       }
 
@@ -1174,9 +1174,10 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 }
 
 // TODO: pass amount of bindings to create here
+// TODO: dont pass the mesh_shading and ray tracing booleans
 static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool mesh_shading_supported)
 {
-   // TODO: cleanup
+   // TODO: cleanup this nonsense
    if(mesh_shading_supported)
    {
       VkDescriptorSetLayoutBinding bindings[3] = {0};
@@ -1543,29 +1544,27 @@ bool vk_instance_create(VkInstance* instance, arena scratch)
 
 static bool vk_buffers_create(vk_context* context)
 {
-   vk_buffer indirect_buffer = { 0 };
-   vk_buffer indirect_rtx_buffer = { 0 };
-   vk_buffer world_transform = { 0 };
+   vk_buffer indirect_buffer = {0};
+   vk_buffer indirect_rtx_buffer = {0};
+   vk_buffer mesh_draw_buffer = {0};
 
-   arena scratch = *context->storage;
+   arena s = *context->storage;
 
-   // TODO: pass devices
-   if(!buffer_indirect_create(&indirect_buffer, context, scratch, false))
+   // TODO: pass devices and geometry
+   if(!buffer_indirect_create(&indirect_buffer, context, s, false))
       return false;
 
    buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
 
-   // TODO: pass devices
-   if(!buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
+   if(!buffer_indirect_create(&indirect_rtx_buffer, context, s, true))
       return false;
 
    buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
 
-   // TODO: pass devices
-   if(!buffer_transforms_create(&world_transform, context, scratch))
+   if(!buffer_transforms_create(&mesh_draw_buffer, context, s))
       return false;
 
-   buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
+   buffer_hash_insert(&context->buffer_table, mesh_draw_buffer_name, mesh_draw_buffer);
 
    return true;
 }
@@ -1577,8 +1576,10 @@ static bool vk_pipelines_create(vk_context* context)
 
    if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context->devices.logical, false))
       return false;
-   if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
-      return false;
+
+   if(context->mesh_shading_supported)
+      if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
+         return false;
 
    VkPipelineLayout non_rtx_pipeline_layout = 0;
    VkPipelineLayout rtx_pipeline_layout = 0;
@@ -1830,7 +1831,7 @@ void vk_uninitialize(hw* hw)
 
    vk_buffer indirect = *buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
    vk_buffer indirect_rtx = *buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
-   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
 
    vkDeviceWaitIdle(context->devices.logical);
 
