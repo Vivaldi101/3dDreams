@@ -23,7 +23,8 @@ struct mesh_draw
    uint32_t metal;
    uint32_t emissive;
    uint32_t ao;
-   mat4 world;           // world transform
+
+   mat4 world;           // world transform - TODO: use pos, quat, scale in future
 };
 
 #endif

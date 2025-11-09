@@ -479,7 +479,6 @@ typedef struct mvp_transform
     f32 n;
     f32 f;
     f32 ar;
-    u32 meshlet_offset;
     bool draw_ground_plane; // TODO: Change to enum for different states
 } mvp_transform;
 #pragma pack(pop)

@@ -80,12 +80,6 @@ align_struct vk_buffer_binding
    VkDescriptorType type;
 } vk_buffer_binding;
 
-align_struct vk_meshlet
-{
-   vk_buffer buffer;
-   u32 count;
-} vk_meshlet;
-
 typedef struct meshlet meshlet;
 align_struct vk_meshlet_buffer
 {

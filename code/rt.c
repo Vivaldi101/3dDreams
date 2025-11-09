@@ -208,6 +208,7 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
       instance.mask = 0xff;
       instance.instanceCustomIndex = (u32)i;
       mat4 wm = geometry->mesh_instances.data->world;
+
       // TODO: transpose here
       VkTransformMatrixKHR transform =
       {{

@@ -10,17 +10,20 @@
 #include "mesh.h"
 #include "common.glsl"
 
-#if RAYTRACE
-#extension GL_EXT_ray_query : require
-layout(binding = 2) uniform accelerationStructureEXT tlas;
-#endif
-
 // number of threads inside the work group
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 layout(triangles, max_vertices = 64, max_primitives = 127) out;
 
 const uint max_vertices = 64;
 const uint max_primitives = 127;
+
+vec3 quad[4] = vec3[]
+(
+    vec3(-100.0f, -1.25f, -100.0f),  // top-left
+    vec3(-100.0f, -1.25f,  100.0f),  // bottom-left
+    vec3(100.0f,  -1.25f,   -100.0f), // top-right
+    vec3(100.0f,  -1.25f,   100.0f)   // bottom-right
+);
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
 {
@@ -32,10 +35,15 @@ layout(set = 0, binding = 1) readonly buffer meshlet_block
    meshlet meshlets[];
 };
 
-layout(set = 0, binding = 2) readonly buffer transform_block
+layout(set = 0, binding = 2) readonly buffer mesh_draw_block
 {
-   mat4 worlds[];
+   mesh_draw draws[];
 };
+
+#if RAYTRACE
+#extension GL_EXT_ray_query : require
+layout(set = 0, binding = 3) uniform accelerationStructureEXT tlas;
+#endif
 
 layout(location = 0) out vec4 out_color[];
 layout(location = 1) out vec2 out_uv[];
@@ -65,8 +73,8 @@ void main()
 {
     int draw_ID = gl_DrawIDARB;
 
-    uint mi = gl_WorkGroupID.x + globals.meshlet_offset;
-    uint ti = gl_LocalInvocationID.x;
+    uint mi = gl_WorkGroupID.x;
+    uint ti = gl_LocalInvocationID.x;  // thread index
 
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;
@@ -85,7 +93,7 @@ void main()
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
       vertex v = verts[vi];
-      vec4 vo = globals.projection * globals.view * worlds[draw_ID] * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
 

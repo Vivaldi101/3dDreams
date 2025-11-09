@@ -981,7 +981,6 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    mvp.view = mat4_view(eye, dir);
 
    //mvp.world = mat4_identity();
-   mvp.meshlet_offset = 0;
 
    VkClearValue clear[2] = {0};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
@@ -1061,7 +1060,10 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
       if(buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
-         vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer,
+                                       buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle,
+                                       0, (u32)context->geometry.mesh_draws.count,
+                                       sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -1092,7 +1094,10 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
       if(buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
-         vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->geometry.mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+         vkCmdDrawIndexedIndirect(command_buffer,
+                                  buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle,
+                                  0, (u32)context->geometry.mesh_draws.count,
+                                  sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 

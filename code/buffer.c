@@ -308,12 +308,7 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
 
       for(u32 i = 0; i < context->geometry.mesh_instances.count; ++i)
       {
-         VkDrawMeshTasksIndirectCommandEXT cmd =
-         {
-            .groupCountX = 1,
-            .groupCountY = 1,
-            .groupCountZ = 1,
-         };
+         VkDrawMeshTasksIndirectCommandEXT cmd = {context->meshlet_count,1,1};
 
          draw_commands[i] = cmd;
       }
@@ -325,7 +320,7 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
          return false;
 
       indirect_buffer->size = scratch_buffer_size;
-      if(!vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      if(!vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
          return false;
 
       vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
