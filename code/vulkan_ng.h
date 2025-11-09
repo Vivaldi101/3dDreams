@@ -81,6 +81,7 @@ align_struct vk_buffer_binding
 } vk_buffer_binding;
 
 typedef struct meshlet meshlet;
+// TODO: store inside vk_context
 align_struct vk_meshlet_buffer
 {
    array(meshlet) meshlets;
@@ -154,6 +155,7 @@ align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
+   array(meshlet) meshlets;
 
    // TODO: into vk_rt_as structure
    VkAccelerationStructureKHR* blases;
@@ -196,8 +198,6 @@ align_struct vk_context
    spv_hash_table shader_table;
 
    vk_buffer_hash_table buffer_table;
-
-   u32 meshlet_count;
 
    vk_swapchain_surface swapchain_surface;
    vk_swapchain_images swapchain_images;

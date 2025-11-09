@@ -304,16 +304,18 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
    }
    else
    {
-      VkDrawMeshTasksIndirectCommandEXT* draw_commands = push(&scratch, VkDrawMeshTasksIndirectCommandEXT, context->geometry.mesh_instances.count);
+      //VkDrawMeshTasksIndirectCommandEXT* draw_commands = push(&scratch, VkDrawMeshTasksIndirectCommandEXT, context->geometry.mesh_instances.count);
+      VkDrawMeshTasksIndirectCommandEXT* draw_commands = push(&scratch, VkDrawMeshTasksIndirectCommandEXT);
 
-      for(u32 i = 0; i < context->geometry.mesh_instances.count; ++i)
+      //for(u32 i = 0; i < context->geometry.mesh_instances.count; ++i)
       {
-         VkDrawMeshTasksIndirectCommandEXT cmd = {context->meshlet_count,1,1};
+         VkDrawMeshTasksIndirectCommandEXT cmd = {(u32)context->meshlets.count,1,1};
 
-         draw_commands[i] = cmd;
+         draw_commands[0] = cmd;
       }
 
-      size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
+      //size scratch_buffer_size = context->geometry.mesh_instances.count * sizeof(VkDrawMeshTasksIndirectCommandEXT);
+      size scratch_buffer_size = sizeof(VkDrawMeshTasksIndirectCommandEXT);
       vk_buffer scratch_buffer = {.size = scratch_buffer_size};
 
       if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
@@ -322,8 +324,9 @@ static bool buffer_indirect_create(vk_buffer* indirect_buffer, vk_context* conte
       indirect_buffer->size = scratch_buffer_size;
       if(!vk_buffer_create_and_bind(indirect_buffer, &context->devices, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
          return false;
-
-      vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
+       
+      //vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT) * context->geometry.mesh_instances.count);
+      vk_buffer_upload(context, indirect_buffer, &scratch_buffer, draw_commands, sizeof(VkDrawMeshTasksIndirectCommandEXT));
       vk_buffer_destroy(&context->devices, &scratch_buffer);
    }
 

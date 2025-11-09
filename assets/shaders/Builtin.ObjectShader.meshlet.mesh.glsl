@@ -1,4 +1,4 @@
-#version 460
+#version 450
 
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
@@ -73,7 +73,7 @@ void main()
 {
     int draw_ID = gl_DrawIDARB;
 
-    uint mi = gl_WorkGroupID.x;
+    uint mi = gl_WorkGroupID.x;        // meshlet index
     uint ti = gl_LocalInvocationID.x;  // thread index
 
     uint vertex_count = meshlets[mi].vertex_count;

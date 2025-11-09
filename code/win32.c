@@ -327,12 +327,12 @@ static void arena_free(arena* a)
 
 align_struct scratch_foo
 {
-   size i, j;
+   i64 i, j;
 } scratch_foo;
 
 align_struct arena_foo
 {
-   size k;
+   i64 k;
 } arena_foo;
 
 static void arena_test_compute1(arena s, arena_foo* result, size sz)
@@ -343,8 +343,8 @@ static void arena_test_compute1(arena s, arena_foo* result, size sz)
       foo->i = i;
       foo->j = i+1;
 
-      result[i].k = foo->i + foo->j;
-      assert(result[i].k == foo->i + foo->j);
+      result[i].k = foo->i - 442 + foo->j*2 + foo->i;
+      //assert(result[i].k == foo->i + foo->j);
    }
 }
 
@@ -434,11 +434,11 @@ int main(int argc, char** argv)
    arena_foo* foos = 0;
    if(arena_test_bool(&base_storage, &foos, sz))
       for(size i = 0; i < sz; ++i)
-         printf("Foo: %d\n", foos[i].k);
+         printf("Foo: %lld\n", foos[i].k);
 
    foos = arena_test_result(&base_storage, sz);
    for(size i = 0; i < sz; ++i)
-      printf("Foo: %d\n", foos[i].k);
+      printf("Foo: %lld\n", foos[i].k);
    #endif
 
    bool gr = global_free(base, 0, MEM_RELEASE);

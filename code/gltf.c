@@ -38,14 +38,16 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* index_buffer, size index_count)
+static vk_meshlet_buffer meshlet_build(arena* a, size vertex_count, u32* index_buffer, size index_count)
 {
    vk_meshlet_buffer result = {0};
 
    struct meshlet ml = {0};
 
-   u8* meshlet_vertices = push(&scratch, u8, vertex_count);
-   result.meshlets.arena = &scratch;
+   //arena s = *a;
+   // TODO: scratch arena for meshlet_vertices 
+   u8* meshlet_vertices = push(a, u8, vertex_count);
+   result.meshlets.arena = a;
 
    // 0xff means the vertex index is not in use yet
    memset(meshlet_vertices, 0xff, vertex_count);
@@ -428,22 +430,26 @@ static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
 
 static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
-   array(vertex) vertices = {context->storage};
+   arena* a = context->storage;
+
+   vk_geometry* geometry = &context->geometry;
+
+   array(vertex) vertices = {a};
 
    // preallocate indices
-   array(u32) indices = {context->storage};
+   array(u32) indices = {a};
    array_resize(indices, gltf_index_count(data));
 
    // preallocate meshes
-   context->geometry.mesh_draws.arena = context->storage;
-   array_resize(context->geometry.mesh_draws, data->meshes_count);
+   geometry->mesh_draws.arena = a;
+   array_resize(geometry->mesh_draws, data->meshes_count);
 
    // preallocate instances
-   context->geometry.mesh_instances.arena = context->storage;
-   array_resize(context->geometry.mesh_instances, data->nodes_count);
+   geometry->mesh_instances.arena = a;
+   array_resize(geometry->mesh_instances, data->nodes_count);
 
    // preallocate textures
-   context->textures.arena = context->storage;
+   context->textures.arena = a;
    array_resize(context->textures, data->textures_count);
 
    size index_offset = 0;
@@ -537,7 +543,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       md.vertex_offset = vertex_offset;
       md.vertex_count = vertex_count;
 
-      array_add(context->geometry.mesh_draws, md);
+      array_add(geometry->mesh_draws, md);
 
       index_offset += index_count;
       vertex_offset += vertex_count;
@@ -591,7 +597,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
          mi.ao = (u32)ao_index;
          mi.emissive = (u32)emissive_index;
 
-         array_add(context->geometry.mesh_instances, mi);
+         array_add(geometry->mesh_instances, mi);
       }
    }
 
@@ -608,10 +614,21 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       vk_texture_load(context, s8(img->uri), gltf_path);
    }
 
-   vk_meshlet_buffer mlb = meshlet_build(*context->storage, vertices.count, indices.data, indices.count);
-   context->meshlet_count = (u32)mlb.meshlets.count;
+   vk_meshlet_buffer mlb = {};
+   context->meshlets.arena = a;
+   for(size i = 0; i < geometry->mesh_draws.count; ++i)
+   {
+      mlb = meshlet_build(a,
+                          geometry->mesh_draws.data[i].vertex_count,
+                          indices.data + geometry->mesh_draws.data[i].index_offset,
+                          geometry->mesh_draws.data[i].index_count);
 
-   usize mb_size = mlb.meshlets.count * sizeof(meshlet);
+      // TODO: memcpy this context->meshlet_count += (u32)mlb.meshlets.count;
+      for(size j = 0; j < mlb.meshlets.count; ++j)
+         array_push(context->meshlets) = mlb.meshlets.data[i];
+   }
+
+   usize mb_size = context->meshlets.count * sizeof(meshlet);
    usize vb_size = vertices.count * sizeof(vertex);
    usize ib_size = indices.count * sizeof(u32);
 
