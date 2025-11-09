@@ -614,18 +614,22 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       vk_texture_load(context, s8(img->uri), gltf_path);
    }
 
-   vk_meshlet_buffer mlb = {};
+   context->meshlet_counts.arena = a;
+   array_resize(context->meshlet_counts, geometry->mesh_draws.count);
+
    context->meshlets.arena = a;
+
    for(size i = 0; i < geometry->mesh_draws.count; ++i)
    {
-      mlb = meshlet_build(a,
-                          geometry->mesh_draws.data[i].vertex_count,
-                          indices.data + geometry->mesh_draws.data[i].index_offset,
-                          geometry->mesh_draws.data[i].index_count);
+      vk_meshlet_buffer mlb = meshlet_build(a,
+                             geometry->mesh_draws.data[i].vertex_count,
+                             indices.data + geometry->mesh_draws.data[i].index_offset,
+                             geometry->mesh_draws.data[i].index_count);
 
-      // TODO: memcpy this context->meshlet_count += (u32)mlb.meshlets.count;
       for(size j = 0; j < mlb.meshlets.count; ++j)
-         array_push(context->meshlets) = mlb.meshlets.data[i];
+         array_push(context->meshlets) = mlb.meshlets.data[j];
+
+      array_add(context->meshlet_counts, mlb.meshlets.count);
    }
 
    usize mb_size = context->meshlets.count * sizeof(meshlet);
@@ -656,7 +660,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    // meshlet data
    if (!vk_buffer_create_and_bind(&mb, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
-   vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
+   vk_buffer_upload(context, &mb, &scratch_buffer, context->meshlets.data, mb.size);
    buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
 
    // index data

@@ -73,8 +73,8 @@ void main()
 {
     int draw_ID = gl_DrawIDARB;
 
-    uint mi = gl_WorkGroupID.x;        // meshlet index
-    uint ti = gl_LocalInvocationID.x;  // thread index
+    uint mi = gl_WorkGroupID.x;   // meshlet index
+    uint ti = gl_LocalInvocationID.x;                             // thread index
 
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;

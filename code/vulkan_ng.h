@@ -95,6 +95,7 @@ align_struct vk_mesh_instance
    u32 ao; 
    u32 metal;
    u32 emissive;
+   u32 index_offset;
    mat4 world;
 } vk_mesh_instance;
 
@@ -156,6 +157,7 @@ align_struct vk_context
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
    array(meshlet) meshlets;
+   array(size) meshlet_counts;
 
    // TODO: into vk_rt_as structure
    VkAccelerationStructureKHR* blases;

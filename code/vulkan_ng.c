@@ -843,11 +843,6 @@ static void cmd_push_all_rtx_constants(VkCommandBuffer command_buffer, VkPipelin
    cmd_push_rtx_constants(command_buffer, layout, mvp, 0);
 }
 
-static void cmd_draw_indexed(VkCommandBuffer command_buffer, vk_mesh_draw md, u32 instance_count, u32 instance)
-{
-   vkCmdDrawIndexed(command_buffer, (u32)md.index_count, instance_count, (u32)md.index_offset, (u32)md.vertex_offset, instance);
-}
-
 static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 {
    assert(buffer->handle && buffer->size > 0);
@@ -1062,7 +1057,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if(buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
          vkCmdDrawMeshTasksIndirectEXT(command_buffer,
                                        buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle,
-                                       0, 1,
+                                       0, (u32)context->geometry.mesh_draws.count,
                                        sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
@@ -1564,7 +1559,7 @@ static bool vk_buffers_create(vk_context* context)
 
    buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
 
-   if(!buffer_transforms_create(&mesh_draw_buffer, context, s))
+   if(!buffer_draws_create(&mesh_draw_buffer, context, s))
       return false;
 
    buffer_hash_insert(&context->buffer_table, mesh_draw_buffer_name, mesh_draw_buffer);
