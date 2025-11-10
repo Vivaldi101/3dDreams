@@ -8,8 +8,13 @@ layout(location = 1) in vec2 in_uv;
 layout(set = 1, binding = 0)
 uniform sampler2D textures[];
 
+#include "common.glsl"
+
 void main()
 {
-   //out_color = texture(textures[0], in_uv);
-   out_color = vec4(1,0,0,1);
+#if DEBUG
+   out_color = in_color;
+#else
+   out_color = texture(textures[0], in_uv);
+#endif
 }

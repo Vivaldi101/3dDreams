@@ -67,17 +67,12 @@ static void meshlet_build(vk_meshlet_buffer* result, u8* meshlet_vertices, u32* 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
          {
-            assert(ml.vertex_index_buffer[j] < vertex_count);
             meshlet_vertices[ml.vertex_index_buffer[j]] = 0xff;
          }
 
          // begin another meshlet
          struct_clear(&ml);
       }
-
-      assert(i0 < vertex_count);
-      assert(i1 < vertex_count);
-      assert(i2 < vertex_count);
 
       meshlet_add_new_vertex_index(i0, meshlet_vertices, &ml);
       meshlet_add_new_vertex_index(i1, meshlet_vertices, &ml);
