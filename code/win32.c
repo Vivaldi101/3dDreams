@@ -335,31 +335,36 @@ align_struct arena_foo
    i64 k;
 } arena_foo;
 
-static void arena_test_compute1(arena s, arena_foo* result, size sz)
+static arena_foo** arena_test_compute1(arena* a, size sz)
 {
+   arena_foo** result = push(a, arena_foo*);
+
    for(size i = 0; i < sz; ++i)
    {
-      scratch_foo* foo = push(&s, scratch_foo);
+      scratch_foo* foo = push(a, scratch_foo);
       foo->i = i;
       foo->j = i+1;
 
-      result[i].k = foo->i - 442 + foo->j*2 + foo->i;
-      //assert(result[i].k == foo->i + foo->j);
+      result[i] = push(a, arena_foo);
+      //result[i]->k = foo->i - 442 + foo->j*2 + foo->i;
+      result[i]->k = foo->i + foo->j;
    }
+
+   return result;
 }
 
-static void arena_test_compute2(arena s, arena_foo* result, size sz)
+static void arena_test_compute2(arena* a, arena_foo** result, size sz)
 {
    for(size i = 0; i < sz; ++i)
    {
-      scratch_foo* foo = push(&s, scratch_foo);
+      scratch_foo* foo = push(a, scratch_foo);
       foo->i = i;
       foo->j = i+1;
 
-      foo->i = -(i64)result[i].k;
-      foo->j = -(i64)result[i].k;
-      result[i].k += foo->i + foo->j;
-      assert(result[i].k * 2 == foo->i + foo->j);
+      foo->i = -(i64)result[i]->k;
+      foo->j = -(i64)result[i]->k;
+      result[i]->k += foo->i + foo->j;
+      assert(result[i]->k * 2 == foo->i + foo->j);
 
       // wp(S, result[i].k*2 == foo->i + foo->j);
       // wp(result[i].k = result[i].k + foo->i + foo->j, result[i].k*2 == foo->i + foo->j);
@@ -370,6 +375,7 @@ static void arena_test_compute2(arena s, arena_foo* result, size sz)
    }
 }
 
+#if 0
 static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 {
    *result = push(a, arena_foo, sz);
@@ -380,14 +386,23 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 
    return true;
 }
+#endif
 
-static arena_foo* arena_test_result(arena* a, size sz)
+static arena_foo** arena_test_result(arena* a, size sz)
 {
-   arena_foo* result = push(a, arena_foo, sz);
+   arena_foo** result = 0;
 
-   arena s = *a;
-   arena_test_compute1(s, result, sz);
-   arena_test_compute2(s, result, sz);
+   result = arena_test_compute1(a, sz);
+
+   for(size i = 0; i < sz; ++i)
+      printf("arena_test_compute1: %lld\n", result[i]->k);
+
+   arena_test_compute2(a, result, sz);
+
+   printf("\n");
+
+   for(size i = 0; i < sz; ++i)
+      printf("arena_test_compute2: %lld\n", result[i]->k);
 
    return result;
 }
@@ -431,14 +446,7 @@ int main(int argc, char** argv)
 
    #if 0
    size sz = 10;
-   arena_foo* foos = 0;
-   if(arena_test_bool(&base_storage, &foos, sz))
-      for(size i = 0; i < sz; ++i)
-         printf("Foo: %lld\n", foos[i].k);
-
-   foos = arena_test_result(&base_storage, sz);
-   for(size i = 0; i < sz; ++i)
-      printf("Foo: %lld\n", foos[i].k);
+   arena_test_result(&base_storage, sz);
    #endif
 
    bool gr = global_free(base, 0, MEM_RELEASE);

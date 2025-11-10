@@ -156,8 +156,11 @@ align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
    array(vk_texture) textures;
+
    array(meshlet) meshlets;
    array(size) meshlet_counts;
+   array(size) meshlet_offsets;
+   array(size) vertex_offsets;
 
    // TODO: into vk_rt_as structure
    VkAccelerationStructureKHR* blases;

@@ -38,19 +38,9 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static vk_meshlet_buffer meshlet_build(arena* a, size vertex_count, u32* index_buffer, size index_count)
+static void meshlet_build(vk_meshlet_buffer* result, size vertex_count, u8* meshlet_vertices, u32* index_buffer, size index_count, u32 index_offset)
 {
-   vk_meshlet_buffer result = {0};
-
    struct meshlet ml = {0};
-
-   //arena s = *a;
-   // TODO: scratch arena for meshlet_vertices 
-   u8* meshlet_vertices = push(a, u8, vertex_count);
-   result.meshlets.arena = a;
-
-   // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertices, 0xff, vertex_count);
 
    usize max_index_count = array_count(ml.primitive_indices);
    usize max_vertex_count = array_count(ml.vertex_index_buffer);
@@ -59,9 +49,9 @@ static vk_meshlet_buffer meshlet_build(arena* a, size vertex_count, u32* index_b
    for(size i = 0; i < index_count; i += 3)
    {
       // original per primitive (triangle indices)
-      u32 i0 = index_buffer[i + 0];
-      u32 i1 = index_buffer[i + 1];
-      u32 i2 = index_buffer[i + 2];
+      u32 i0 = index_buffer[index_offset + i + 0];
+      u32 i1 = index_buffer[index_offset + i + 1];
+      u32 i2 = index_buffer[index_offset + i + 2];
 
       // are the mesh vertex indices not used yet
       bool mi0 = meshlet_vertices[i0] == 0xff;
@@ -72,7 +62,7 @@ static vk_meshlet_buffer meshlet_build(arena* a, size vertex_count, u32* index_b
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         array_push(result.meshlets) = ml;
+         array_push(result->meshlets) = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
@@ -116,9 +106,7 @@ static vk_meshlet_buffer meshlet_build(arena* a, size vertex_count, u32* index_b
 
    // add any left over meshlets
    if(ml.vertex_count > 0)
-      array_push(result.meshlets) = ml;
-
-   return result;
+      array_push(result->meshlets) = ml;
 }
 
 #if 0
@@ -614,22 +602,53 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       vk_texture_load(context, s8(img->uri), gltf_path);
    }
 
+   size max_vertex_count = 0;
+   for(size i = 0; i < geometry->mesh_draws.count; ++i)
+   {
+      size vertex_count = geometry->mesh_draws.data[i].vertex_count;
+      if(vertex_count > max_vertex_count) max_vertex_count = vertex_count;
+   }
+
+   // TODO: Fix this later - should use scratch arenas and not overallocate memory
+
+   u8* meshlet_vertices = push(a, u8, max_vertex_count);
+
    context->meshlet_counts.arena = a;
    array_resize(context->meshlet_counts, geometry->mesh_draws.count);
 
+   context->meshlet_offsets.arena = a;
+   array_resize(context->meshlet_offsets, geometry->mesh_draws.count);
+
+   context->vertex_offsets.arena = a;
+   array_resize(context->vertex_offsets, geometry->mesh_draws.count);
+
    context->meshlets.arena = a;
+   array_resize(context->meshlets, max_vertex_count);
+
+   size meshlet_offset = 0;
+   vertex_offset = 0;
 
    for(size i = 0; i < geometry->mesh_draws.count; ++i)
    {
-      vk_meshlet_buffer mlb = meshlet_build(a,
-                             geometry->mesh_draws.data[i].vertex_count,
-                             indices.data + geometry->mesh_draws.data[i].index_offset,
-                             geometry->mesh_draws.data[i].index_count);
+      // 0xff means the vertex index is not in use yet
+      memset(meshlet_vertices, 0xff, max_vertex_count);
+
+      size vertex_count = geometry->mesh_draws.data[i].vertex_count;
+      size index_count = geometry->mesh_draws.data[i].index_count;
+
+      vk_meshlet_buffer mlb = {a};
+      meshlet_build(&mlb, vertex_count, meshlet_vertices, indices.data, index_count,
+                    (u32)geometry->mesh_draws.data[i].index_offset);
 
       for(size j = 0; j < mlb.meshlets.count; ++j)
-         array_push(context->meshlets) = mlb.meshlets.data[j];
+         array_add(context->meshlets, mlb.meshlets.data[j]);
 
       array_add(context->meshlet_counts, mlb.meshlets.count);
+      array_add(context->meshlet_offsets, meshlet_offset);
+      array_add(context->vertex_offsets, vertex_offset);
+
+      meshlet_offset += mlb.meshlets.count;
+      vertex_offset += vertex_count;
    }
 
    usize mb_size = context->meshlets.count * sizeof(meshlet);

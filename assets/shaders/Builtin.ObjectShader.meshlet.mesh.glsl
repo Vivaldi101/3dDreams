@@ -73,8 +73,8 @@ void main()
 {
     int draw_ID = gl_DrawIDARB;
 
-    uint mi = gl_WorkGroupID.x;   // meshlet index
-    uint ti = gl_LocalInvocationID.x;                             // thread index
+    uint mi = draws[draw_ID].mesh_offset + gl_WorkGroupID.x;    // global meshlet index
+    uint ti = gl_LocalInvocationID.x;     // thread index
 
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;
@@ -92,7 +92,8 @@ void main()
     {
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
-      vertex v = verts[vi];
+      uint offset = draws[draw_ID].vertex_offset;
+      vertex v = verts[offset + vi];
       vec4 vo = globals.projection * globals.view * draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;

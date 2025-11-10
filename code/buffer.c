@@ -239,6 +239,9 @@ static bool buffer_draws_create(vk_buffer* transform_buffer, vk_context* context
 
    for(u32 i = 0; i < context->geometry.mesh_instances.count; ++i)
    {
+      draws[i].mesh_offset = (u32)context->meshlet_offsets.data[i];
+      draws[i].vertex_offset = (u32)context->vertex_offsets.data[i];
+
       draws[i].world = context->geometry.mesh_instances.data[i].world;
       draws[i].normal = (u32)context->geometry.mesh_instances.data[i].normal;
       draws[i].albedo = (u32)context->geometry.mesh_instances.data[i].albedo;
