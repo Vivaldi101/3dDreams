@@ -38,7 +38,7 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static void meshlet_build(vk_meshlet_buffer* result, size vertex_count, u8* meshlet_vertices, u32* index_buffer, size index_count, u32 index_offset)
+static void meshlet_build(vk_meshlet_buffer* result, u8* meshlet_vertices, u32* index_buffer, size index_count, u32 index_offset)
 {
    struct meshlet ml = {0};
 
@@ -637,7 +637,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       size index_count = geometry->mesh_draws.data[i].index_count;
 
       vk_meshlet_buffer mlb = {a};
-      meshlet_build(&mlb, vertex_count, meshlet_vertices, indices.data, index_count,
+      meshlet_build(&mlb, meshlet_vertices, indices.data, index_count,
                     (u32)geometry->mesh_draws.data[i].index_offset);
 
       for(size j = 0; j < mlb.meshlets.count; ++j)
