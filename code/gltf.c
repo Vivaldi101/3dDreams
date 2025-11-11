@@ -596,24 +596,24 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    }
 
    size max_vertex_count = 0;
-   for(size i = 0; i < geometry->mesh_draws.count; ++i)
+   const size mesh_draws_count = 0;
+   for(size i = 0; i < mesh_draws_count; ++i)
    {
       size vertex_count = geometry->mesh_draws.data[i].vertex_count;
       if(vertex_count > max_vertex_count)
          max_vertex_count = vertex_count;
    }
 
-   // TODO: Fix this later - should use scratch arenas and not overallocate memory
    u8* meshlet_vertices = push(a, u8, max_vertex_count);
 
    context->meshlet_counts.arena = a;
-   array_resize(context->meshlet_counts, geometry->mesh_draws.count);
+   array_resize(context->meshlet_counts, mesh_draws_count);
 
    context->meshlet_offsets.arena = a;
-   array_resize(context->meshlet_offsets, geometry->mesh_draws.count);
+   array_resize(context->meshlet_offsets, mesh_draws_count);
 
    context->vertex_offsets.arena = a;
-   array_resize(context->vertex_offsets, geometry->mesh_draws.count);
+   array_resize(context->vertex_offsets, mesh_draws_count);
 
    context->meshlets.arena = a;
    array_resize(context->meshlets, max_vertex_count);
@@ -621,7 +621,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    size meshlet_offset = 0;
    vertex_offset = 0;
 
-   for(size i = 0; i < geometry->mesh_draws.count; ++i)
+   for(size i = 0; i < mesh_draws_count; ++i)
    {
       // 0xff means the vertex index is not in use yet
       memset(meshlet_vertices, 0xff, max_vertex_count);
