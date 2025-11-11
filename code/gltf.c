@@ -596,7 +596,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    }
 
    size max_vertex_count = 0;
-   const size mesh_draws_count = 0;
+   const size mesh_draws_count = geometry->mesh_draws.count;
    for(size i = 0; i < mesh_draws_count; ++i)
    {
       size vertex_count = geometry->mesh_draws.data[i].vertex_count;
