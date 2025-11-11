@@ -149,6 +149,12 @@ align_struct vk_geometry
    array(vk_mesh_instance) mesh_instances;
 } vk_geometry; 
 
+align_struct vk_cmd
+{
+   VkCommandBuffer buffer;
+   VkCommandPool pool;
+} vk_cmd;
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
@@ -184,9 +190,12 @@ align_struct vk_context
    u32 image_index;
 
    VkQueue graphics_queue;
-   VkCommandPool command_pool;
    VkQueryPool query_pool;
+
+   // TODO: vk_cmd
+   VkCommandPool command_pool;
    VkCommandBuffer command_buffer;
+
    VkRenderPass renderpass;
 
    VkPipeline rtx_pipeline;
