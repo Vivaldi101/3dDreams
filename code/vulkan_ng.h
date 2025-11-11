@@ -81,11 +81,8 @@ align_struct vk_buffer_binding
 } vk_buffer_binding;
 
 typedef struct meshlet meshlet;
-// TODO: store inside vk_context
-align_struct vk_meshlet_buffer
-{
-   array(meshlet) meshlets;
-} vk_meshlet_buffer;
+
+typedef array(meshlet) array_meshlet;
 
 align_struct vk_mesh_instance
 {

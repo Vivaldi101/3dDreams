@@ -3,15 +3,8 @@
 
 #include "common.h"
 
+// TODO: make areanas platform agnostic
 #include <Windows.h>
-
-#define arena_iterate(a, s, type, var, code_block) \
-do { \
-    arena scratch_ = push(&(a), type, (s)); \
-    type* (var) = scratch_.beg; \
-    size_t count_ = scratch_size(scratch_) / sizeof(type); \
-    for (size_t i = 0; i < count_; ++i) code_block \
-} while (0)
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -25,6 +18,8 @@ do { \
 // TODO: cleanup array_push() and array_add()
 // Pushes to non preallocated storage
 #define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
+#define arrayp_push(a)      (a)->count++, *(typeof(a->data))array_alloc((array*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, 0)
+
 // Adds to preallocated storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
 #define array_resize(a, s)  {(a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);};
