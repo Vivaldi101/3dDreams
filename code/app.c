@@ -173,7 +173,8 @@ void app_start(hw* hw)
       return;
    }
 
-   hw->state.asset_file = s8("lantern/lantern.gltf");
+   //hw->state.asset_file = s8("lantern/lantern.gltf");
+   hw->state.asset_file = s8("dragon/DragonAttenuation.gltf");
    //hw->state.asset_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
    //hw->state.asset_file = s8("damagedhelmet/damagedhelmet.gltf");
    //hw->state.asset_file = s8("flighthelmet/flighthelmet.gltf");
