@@ -423,11 +423,18 @@ int main(int argc, char** argv)
    arena base_arena = {0};
    base_arena.end = base;
 
+   arena scratch_arena = {0};
+   scratch_arena.end = (u8*)base + (arena_size/2);
+
    size initial_arena_size = KB(256);
    arena base_storage = arena_new(&base_arena, initial_arena_size);
    assert(arena_left(&base_storage) == initial_arena_size);
 
+   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size);
+   assert(arena_left(&scratch_storage) == initial_arena_size);
+
    hw.vk_storage = base_storage;
+   hw.scratch = scratch_storage;
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;

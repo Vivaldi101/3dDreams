@@ -604,7 +604,8 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
          max_vertex_count = vertex_count;
    }
 
-   u8* meshlet_vertices = push(a, u8, max_vertex_count);
+   arena s = context->scratch;
+   u8* meshlet_vertices = push(&s, u8, max_vertex_count);
 
    context->meshlet_counts.arena = a;
    array_resize(context->meshlet_counts, mesh_draws_count);

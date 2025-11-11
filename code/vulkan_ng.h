@@ -205,6 +205,7 @@ align_struct vk_context
    vk_swapchain_images swapchain_images;
 
    arena* storage;
+   arena scratch;
 
    u32 queue_family_index;
    f32 time_period;

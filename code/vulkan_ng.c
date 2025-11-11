@@ -1688,6 +1688,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
    context->storage = &hw->vk_storage;
+   context->scratch = hw->scratch;
 
    VkInstance instance = 0;
    if(!vk_instance_create(&instance, *context->storage))

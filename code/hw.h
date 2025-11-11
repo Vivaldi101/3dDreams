@@ -61,6 +61,7 @@ align_struct hw
 {
    hw_renderer renderer;
    arena vk_storage;
+   arena scratch;
    hw_timer timer;
    app_state state;
    void (*window_title)(struct hw* hw, s8 message, ...);
