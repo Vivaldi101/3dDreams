@@ -20,7 +20,7 @@ uniform sampler2D textures[];
 
 void main()
 {
-   vec3 sun_dir = normalize(vec3(1, 1, 0));
+   vec3 sun_dir = normalize(vec3(1, 0.45, 1));
    vec3 N = normalize(in_normal);
    
    // Small offset to avoid self-intersection
@@ -55,4 +55,5 @@ void main()
    vec3 color = albedo * ndotl * visibility + 0.05; // small ambient
    
    out_color = vec4(color, 1.0);
+   //out_color = vec4(albedo, 1);
 }
