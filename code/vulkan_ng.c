@@ -1018,10 +1018,8 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-   vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);  // TODO: Use strip for ground planes
+   vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-   // TODO: Currently this is broken
-   // TODO: Handle multi-meshes in the mesh shader
    if(state->is_mesh_shading)
    {
       VkPipeline pipeline = context->rtx_pipeline;
