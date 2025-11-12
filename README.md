@@ -2,7 +2,7 @@ Vulkan renderer with mesh shading and ray tracing written in C23 with minimal li
 
 Orbit camera usage: left-click to orbit eye, right-click to pan, wheel to zoom in and out.
 
-<img width="1920" height="1032" alt="meshlets" src="https://github.com/user-attachments/assets/af97d79a-bd4f-431a-9b87-de0c53f1259c" />
+<img width="1919" height="1026" alt="{8956BBB2-31E1-4AB2-8964-367FF657D6DE}" src="https://github.com/user-attachments/assets/651520f2-63c0-47a4-9c53-caca29bb576b" />
 
 <img width="1920" height="1030" alt="{FAB0CEDE-C01B-4EBE-9374-22AA33A48A32}" src="https://github.com/user-attachments/assets/2e56047d-2156-4499-8adf-99b99670aef4" />
 
