@@ -8,6 +8,7 @@ static const char* mb_buffer_name = "mb";
 static const char* indirect_buffer_name = "indirect";
 static const char* indirect_rtx_buffer_name = "indirect_rtx";
 static const char* mesh_draw_buffer_name = "mesh_draw";
+static const char* rt_buffer_name = "rt";
 
 #define graphics_module_name "graphics"
 #define meshlet_module_name "meshlet"
@@ -262,6 +263,33 @@ static bool buffer_draws_create(vk_buffer* transform_buffer, vk_context* context
       return false;
 
    vk_buffer_upload(context, transform_buffer, &scratch_buffer, draws, sizeof(struct mesh_draw) * context->geometry.mesh_instances.count);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
+
+   return true;
+}
+
+static bool buffer_rt_create(vk_buffer* rt_buffer, vk_context* context)
+{
+   VkAccelerationStructureDeviceAddressInfoKHR acceleration_info =
+   {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+   acceleration_info.accelerationStructure = context->tlas;
+
+   VkDeviceAddress tlas_address =
+      vkGetAccelerationStructureDeviceAddressKHR(context->devices.logical, &acceleration_info);
+
+   VkDeviceSize tlas_address_buffer_size = sizeof(VkDeviceAddress);
+
+   size scratch_buffer_size = tlas_address_buffer_size;
+   vk_buffer scratch_buffer = {.size = scratch_buffer_size};
+
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
+   rt_buffer->size = scratch_buffer_size;
+   if(!vk_buffer_create_and_bind(rt_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
+
+   vk_buffer_upload(context, rt_buffer, &scratch_buffer, &tlas_address, sizeof(VkDeviceAddress));
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    return true;

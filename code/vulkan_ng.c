@@ -855,9 +855,19 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
    return result;
 }
 
-static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorType type, VkDescriptorBufferInfo* buffer_info)
+static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorType type, VkDescriptorBufferInfo* buffer_info, void* extras)
 {
    VkWriteDescriptorSet result = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+   VkWriteDescriptorSetAccelerationStructureKHR acceleration_write_descriptor =
+   {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+
+   if(type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+   {
+      acceleration_write_descriptor.pAccelerationStructures = extras;
+      acceleration_write_descriptor.accelerationStructureCount = 1;
+      result.pNext = &acceleration_write_descriptor;
+   }
 
    result.dstBinding = binding;
    result.dstSet = VK_NULL_HANDLE;
@@ -873,11 +883,28 @@ static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratc
    VkWriteDescriptorSet* write_sets = push(&scratch, VkWriteDescriptorSet, binding_count);
    VkDescriptorBufferInfo* infos = push(&scratch, VkDescriptorBufferInfo, binding_count);
 
+   VkWriteDescriptorSetAccelerationStructureKHR acceleration_write_descriptor =
+   {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+
    for(u32 i = 0; i < binding_count; ++i)
    {
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
 
-      VkWriteDescriptorSet set = cmd_write_descriptor_create(bindings[i].binding, bindings[i].type, &infos[i]);
+      VkWriteDescriptorSet set = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+      if(bindings[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+      {
+         acceleration_write_descriptor.pAccelerationStructures = bindings[i].extras;
+         acceleration_write_descriptor.accelerationStructureCount = 1;
+         set.pNext = &acceleration_write_descriptor;
+      }
+
+      set.dstBinding = bindings[i].binding;
+      set.dstSet = VK_NULL_HANDLE;
+      set.descriptorCount = 1;
+      set.descriptorType = bindings[i].type;
+      set.pBufferInfo = &infos[i];
+
       write_sets[i] = set;
    }
 
@@ -979,8 +1006,8 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    VkClearValue clear[2] = {0};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
-   clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
-   //clear[0].color = (VkClearColorValue){0.19f, 0.19f, 0.19f};
+   //clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
+   clear[0].color = (VkClearColorValue){0.19f, 0.19f, 0.19f};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 
    renderpass_info.clearValueCount = 2;
@@ -1047,6 +1074,12 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
          array_push(bindings) = (vk_buffer_binding){buffer, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+      }
+
+      if(buffer_hash_lookup(&context->buffer_table, rt_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, rt_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 3, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, &context->tlas};
       }
 
       cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
@@ -1170,13 +1203,13 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 }
 
 // TODO: pass amount of bindings to create here
-// TODO: dont pass the mesh_shading and ray tracing booleans
-static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool mesh_shading_supported)
+// TODO: dont pass any booleans?
+static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool is_rtx)
 {
    // TODO: cleanup this nonsense
-   if(mesh_shading_supported)
+   if(is_rtx)
    {
-      VkDescriptorSetLayoutBinding bindings[3] = {0};
+      VkDescriptorSetLayoutBinding bindings[4] = {0};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
@@ -1191,6 +1224,11 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
       bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[2].descriptorCount = 1;
       bindings[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+
+      bindings[3].binding = 3;
+      bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+      bindings[3].descriptorCount = 1;
+      bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
       VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
@@ -1543,6 +1581,7 @@ static bool vk_buffers_create(vk_context* context)
    vk_buffer indirect_buffer = {0};
    vk_buffer indirect_rtx_buffer = {0};
    vk_buffer mesh_draw_buffer = {0};
+   vk_buffer rt_buffer = {0};
 
    arena s = *context->storage;
 
@@ -1562,6 +1601,11 @@ static bool vk_buffers_create(vk_context* context)
 
    buffer_hash_insert(&context->buffer_table, mesh_draw_buffer_name, mesh_draw_buffer);
 
+   if(!buffer_rt_create(&rt_buffer, context))
+      return false;
+
+   buffer_hash_insert(&context->buffer_table, rt_buffer_name, rt_buffer);
+
    return true;
 }
 
@@ -1573,7 +1617,7 @@ static bool vk_pipelines_create(vk_context* context)
    if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context->devices.logical, false))
       return false;
 
-   if(context->mesh_shading_supported)
+   if(context->mesh_shading_supported && context->raytracing_supported)
       if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
          return false;
 
@@ -1775,6 +1819,13 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
+   if(context->raytracing_supported)
+      if(!rt_acceleration_structures_create(context))
+      {
+         printf("Could not create acceleration structures for ray tracing\n");
+         return false;
+      }
+
    if(!vk_buffers_create(context))
    {
       printf("Could not create all the buffer objects\n");
@@ -1787,13 +1838,6 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(context->raytracing_supported)
-      if(!rt_acceleration_structures_create(context))
-      {
-         printf("Could not create acceleration structures for ray tracing\n");
-         return false;
-      }
-
    // TODO: remove vk_* prefix
    if(!vk_pipelines_create(context))
    {
@@ -1803,6 +1847,11 @@ bool vk_initialize(hw* hw)
 
    vk_textures_log(context);
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
+
+   //array(descriptor_info) descriptors = {context->storage};
+
+   //array_push(descriptors) = (descriptor_info){.name = image};
+   //array_push(descriptors) = (descriptor_info){.name = tlas};
 
    return true;
 }

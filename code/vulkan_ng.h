@@ -78,6 +78,7 @@ align_struct vk_buffer_binding
    vk_buffer buffer;
    u32 binding;
    VkDescriptorType type;
+   void* extras;
 } vk_buffer_binding;
 
 typedef struct meshlet meshlet;
@@ -154,6 +155,11 @@ align_struct vk_cmd
    VkCommandBuffer buffer;
    VkCommandPool pool;
 } vk_cmd;
+
+align_struct vk_rt_as
+{
+   int foo;
+} vk_rt_as;
 
 align_struct vk_context
 {

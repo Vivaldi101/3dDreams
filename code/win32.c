@@ -426,7 +426,7 @@ int main(int argc, char** argv)
    arena scratch_arena = {0};
    scratch_arena.end = (u8*)base + (arena_size/2);
 
-   size initial_arena_size = KB(256);
+   size initial_arena_size = KB(4);
    arena base_storage = arena_new(&base_arena, initial_arena_size);
    assert(arena_left(&base_storage) == initial_arena_size);
 

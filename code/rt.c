@@ -226,7 +226,7 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
    vk_buffer tlas_buffer = {.size = size_info.accelerationStructureSize};
 
    if(!vk_buffer_create_and_bind(&tlas_buffer, devices,
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR,
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 

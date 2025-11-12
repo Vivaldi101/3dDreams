@@ -1,4 +1,4 @@
-#version 450
+#version 460
 
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
@@ -40,13 +40,10 @@ layout(set = 0, binding = 2) readonly buffer mesh_draw_block
    mesh_draw draws[];
 };
 
-#if RAYTRACE
-#extension GL_EXT_ray_query : require
-layout(set = 0, binding = 3) uniform accelerationStructureEXT tlas;
-#endif
-
 layout(location = 0) out vec4 out_color[];
 layout(location = 1) out vec2 out_uv[];
+layout(location = 2) out vec3 out_wp[];
+layout(location = 3) out vec3 out_normal[];
 
 vec3 renormalize_normal(vec3 n)
 {
@@ -79,6 +76,8 @@ void main()
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;
 
+    mat3 normal_matrix = transpose(inverse(mat3(draws[draw_ID].world)));
+
 #if DEBUG
     uint h = hash_index(mi);
     vec3 meshlet_color = vec3(float(h & 255), float((h >> 8) & 255), float((h >> 16) & 255)) / 255.f;
@@ -94,12 +93,15 @@ void main()
 
       uint offset = draws[draw_ID].vertex_offset;
       vertex v = verts[offset + vi];
-      vec4 vo = globals.projection * globals.view * draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 wp = draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * wp;
+      vec3 n = vec3(v.nx, v.ny, v.nz);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
+      out_wp[i] = wp.xyz;
 
-      //vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
-      vec3 normal = renormalize_normal(vec3(v.nx, v.ny, v.nz));
+      vec3 normal = (n - 127.5) / 127.5;
+      vec3 world_normal = normalize(normal_matrix * normal);
 
 #if DEBUG
       out_color[i] = vec4(meshlet_color, 1.0);
@@ -108,6 +110,7 @@ void main()
 #endif
       vec2 texcoord = vec2(v.tu, v.tv);
       out_uv[i] = texcoord;
+      out_normal[i] = world_normal;
     }
 
     for(uint i = ti; i < triangle_count; i += 64)
