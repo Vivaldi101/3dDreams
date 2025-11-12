@@ -37,7 +37,6 @@ float ndc_to_linear_z(float ndc_z, float near, float far)
 void main()
 {
     vec3 light_color = vec3(1.f);
-    float ambient = 0.75f;
     if(!globals.draw_ground_plane)
     {
        mesh_draw draw = draws[in_draw_ID];
@@ -52,10 +51,9 @@ void main()
        if(draw.emissive != -1)
          emissive = texture(textures[draw.emissive], in_uv).rgb;
 
-       float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 1, 0))), 0.0);
+       float diffuse_factor = max(dot(normalize(in_normal), normalize(vec3(1, 0.45, 1))), 0.0);
        vec3 diffuse = diffuse_factor * light_color;
 
-       //out_color = vec4(final.rgb * (diffuse + ambient), 1.0); // keep opaque
        out_color = vec4(albedo.rgb * sqrt(diffuse_factor + 0.05) + emissive, albedo.a);
     }
     else

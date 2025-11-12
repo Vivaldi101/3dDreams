@@ -175,9 +175,11 @@ void app_start(hw* hw)
 
    //hw->state.asset_file = s8("lantern/lantern.gltf");
    hw->state.asset_file = s8("dragon/DragonAttenuation.gltf");
+   //hw->state.asset_file = s8("glassbrokenwindow/glassbrokenwindow.gltf");
    //hw->state.asset_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
    //hw->state.asset_file = s8("damagedhelmet/damagedhelmet.gltf");
    //hw->state.asset_file = s8("flighthelmet/flighthelmet.gltf");
+   //hw->state.asset_file = s8("sponza/sponza.gltf");
 
    if(!vk_initialize(hw))
    {

@@ -955,9 +955,6 @@ static void vk_present(hw* hw, vk_context* context)
    // essentialy run gpu and cpu in sync (60 FPS usually)
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
-
-   u64 query_results[2];
-   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 }
 
 static void vk_render(hw* hw, vk_context* context, app_state* state)
@@ -1173,32 +1170,24 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
 
-#if 0
+   u64 query_results[2];
+   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
+
+#if 1
    f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
    f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
-
-   static u32 begin = 0;
-   static u32 timer = 0;
-   u32 time = hw->timer.time();
-   if(begin == 0)
-      begin = time;
-   u32 end = hw->timer.time();
 
    {
       // frame logs
       // TODO: this should really be in app.c
-      if(hw->timer.time() - timer > 100)
+      if(1)
       {
          if(hw->state.is_mesh_shading)
-            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
+            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), gpu_end - gpu_begin, context->meshlets.count);
          else
-            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
-
-         timer = hw->timer.time();
+            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), gpu_end - gpu_begin);
       }
    }
-
-   begin = end;
 #endif
 }
 
@@ -1223,7 +1212,7 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
       bindings[2].binding = 2;
       bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[2].descriptorCount = 1;
-      bindings[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+      bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
 
       bindings[3].binding = 3;
       bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;

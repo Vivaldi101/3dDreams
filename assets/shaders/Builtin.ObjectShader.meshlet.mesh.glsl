@@ -44,6 +44,7 @@ layout(location = 0) out vec4 out_color[];
 layout(location = 1) out vec2 out_uv[];
 layout(location = 2) out vec3 out_wp[];
 layout(location = 3) out vec3 out_normal[];
+layout(location = 4) flat out uint out_draw_ID[];
 
 vec3 renormalize_normal(vec3 n)
 {
@@ -111,6 +112,7 @@ void main()
       vec2 texcoord = vec2(v.tu, v.tv);
       out_uv[i] = texcoord;
       out_normal[i] = world_normal;
+      out_draw_ID[i] = draw_ID;
     }
 
     for(uint i = ti; i < triangle_count; i += 64)
