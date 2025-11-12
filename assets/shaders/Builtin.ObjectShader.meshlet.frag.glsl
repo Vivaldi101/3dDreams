@@ -32,7 +32,7 @@ layout(set = 0, binding = 2) readonly buffer mesh_draw_block
 
 void main()
 {
-   mesh_draw draw = draws[in_draw_ID];
+    mesh_draw draw = draws[in_draw_ID];
     vec3 light_color = vec3(1.f);
     float ambient = 0.f;
 
@@ -42,7 +42,7 @@ void main()
 
    if(draw.albedo != -1)
       albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
-
+   
    if(draw.emissive != -1)
       emissive = texture(textures[draw.emissive], in_uv).rgb;
 

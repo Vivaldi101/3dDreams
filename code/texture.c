@@ -128,7 +128,7 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    tex.path.data[tex_len] = 0;        // null terminate
 
-   i32 tex_width, tex_height, tex_channels;
+   i32 tex_width = 0, tex_height = 0, tex_channels = 0;
    stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 
    VkExtent3D extents = {.width = tex_width, .height = tex_height, .depth = 1};

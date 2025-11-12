@@ -238,15 +238,47 @@ static size gltf_index_count(cgltf_data* data)
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = &data->meshes[i];
-      assert(gltf_mesh->primitives_count == 1);
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+      {
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
 
-      cgltf_primitive* prim = &gltf_mesh->primitives[0];
-      assert(prim->type == cgltf_primitive_type_triangles);
-
-      index_count += prim->indices->count;
+         index_count += prim->indices->count;
+      }
    }
 
    return index_count;
+}
+
+static size gltf_vertex_count(cgltf_data* data)
+{
+   size vertex_count = 0;
+   for(usize i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = &data->meshes[i];
+
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+      {
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
+
+         // Get the POSITION attribute to count vertices
+         cgltf_attribute* position_attr = 0;
+         for(usize a = 0; a < prim->attributes_count; ++a)
+         {
+            if(prim->attributes[a].type == cgltf_attribute_type_position)
+            {
+               position_attr = &prim->attributes[a];
+               break;
+            }
+         }
+
+         assert(position_attr && position_attr->data);
+         vertex_count += position_attr->data->count;
+      }
+   }
+
+   return vertex_count;
 }
 
 static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_count)
@@ -416,18 +448,34 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    vk_geometry* geometry = &context->geometry;
 
    array(vertex) vertices = {a};
+   array_resize(vertices, gltf_vertex_count(data));
 
    // preallocate indices
    array(u32) indices = {a};
    array_resize(indices, gltf_index_count(data));
 
+   size max_mesh_draws_count = 0;
+   for(usize i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = data->meshes + i;
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+         max_mesh_draws_count++;
+   }
+   size max_mesh_instances_count = 0;
+   for(usize i = 0; i < data->nodes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = data->meshes + i;
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+         max_mesh_instances_count++;
+   }
+
    // preallocate meshes
    geometry->mesh_draws.arena = a;
-   array_resize(geometry->mesh_draws, data->meshes_count);
+   array_resize(geometry->mesh_draws, max_mesh_draws_count);
 
    // preallocate instances
    geometry->mesh_instances.arena = a;
-   array_resize(geometry->mesh_instances, data->nodes_count);
+   array_resize(geometry->mesh_instances, max_mesh_instances_count);
 
    // preallocate textures
    context->textures.arena = a;
@@ -439,95 +487,97 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = data->meshes + i;
-      assert(gltf_mesh->primitives_count == 1);
-
-      cgltf_primitive* prim = gltf_mesh->primitives + 0;
-      assert(prim->type == cgltf_primitive_type_triangles);
-
-      usize vertex_count = 0;
-      cgltf_accessor* position_accessor = 0;
-      cgltf_accessor* normal_accessor = 0;
-      cgltf_accessor* texcoord_accessor = 0;
-
-      // parse attribute types
-      for(usize j = 0; j < prim->attributes_count; ++j)
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
       {
-         cgltf_attribute* attr = prim->attributes + j;
 
-         cgltf_attribute_type attr_type;
-         i32 attr_index;
-         cgltf_parse_attribute_type(attr->name, &attr_type, &attr_index);
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
 
-         switch(attr_type)
+         usize vertex_count = 0;
+         cgltf_accessor* position_accessor = 0;
+         cgltf_accessor* normal_accessor = 0;
+         cgltf_accessor* texcoord_accessor = 0;
+
+         // parse attribute types
+         for(usize j = 0; j < prim->attributes_count; ++j)
          {
-            case cgltf_attribute_type_position:
+            cgltf_attribute* attr = prim->attributes + j;
+
+            cgltf_attribute_type attr_type;
+            i32 attr_index;
+            cgltf_parse_attribute_type(attr->name, &attr_type, &attr_index);
+
+            switch(attr_type)
+            {
+               case cgltf_attribute_type_position:
                position_accessor = attr->data;
                vertex_count = position_accessor->count;
                break;
 
-            case cgltf_attribute_type_normal:
+               case cgltf_attribute_type_normal:
                normal_accessor = attr->data;
                break;
 
-            case cgltf_attribute_type_texcoord:
+               case cgltf_attribute_type_texcoord:
                if(attr_index == 0) // first uv set only
                   texcoord_accessor = attr->data;
                break;
 
-            default:
+               default:
                // ignore other attributes (e.g., color, joints, etc.)
                break;
+            }
          }
+
+         // load vertices
+         for(usize k = 0; k < vertex_count; ++k)
+         {
+            vertex vert = {0};
+
+            if(position_accessor)
+            {
+               f32 pos[3] = {0};
+               cgltf_accessor_read_float(position_accessor, k, pos, 3);
+               vert.vx = pos[0];
+               vert.vy = pos[1];
+               vert.vz = pos[2];
+            }
+            if(normal_accessor)
+            {
+               f32 norm[3] = {0};
+               cgltf_accessor_read_float(normal_accessor, k, norm, 3);
+               // pack normals
+               vert.nx = (uint8_t)((norm[0] * 0.5f + 0.5f) * 255.0f);
+               vert.ny = (uint8_t)((norm[1] * 0.5f + 0.5f) * 255.0f);
+               vert.nz = (uint8_t)((norm[2] * 0.5f + 0.5f) * 255.0f);
+            }
+            if(texcoord_accessor)
+            {
+               f32 uv[2] = {0};
+               cgltf_accessor_read_float(texcoord_accessor, k, uv, 2);
+               vert.tu = uv[0];
+               vert.tv = uv[1];
+            }
+
+            array_add(vertices, vert);
+         }
+
+         // load indices
+         usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
+         indices.count += index_count;
+
+         // add this mesh geometry
+         vk_mesh_draw md = {0};
+         md.index_count = index_count;
+         md.index_offset = index_offset;
+         md.vertex_offset = vertex_offset;
+         md.vertex_count = vertex_count;
+
+         array_add(geometry->mesh_draws, md);
+
+         index_offset += index_count;
+         vertex_offset += vertex_count;
       }
-
-      // load vertices
-      for(usize k = 0; k < vertex_count; ++k)
-      {
-         vertex vert = {0};
-
-         if(position_accessor)
-         {
-            f32 pos[3] = {0};
-            cgltf_accessor_read_float(position_accessor, k, pos, 3);
-            vert.vx = pos[0];
-            vert.vy = pos[1];
-            vert.vz = pos[2];
-         }
-         if(normal_accessor)
-         {
-            f32 norm[3] = {0};
-            cgltf_accessor_read_float(normal_accessor, k, norm, 3);
-            // pack normals
-            vert.nx = (uint8_t)((norm[0] * 0.5f + 0.5f) * 255.0f);
-            vert.ny = (uint8_t)((norm[1] * 0.5f + 0.5f) * 255.0f);
-            vert.nz = (uint8_t)((norm[2] * 0.5f + 0.5f) * 255.0f);
-         }
-         if(texcoord_accessor)
-         {
-            f32 uv[2] = {0};
-            cgltf_accessor_read_float(texcoord_accessor, k, uv, 2);
-            vert.tu = uv[0];
-            vert.tv = uv[1];
-         }
-
-         array_push(vertices) = vert;
-      }
-
-      // load indices
-      usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
-      indices.count += index_count;
-
-      // add this mesh geometry
-      vk_mesh_draw md = {0};
-      md.index_count = index_count;
-      md.index_offset = index_offset;
-      md.vertex_offset = vertex_offset;
-      md.vertex_count = vertex_count;
-
-      array_add(geometry->mesh_draws, md);
-
-      index_offset += index_count;
-      vertex_offset += vertex_count;
    }
 
    for(usize i = 0; i < data->nodes_count; ++i)
