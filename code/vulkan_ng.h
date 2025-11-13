@@ -157,6 +157,7 @@ align_struct vk_cmd
 
 align_struct vk_rt_as
 {
+   // TODO: fill this acceleration structures
    int foo;
 } vk_rt_as;
 

@@ -92,8 +92,8 @@ void main()
     {
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
-      uint offset = draws[draw_ID].vertex_offset;
-      vertex v = verts[offset + vi];
+      uint vertex_offset = draws[draw_ID].vertex_offset;
+      vertex v = verts[vertex_offset + vi];
       vec4 wp = draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
       vec4 vo = globals.projection * globals.view * wp;
       vec3 n = vec3(v.nx, v.ny, v.nz);

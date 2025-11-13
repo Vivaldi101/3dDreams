@@ -231,7 +231,7 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 }
 #endif
 
-static size gltf_index_count(cgltf_data* data)
+static size gltf_index_count(const cgltf_data* data)
 {
    size index_count = 0;
    for(usize i = 0; i < data->meshes_count; ++i)
@@ -249,7 +249,7 @@ static size gltf_index_count(cgltf_data* data)
    return index_count;
 }
 
-static size gltf_vertex_count(cgltf_data* data)
+static size gltf_vertex_count(const cgltf_data* data)
 {
    size vertex_count = 0;
    for(usize i = 0; i < data->meshes_count; ++i)
@@ -440,7 +440,7 @@ static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
    return true;
 }
 
-static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
+static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_path)
 {
    arena* a = context->storage;
    arena s = context->scratch;
@@ -461,13 +461,8 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
       for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
          max_mesh_draws_count++;
    }
-   size max_mesh_instances_count = 0;
-   for(usize i = 0; i < data->nodes_count; ++i)
-   {
-      cgltf_mesh* gltf_mesh = data->meshes + i;
-      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
-         max_mesh_instances_count++;
-   }
+
+   size max_mesh_instances_count = max_mesh_draws_count;
 
    // preallocate meshes
    geometry->mesh_draws.arena = a;
@@ -590,16 +585,16 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
 
       for(cgltf_size pi = 0; pi < mesh->primitives_count; ++pi)
       {
-         cgltf_primitive* prim = &mesh->primitives[pi];
+         cgltf_primitive* prim = mesh->primitives + pi;
          cgltf_material* material = prim->material;
 
          mat4 wm = {0};
          cgltf_node_transform_world(node, wm.data);
 
          vk_mesh_instance mi = {0};
-         u32 mesh_index = (u32)cgltf_mesh_index(data, node->mesh);
+         u32 mesh_index = (u32)cgltf_mesh_index(data, mesh);
          // index into the mesh to draw
-         mi.mesh_index = mesh_index;
+         mi.mesh_index = mesh_index + (u32)pi;
          mi.world = wm;
 
          cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture

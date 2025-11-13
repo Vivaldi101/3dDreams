@@ -1836,11 +1836,6 @@ bool vk_initialize(hw* hw)
 
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
 
-   //array(descriptor_info) descriptors = {context->storage};
-
-   //array_push(descriptors) = (descriptor_info){.name = image};
-   //array_push(descriptors) = (descriptor_info){.name = tlas};
-
    return true;
 }
 
