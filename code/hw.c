@@ -152,12 +152,10 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 {
    clock_query_frequency();
 
-   f32 altitude = PI / 8.f;
-   //f32 altitude = 0;
-   f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-   //f32 azimuth = 0;
+   f32 altitude = PI / 10.f;
+   f32 azimuth = PI * 2.f;
    vec3 origin = {0, 0, 0};
-   app_camera_reset(&hw->state.camera, origin, 50.f, altitude, azimuth);
+   app_camera_reset(&hw->state.camera, origin, 1.0f, altitude, azimuth);
 
    i64 fps_log_counter = (i64)(clock_time_to_counter(.5f) + .5f);
 
