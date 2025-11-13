@@ -1183,9 +1183,9 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if(1)
       {
          if(hw->state.is_mesh_shading)
-            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), gpu_end - gpu_begin, context->meshlets.count);
+            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: %u; Press 'm' to toggle RTX; RTX ON"), gpu_end - gpu_begin, context->meshlets.count);
          else
-            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), gpu_end - gpu_begin);
+            hw->window_title(hw, s8("gpu: %.2f ms; #Meshlets: 0; Press 'm' to toggle RTX; RTX OFF"), gpu_end - gpu_begin);
       }
    }
 #endif

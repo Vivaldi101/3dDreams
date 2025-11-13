@@ -416,17 +416,18 @@ int main(int argc, char** argv)
    hw_virtual_memory_init();
 
    // max virtual limit
-   size arena_size = 1ull << 46;
-   void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
+   void* base = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
 
    arena base_arena = {0};
    base_arena.end = base;
+   base_arena.commit_end = (byte*)base_arena.end + arena_max_commit_size/2;
 
    arena scratch_arena = {0};
-   scratch_arena.end = (u8*)base + (arena_size/2);
+   scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
+   scratch_arena.commit_end = (byte*)scratch_arena.end + arena_max_commit_size/2;
 
-   size initial_arena_size = KB(512);
+   size initial_arena_size = KB(4);
    arena base_storage = arena_new(&base_arena, initial_arena_size);
    assert(arena_left(&base_storage) == initial_arena_size);
 

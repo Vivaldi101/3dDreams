@@ -128,7 +128,9 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    tex.path.data[tex_len] = 0;        // null terminate
 
-   i32 tex_width = 0, tex_height = 0, tex_channels = 0;
+   i32 tex_width = 0;
+   i32 tex_height = 0;
+   i32 tex_channels = 0;
    stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 
    VkExtent3D extents = {.width = tex_width, .height = tex_height, .depth = 1};
@@ -149,17 +151,13 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    vk_buffer scratch_buffer = {.size = tex_size};
    vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   // TODO: narrow
-   if(vk_valid_handle(image.handle))
-   {
-      vk_buffer_to_image_upload(context, scratch_buffer, image.handle, extents, tex_pixels, scratch_buffer.size);
+   vk_buffer_to_image_upload(context, scratch_buffer, image.handle, extents, tex_pixels, scratch_buffer.size);
 
-      tex.image.handle = image.handle;
-      tex.image.memory = image.memory;
-      tex.image.view = image_view;
+   tex.image.handle = image.handle;
+   tex.image.memory = image.memory;
+   tex.image.view = image_view;
 
-      array_add(context->textures, tex);
-   }
+   array_add(context->textures, tex);
 
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 

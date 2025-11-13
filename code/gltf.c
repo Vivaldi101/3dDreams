@@ -643,6 +643,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
 
       cgltf_decode_uri(img->uri);
 
+      // TODO: pass just textures, devices instead of entire context
       vk_texture_load(context, s8(img->uri), gltf_path);
    }
 

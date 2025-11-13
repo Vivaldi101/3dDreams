@@ -6,6 +6,8 @@
 // TODO: make areanas platform agnostic
 #include <Windows.h>
 
+static size arena_max_commit_size = 1ull << 46;
+
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
 #define newx(a,b,c,d,e,...) e
@@ -34,7 +36,8 @@
 align_struct arena
 {
    void* beg;
-   void* end;  // one past the end
+   void* end;         // one past the end
+   void* commit_end;  // one past the commit end
 } arena;
 
 // TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
@@ -64,8 +67,10 @@ static arena arena_new(arena* base, size cap)
 {
    assert(base->end && cap > 0);
    assert(cap >= page_size);
+   assert((byte*)base->end + cap <= (byte*)base->commit_end);
 
    arena result = {0};
+   result.commit_end = base->commit_end;
 
    if(hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
