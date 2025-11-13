@@ -108,7 +108,6 @@ align_struct vk_mesh_draw
 
 align_struct vk_texture
 {
-   array(char) path;
    vk_image image;
 } vk_texture;
 

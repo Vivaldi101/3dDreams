@@ -1834,7 +1834,6 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   vk_textures_log(context);
    spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
 
    //array(descriptor_info) descriptors = {context->storage};
