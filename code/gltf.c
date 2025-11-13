@@ -444,14 +444,15 @@ static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
 static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
 {
    arena* a = context->storage;
+   arena s = context->scratch;
 
    vk_geometry* geometry = &context->geometry;
 
-   array(vertex) vertices = {a};
+   array(vertex) vertices = {&s};
    array_resize(vertices, gltf_vertex_count(data));
 
    // preallocate indices
-   array(u32) indices = {a};
+   array(u32) indices = {&s};
    array_resize(indices, gltf_index_count(data));
 
    size max_mesh_draws_count = 0;
@@ -654,7 +655,6 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
          max_vertex_count = vertex_count;
    }
 
-   arena s = context->scratch;
    u8* meshlet_vertices = push(&s, u8, max_vertex_count);
 
    context->meshlet_counts.arena = a;
