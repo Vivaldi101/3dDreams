@@ -36,12 +36,11 @@ void main()
     vec3 light_color = vec3(1.f);
     float ambient = 0.f;
 
-   //vec4 final = vec4(1, 1, 1, 1);
    vec4 albedo = vec4(.5, .5, .5, 1);
    vec3 emissive = vec3(0.0);
 
    if(draw.albedo != -1)
-      albedo = vec4(texture(textures[draw.albedo], in_uv).rgb, 1.f);
+      albedo = texture(textures[draw.albedo], in_uv).rgba;
    
    if(draw.emissive != -1)
       emissive = texture(textures[draw.emissive], in_uv).rgb;
@@ -80,8 +79,8 @@ void main()
    // Apply Lambertian lighting and shadow
    //vec3 color = albedo * ndotl * visibility + 0.05; // small ambient
    vec3 color = (albedo.rgb * ndotl * visibility + emissive);
+
+   if(albedo.a < 0.5) discard;
    
-   //out_color = vec4(albedo, 1);
    out_color = vec4(color, albedo.a);
-   //out_color = vec4(albedo.rgb * sqrt(diffuse_factor + 0.05) + emissive, albedo.a);
 }
