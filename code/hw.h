@@ -55,6 +55,8 @@ align_struct hw_timer
 {
    void(*sleep)(u32 ms);
    i64(*time)();
+   f64(*seconds_elapsed)(i64 begin, i64 end);
+   f64(*time_to_counter)(f64 time);
 } hw_timer;
 
 align_struct hw

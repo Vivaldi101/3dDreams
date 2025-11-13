@@ -30,6 +30,11 @@ static i64 win32_query_counter()
    return clock_query_counter();
 }
 
+static f64 win32_time_to_counter(f64 time)
+{
+   return clock_time_to_counter(time);
+}
+
 static f64 win32_seconds_elapsed(i64 begin, i64 end)
 {
    return clock_seconds_elapsed(begin, end);
@@ -443,6 +448,8 @@ int main(int argc, char** argv)
 
    hw.timer.sleep = win32_sleep;
    hw.timer.time = win32_query_counter;
+   hw.timer.seconds_elapsed = win32_seconds_elapsed;
+   hw.timer.time_to_counter = win32_time_to_counter;
 
    hw.platform_loop = win32_platform_loop;
 

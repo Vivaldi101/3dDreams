@@ -28,9 +28,9 @@ IF /I "%1"=="d" (
 
 IF /I "%1"=="r" (
     echo Building RELEASE version...
-    cl -MT -nologo -O2 -Oi -Os -GL -fp:fast /FC -W3 /std:clatest /DNDEBUG %IGNORE_WARNINGS% ^
+    cl -MT -nologo -O2 -Oi -Zi -FC -W3 /std:clatest %IGNORE_WARNINGS% ^
         -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" "%ROOT%\app.c" "%ROOT%\win32.c" ^
-        /link %WIN32_LIBS% /incremental:no /LTCG /OPT:REF /OPT:ICF /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_release.exe
+        /link %WIN32_LIBS% -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_release.exe
 
     popd
 )
