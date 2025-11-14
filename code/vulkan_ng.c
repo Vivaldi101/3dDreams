@@ -1739,8 +1739,11 @@ bool vk_initialize(hw* hw)
    context->storage = &hw->vk_storage;
    context->scratch = hw->scratch;
 
+   arena* a = context->storage;
+   arena s = *context->storage;
+
    VkInstance instance = 0;
-   if(!vk_instance_create(&instance, *context->storage))
+   if(!vk_instance_create(&instance, s))
       return false;
 
    volkLoadInstance(instance);
@@ -1779,8 +1782,8 @@ bool vk_initialize(hw* hw)
    // TODO: should pass the scratch arenas instead of the context
    context->devices.physical = vk_physical_device_select(context);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
-   context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
-   context->devices.logical = vk_logical_device_create(context, *context->storage);
+   context->queue_family_index = vk_logical_device_select_family_index(context, s);
+   context->devices.logical = vk_logical_device_create(context, s);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(context);
@@ -1791,15 +1794,15 @@ bool vk_initialize(hw* hw)
    context->renderpass = vk_renderpass_create(context);
 
    // framebuffers
-   context->framebuffers.arena = context->storage;
+   context->framebuffers.arena = a;
    array_resize(context->framebuffers, context->swapchain_surface.image_count);
 
    // images
-   context->swapchain_images.images.arena = context->storage;
+   context->swapchain_images.images.arena = a;
    array_resize(context->swapchain_images.images, context->swapchain_surface.image_count);
 
    // depths
-   context->swapchain_images.depths.arena = context->storage;
+   context->swapchain_images.depths.arena = a;
    array_resize(context->swapchain_images.depths, context->swapchain_surface.image_count);
 
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
@@ -1811,7 +1814,7 @@ bool vk_initialize(hw* hw)
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   context->buffer_table = buffer_hash_create(100, context->storage);
+   context->buffer_table = buffer_hash_create(100, a);
    buffer_hash_clear(&context->buffer_table);
 
    if(!spirv_initialize(context))

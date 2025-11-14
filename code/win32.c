@@ -420,6 +420,8 @@ int main(int argc, char** argv)
 
    hw_virtual_memory_init();
 
+   size arena_max_commit_size = 1ull << 46;
+
    // max virtual limit
    void* base = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
@@ -427,20 +429,25 @@ int main(int argc, char** argv)
    arena base_arena = {0};
    base_arena.end = base;
    base_arena.commit_end = (byte*)base_arena.end + arena_max_commit_size/2;
+   base_arena.kind = arena_persistent;
 
    arena scratch_arena = {0};
    scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
    scratch_arena.commit_end = (byte*)scratch_arena.end + arena_max_commit_size/2;
+   scratch_arena.kind = arena_scratch;
 
-   size initial_arena_size = KB(4);
-   arena base_storage = arena_new(&base_arena, initial_arena_size);
-   assert(arena_left(&base_storage) == initial_arena_size);
+   const size initial_arena_size = KB(4);
 
-   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size);
-   assert(arena_left(&scratch_storage) == initial_arena_size);
+   arena* base_storage = arena_new(&base_arena, initial_arena_size);
+   size base_size = arena_left(base_storage);
+   assert(base_size == initial_arena_size);
 
-   hw.vk_storage = base_storage;
-   hw.scratch = scratch_storage;
+   arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size);
+   size scratch_size = arena_left(scratch_storage);
+   assert(scratch_size == initial_arena_size);
+
+   hw.vk_storage = *base_storage;
+   hw.scratch = *scratch_storage;
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
