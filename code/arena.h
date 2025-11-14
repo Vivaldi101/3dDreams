@@ -42,7 +42,6 @@ align_struct arena
    void* beg;
    void* end;         // one past the end
    void* commit_end;  // one past the commit end
-   struct arena* next;
    arena_flags kind;
 } arena;
 
@@ -83,7 +82,7 @@ static arena* arena_new(arena* base, size cap)
       a->beg = base->end;
       a->end = (byte*)base->end + cap;
 
-      assert(a->beg < a->end);
+      assert((byte*)a->beg + cap == a->end);
 
       assert(a->beg == base->beg);
       assert(a->end == base->end);
@@ -94,12 +93,11 @@ static arena* arena_new(arena* base, size cap)
    // alloc arena + payload
    arena* p = VirtualAlloc(base->end, cap + sizeof(arena), MEM_COMMIT, PAGE_READWRITE);
    assert(p);
-   p->next = base->next;
-   base->next = p;
+
    p->beg = p + sizeof(arena);
    p->end = (byte*)p->beg + cap;
 
-   assert(p->beg < p->end);
+   assert((byte*)p->beg + cap == p->end);
 
    return p;
 }
