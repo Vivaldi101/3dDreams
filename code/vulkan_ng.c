@@ -955,8 +955,8 @@ static void vk_present(hw* hw, vk_context* context)
    vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT);
 
 #if 1
-   f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
-   f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
+   f64 gpu_begin = (f64)(query_results[0]) * context->time_period;
+   f64 gpu_end = (f64)(query_results[1]) * context->time_period;
 
    static i64 cpu_begin = 0;
    static i64 cpu_counter = 0;
@@ -978,13 +978,14 @@ static void vk_present(hw* hw, vk_context* context)
 
    if(cpu_end - cpu_counter > log_time)
    {
+      const f64 ms = 1e6;
       cpu_counter = cpu_end;
       // frame logs
       // TODO: this should really be in app.c
       if(hw->state.is_mesh_shading)
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, gpu_end - gpu_begin, context->meshlets.count);
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, (gpu_end - gpu_begin) / ms, context->meshlets.count);
       else
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, gpu_end - gpu_begin);
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, (gpu_end - gpu_begin) / ms);
    }
 #endif
 
