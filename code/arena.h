@@ -6,7 +6,11 @@
 // TODO: make areanas platform agnostic
 #include <Windows.h>
 
-static size arena_max_commit_size = 1ull << 46;
+typedef enum arena_flags
+{
+   arena_persistent = 0,
+   arena_scratch
+} arena_flags;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -38,6 +42,8 @@ align_struct arena
    void* beg;
    void* end;         // one past the end
    void* commit_end;  // one past the commit end
+   struct arena* next;
+   arena_flags kind;
 } arena;
 
 // TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
@@ -63,32 +69,39 @@ static bool hw_is_virtual_memory_commited(void* address)
 }
 
 // TODO: use GetSystemInfo
-static arena arena_new(arena* base, size cap)
+// TODO: just expand base in place instead of return
+static arena* arena_new(arena* base, size cap)
 {
    assert(base->end && cap > 0);
    assert(cap >= page_size);
-   assert((byte*)base->end + cap <= (byte*)base->commit_end);
+   //assert((byte*)base->end + cap <= (byte*)base->commit_end);   TODO: re-enable
 
-   arena result = {0};
-   result.commit_end = base->commit_end;
+   arena* a = base;
 
    if(hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
-      result.beg = base->end;
-      result.end = (byte*)result.beg + cap;
+      a->beg = base->end;
+      a->end = (byte*)base->end + cap;
 
-      assert(result.beg < result.end);
+      assert(a->beg < a->end);
 
-      return result;
+      assert(a->beg == base->beg);
+      assert(a->end == base->end);
+
+      return a;
    }
 
-   result.beg = VirtualAlloc(base->end, cap, MEM_COMMIT, PAGE_READWRITE);
-   assert(result.beg);
-   result.end = (byte*)result.beg + cap;
+   // alloc arena + payload
+   arena* p = VirtualAlloc(base->end, cap + sizeof(arena), MEM_COMMIT, PAGE_READWRITE);
+   assert(p);
+   p->next = base->next;
+   base->next = p;
+   p->beg = p + sizeof(arena);
+   p->end = (byte*)p->beg + cap;
 
-   assert(result.beg < result.end);
+   assert(p->beg < p->end);
 
-   return result;
+   return p;
 }
 
 static void arena_expand(arena* a, size new_cap)
@@ -96,13 +109,12 @@ static void arena_expand(arena* a, size new_cap)
    assert(new_cap > 0);
    assert((uptr)a->end <= ((1ull << 48)-1) - page_size);
 
-   arena new_arena = arena_new(a, new_cap);
-   //assert(new_arena.beg == a->end);
-   assert(new_arena.end > a->end);
+   arena* new_arena = arena_new(a, new_cap);
+   assert(new_arena->end >= a->end);
 
-   a->end = (byte*)new_arena.end;
+   a->end = (byte*)new_arena->end;
 
-   assert(a->end == (byte*)new_arena.beg + new_cap);
+   assert(a->end == (byte*)new_arena->beg + new_cap);
 }
 
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
