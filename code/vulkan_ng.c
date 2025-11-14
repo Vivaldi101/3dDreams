@@ -989,7 +989,7 @@ static void vk_present(hw* hw, vk_context* context)
 #endif
 
    // wait until all queue ops are done
-   // essentialy run gpu and cpu in sync (60 FPS usually)
+   // essentialy run gpu and cpu in sync (driver decides this)
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }

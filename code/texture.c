@@ -143,7 +143,6 @@ static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_pa
 
    VkImageView image_view = vk_image_view_create(context, format, image.handle, VK_IMAGE_ASPECT_COLOR_BIT);
 
-   // TODO: enable for mip textures
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
    VkPhysicalDeviceMemoryProperties memory_props;
