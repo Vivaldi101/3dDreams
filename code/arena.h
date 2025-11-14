@@ -3,15 +3,10 @@
 
 #include "common.h"
 
+// TODO: make areanas platform agnostic
 #include <Windows.h>
 
-#define arena_iterate(a, s, type, var, code_block) \
-do { \
-    arena scratch_ = push(&(a), type, (s)); \
-    type* (var) = scratch_.beg; \
-    size_t count_ = scratch_size(scratch_) / sizeof(type); \
-    for (size_t i = 0; i < count_; ++i) code_block \
-} while (0)
+static size arena_max_commit_size = 1ull << 46;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -22,32 +17,36 @@ do { \
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
 // TODO: functions?
+// TODO: cleanup array_push() and array_add()
 // Pushes to non preallocated storage
-#define array_push(a)          (a).count++; *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
+#define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
+#define arrayp_push(a)      (a)->count++, *(typeof(a->data))array_alloc((array*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, 0)
+
 // Adds to preallocated storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
-#define array_resize(a, s)  (a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);
+#define array_resize(a, s)  {(a).data = alloc(a.arena, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), (s), 0);};
+
+#define array_set(arr, a)  (arr).arena = a
+#define array_set_size(arr, s, a)  {array_set((arr), (a)); array_resize((arr), (s)); array_clear((arr), (s));}
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)
 #define amountof(a, t)  ((a) * sizeof(t))
 
-enum
-{
-   FIXED_ARRAY_PUSH_FLAG = 1 << 0,
-};
-
-typedef struct arena
+align_struct arena
 {
    void* beg;
-   void* end;  // one past the end
+   void* end;         // one past the end
+   void* commit_end;  // one past the commit end
 } arena;
 
 // TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
-
 #define array(T) struct { arena* arena; size count; T* data; }
 
-typedef struct array
+#define array_clear(a, s) memset((a).data, 0, s*sizeof(typeof(*(a).data)))
+#define array_fixed(t, T, s, a) array(T) (t) = {&(a)}; {array_resize((t), (s)); array_clear((t), (s));}
+
+align_struct array
 {
    arena* arena;
    size count;
@@ -68,8 +67,10 @@ static arena arena_new(arena* base, size cap)
 {
    assert(base->end && cap > 0);
    assert(cap >= page_size);
+   assert((byte*)base->end + cap <= (byte*)base->commit_end);
 
    arena result = {0};
+   result.commit_end = base->commit_end;
 
    if(hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
@@ -93,10 +94,10 @@ static arena arena_new(arena* base, size cap)
 static void arena_expand(arena* a, size new_cap)
 {
    assert(new_cap > 0);
-   assert((uintptr_t)a->end <= ((1ull << 48)-1) - page_size);
+   assert((uptr)a->end <= ((1ull << 48)-1) - page_size);
 
    arena new_arena = arena_new(a, new_cap);
-   assert(new_arena.beg == a->end);
+   //assert(new_arena.beg == a->end);
    assert(new_arena.end > a->end);
 
    a->end = (byte*)new_arena.end;
@@ -106,16 +107,25 @@ static void arena_expand(arena* a, size new_cap)
 
 static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 {
+   (void)flag;
+   assert(a);
+   assert(alloc_size > 0);
+   assert(align > 0);
+   assert(count > 0);
+
    // align allocation to next aligned boundary
-   void* p = (void*)(((uptr)a->beg + (align - 1)) & (-align));
+   void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
 
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
+      // page align allocs
       arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
       p = a->beg;
    }
 
    a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
+
+   pointer_clear(p, count * alloc_size);
 
    return p;
 }

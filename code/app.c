@@ -10,6 +10,8 @@
 
 static void app_frame(arena scratch, app_state* state)
 {
+   (void)scratch;
+   (void)state;
    // per app frame drawing
 }
 
@@ -112,7 +114,7 @@ void app_camera_reset(app_camera* camera, vec3 origin, f32 radius, f32 altitude,
    f32 y = radius * sinf(altitude) + origin.y;
    vec3 eye = {x, y, z};
 
-   memset(camera, 0, sizeof(app_camera));
+   struct_clear(camera);
 
    camera->origin = origin;
    camera->eye = eye;
@@ -131,12 +133,17 @@ static void app_input_handle(app_state* state)
    app_camera_update(state);
    state->draw_axis = false;
 
-   if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
-      state->draw_axis = true;
    if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
-      state->rtx_enabled = !state->rtx_enabled;
+      state->is_raytracing = !state->is_raytracing;
+   }
+   if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
+      state->draw_axis = true;
+   if(state->input.key == 'M' && state->input.key_state == KEY_STATE_UP)
+   {
+      state->input.key_state = 0;
+      state->is_mesh_shading = !state->is_mesh_shading;
    }
    if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
    {
@@ -147,10 +154,10 @@ static void app_input_handle(app_state* state)
    if(state->input.key == 'S' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
-      f32 altitude = PI / 8.f;
-      f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-      vec3 origin = {};
-      app_camera_reset(&state->camera, origin, 50.f, altitude, azimuth);
+      f32 altitude = PI / 10.f;
+      f32 azimuth = PI * 2.f;
+      vec3 origin = {0, 0, 0};
+      app_camera_reset(&state->camera, origin, 1.f, altitude, azimuth);
    }
 }
 
@@ -158,7 +165,7 @@ void app_start(hw* hw)
 {
    int w = 800, h = 600;
 	int x = 100, y = 100;
-   const char* win_name = "Foo";
+   const char* win_name = "";
 
    if(!hw_window_open(hw, win_name, x, y, w, h))
    {
@@ -166,13 +173,21 @@ void app_start(hw* hw)
       return;
    }
 
-   hw->state.asset_file = s8("lantern/lantern.gltf");
+   //hw->state.asset_file = s8("lantern/lantern.gltf");
+   //hw->state.asset_file = s8("dragon/DragonAttenuation.gltf");
+   //hw->state.asset_file = s8("glassbrokenwindow/glassbrokenwindow.gltf");
+   //hw->state.asset_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
+   //hw->state.asset_file = s8("damagedhelmet/damagedhelmet.gltf");
+   //hw->state.asset_file = s8("flighthelmet/flighthelmet.gltf");
+   hw->state.asset_file = s8("sponza/sponza.gltf");
 
    if(!vk_initialize(hw))
    {
       printf("Could not initialize all the required subsystems for Vulkan backend\n");
       return;
    }
+
+   printf("Vulkan backend initialized!\n");
 
    hw_event_loop_start(hw, app_frame, app_input_handle);
    vk_uninitialize(hw);

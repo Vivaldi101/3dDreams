@@ -7,8 +7,6 @@
 #extension GL_ARB_shader_draw_parameters : require
 #extension GL_GOOGLE_include_directive: require
 
-#define DEBUG 1
-
 #include "mesh.h"
 #include "common.glsl"
 
@@ -18,6 +16,14 @@ layout(triangles, max_vertices = 64, max_primitives = 127) out;
 
 const uint max_vertices = 64;
 const uint max_primitives = 127;
+
+vec3 quad[4] = vec3[]
+(
+    vec3(-100.0f, -1.25f, -100.0f),  // top-left
+    vec3(-100.0f, -1.25f,  100.0f),  // bottom-left
+    vec3(100.0f,  -1.25f,   -100.0f), // top-right
+    vec3(100.0f,  -1.25f,   100.0f)   // bottom-right
+);
 
 layout(set = 0, binding = 0) readonly buffer vertex_block
 {
@@ -29,13 +35,16 @@ layout(set = 0, binding = 1) readonly buffer meshlet_block
    meshlet meshlets[];
 };
 
-layout(set = 0, binding = 2) readonly buffer transform_block
+layout(set = 0, binding = 2) readonly buffer mesh_draw_block
 {
-   mat4 worlds[];
+   mesh_draw draws[];
 };
 
 layout(location = 0) out vec4 out_color[];
 layout(location = 1) out vec2 out_uv[];
+layout(location = 2) out vec3 out_wp[];
+layout(location = 3) out vec3 out_normal[];
+layout(location = 4) flat out uint out_draw_ID[];
 
 vec3 renormalize_normal(vec3 n)
 {
@@ -62,11 +71,13 @@ void main()
 {
     int draw_ID = gl_DrawIDARB;
 
-    uint mi = gl_WorkGroupID.x + globals.meshlet_offset;
-    uint ti = gl_LocalInvocationID.x;
+    uint mi = draws[draw_ID].mesh_offset + gl_WorkGroupID.x;    // global meshlet index
+    uint ti = gl_LocalInvocationID.x;     // thread index
 
     uint vertex_count = meshlets[mi].vertex_count;
     uint triangle_count = meshlets[mi].triangle_count;
+
+    mat3 normal_matrix = transpose(inverse(mat3(draws[draw_ID].world)));
 
 #if DEBUG
     uint h = hash_index(mi);
@@ -81,13 +92,17 @@ void main()
     {
       uint vi = meshlets[mi].vertex_index_buffer[i];
 
-      vertex v = verts[vi];
-      vec4 vo = globals.projection * globals.view * worlds[draw_ID] * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      uint vertex_offset = draws[draw_ID].vertex_offset;
+      vertex v = verts[vertex_offset + vi];
+      vec4 wp = draws[draw_ID].world * vec4(vec3(v.vx, v.vy, v.vz), 1.0f);
+      vec4 vo = globals.projection * globals.view * wp;
+      vec3 n = vec3(v.nx, v.ny, v.nz);
 
       gl_MeshVerticesEXT[i].gl_Position = vo;
+      out_wp[i] = wp.xyz;
 
-      //vec3 normal = (vec3(v.nx, v.ny, v.nz) - 127.5) / 127.5;
-      vec3 normal = renormalize_normal(vec3(v.nx, v.ny, v.nz));
+      vec3 normal = (n - 127.5) / 127.5;
+      vec3 world_normal = normalize(normal_matrix * normal);
 
 #if DEBUG
       out_color[i] = vec4(meshlet_color, 1.0);
@@ -96,6 +111,8 @@ void main()
 #endif
       vec2 texcoord = vec2(v.tu, v.tv);
       out_uv[i] = texcoord;
+      out_normal[i] = world_normal;
+      out_draw_ID[i] = draw_ID;
     }
 
     for(uint i = ti; i < triangle_count; i += 64)

@@ -11,8 +11,7 @@
 
 #include "vulkan_ng.h"
 
-static void vk_textures_log(vk_context* context);
-static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path);
+static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path);
 
 typedef struct vertex vertex;
 typedef struct 
@@ -38,17 +37,9 @@ static void meshlet_add_new_vertex_index(u32 index, u8* meshlet_vertices, struct
    }
 }
 
-static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* index_buffer, size index_count)
+static void meshlet_build(array_meshlet* result, u8* meshlet_vertices, u32* index_buffer, size index_count, u32 index_offset)
 {
-   vk_meshlet_buffer result = {0};
-
    struct meshlet ml = {0};
-
-   u8* meshlet_vertices = push(&scratch, u8, vertex_count);
-   result.meshlets.arena = &scratch;
-
-   // 0xff means the vertex index is not in use yet
-   memset(meshlet_vertices, 0xff, vertex_count);
 
    usize max_index_count = array_count(ml.primitive_indices);
    usize max_vertex_count = array_count(ml.vertex_index_buffer);
@@ -57,9 +48,9 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
    for(size i = 0; i < index_count; i += 3)
    {
       // original per primitive (triangle indices)
-      u32 i0 = index_buffer[i + 0];
-      u32 i1 = index_buffer[i + 1];
-      u32 i2 = index_buffer[i + 2];
+      u32 i0 = index_buffer[index_offset + i + 0];
+      u32 i1 = index_buffer[index_offset + i + 1];
+      u32 i2 = index_buffer[index_offset + i + 2];
 
       // are the mesh vertex indices not used yet
       bool mi0 = meshlet_vertices[i0] == 0xff;
@@ -70,22 +61,15 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
       if((ml.vertex_count + (mi0 + mi1 + mi2) > max_vertex_count) || 
          (ml.triangle_count + 1 > max_triangle_count))
       {
-         array_push(result.meshlets) = ml;
+         arrayp_push(result) = ml;
 
          // clear the vertex indices used for this meshlet so that they can be used for the next one
          for(u32 j = 0; j < ml.vertex_count; ++j)
-         {
-            assert(ml.vertex_index_buffer[j] < vertex_count);
             meshlet_vertices[ml.vertex_index_buffer[j]] = 0xff;
-         }
 
          // begin another meshlet
-         struct_clear(ml);
+         struct_clear(&ml);
       }
-
-      assert(i0 < vertex_count);
-      assert(i1 < vertex_count);
-      assert(i2 < vertex_count);
 
       meshlet_add_new_vertex_index(i0, meshlet_vertices, &ml);
       meshlet_add_new_vertex_index(i1, meshlet_vertices, &ml);
@@ -114,9 +98,7 @@ static vk_meshlet_buffer meshlet_build(arena scratch, size vertex_count, u32* in
 
    // add any left over meshlets
    if(ml.vertex_count > 0)
-      array_push(result.meshlets) = ml;
-
-   return result;
+      arrayp_push(result) = ml;
 }
 
 #if 0
@@ -125,13 +107,13 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 {
    vk_buffer_objects result = {0};
 
-   context->mesh_draws.arena = context->storage;
+   context->geometry.mesh_draws.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_draws, 1);
+   array_resize(context->geometry.mesh_draws, 1);
 
-   context->mesh_instances.arena = context->storage;
+   context->geometry.mesh_instances.arena = context->storage;
    // single .obj mesh
-   array_resize(context->mesh_instances, 1);
+   array_resize(context->geometry.mesh_instances, 1);
 
    // TODO: obj part
    // TODO: remove and use vertex_deduplicate()
@@ -237,11 +219,11 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 
    vk_mesh_draw md = {0};
    md.index_count = index_count;
-   array_add(context->mesh_draws, md);
+   array_add(context->geometry.mesh_draws, md);
 
    vk_mesh_instance mi = {0};
    mi.mesh_index = 0;   // single mesh
-   array_add(context->mesh_instances, mi);
+   array_add(context->geometry.mesh_instances, mi);
 
    vk_buffer_destroy(context->devices.logical, &scratch_buffer);
 
@@ -249,24 +231,56 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 }
 #endif
 
-static size gltf_index_count(cgltf_data* data)
+static size gltf_index_count(const cgltf_data* data)
 {
    size index_count = 0;
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = &data->meshes[i];
-      assert(gltf_mesh->primitives_count == 1);
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+      {
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
 
-      cgltf_primitive* prim = &gltf_mesh->primitives[0];
-      assert(prim->type == cgltf_primitive_type_triangles);
-
-      index_count += prim->indices->count;
+         index_count += prim->indices->count;
+      }
    }
 
    return index_count;
 }
 
-static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* context, vk_device* device, u32 max_descriptor_count)
+static size gltf_vertex_count(const cgltf_data* data)
+{
+   size vertex_count = 0;
+   for(usize i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = &data->meshes[i];
+
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+      {
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
+
+         // Get the POSITION attribute to count vertices
+         cgltf_attribute* position_attr = 0;
+         for(usize a = 0; a < prim->attributes_count; ++a)
+         {
+            if(prim->attributes[a].type == cgltf_attribute_type_position)
+            {
+               position_attr = &prim->attributes[a];
+               break;
+            }
+         }
+
+         assert(position_attr && position_attr->data);
+         vertex_count += position_attr->data->count;
+      }
+   }
+
+   return vertex_count;
+}
+
+static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_count)
 {
    arena scratch = *context->storage;
 
@@ -287,7 +301,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkDescriptorPool descriptor_pool = 0;
-   if(!vk_valid(vkCreateDescriptorPool(device->logical, &pool_info, 0, &descriptor_pool)))
+   if(!vk_valid(vkCreateDescriptorPool(context->devices.logical, &pool_info, 0, &descriptor_pool)))
       return false;
 
    VkSamplerCreateInfo sampler_info =
@@ -311,7 +325,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkSampler immutable_sampler;
-   if(!vk_valid(vkCreateSampler(device->logical, &sampler_info, 0, &immutable_sampler)))
+   if(!vk_valid(vkCreateSampler(context->devices.logical, &sampler_info, 0, &immutable_sampler)))
       return false;
 
    // variable and partially bound descriptor arrays
@@ -344,7 +358,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
    };
 
    VkDescriptorSetLayout descriptor_set_layout = 0;
-   if (!vk_valid(vkCreateDescriptorSetLayout(device->logical, &layout_info, 0, &descriptor_set_layout)))
+   if (!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, 0, &descriptor_set_layout)))
       return false;
 
 	if(context->textures.count > 0)
@@ -366,7 +380,7 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
 		};
 
 		VkDescriptorSet descriptor_set;
-      if(!vk_valid(vkAllocateDescriptorSets(device->logical, &alloc_info, &descriptor_set)))
+      if(!vk_valid(vkAllocateDescriptorSets(context->devices.logical, &alloc_info, &descriptor_set)))
          return false;
 
 		array(VkDescriptorImageInfo) image_infos = {&scratch};
@@ -390,9 +404,9 @@ static bool texture_descriptor_create(vk_descriptor* descriptor, vk_context* con
 			 .pImageInfo = image_infos.data,
 		};
 
-		descriptor->set = descriptor_set;
-		descriptor->layout = descriptor_set_layout;
-		descriptor->descriptor_pool = descriptor_pool;
+		context->texture_descriptor.set = descriptor_set;
+		context->texture_descriptor.layout = descriptor_set_layout;
+		context->texture_descriptor.descriptor_pool = descriptor_pool;
 
       vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
       vkDestroySampler(context->devices.logical, immutable_sampler, 0);
@@ -426,24 +440,40 @@ static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
    return true;
 }
 
-static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
+static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_path)
 {
-   array(vertex) vertices = {context->storage};
+   arena* a = context->storage;
+   arena s = context->scratch;
+
+   vk_geometry* geometry = &context->geometry;
+
+   array(vertex) vertices = {&s};
+   array_resize(vertices, gltf_vertex_count(data));
 
    // preallocate indices
-   array(u32) indices = {context->storage};
+   array(u32) indices = {&s};
    array_resize(indices, gltf_index_count(data));
 
+   size max_mesh_draws_count = 0;
+   for(usize i = 0; i < data->meshes_count; ++i)
+   {
+      cgltf_mesh* gltf_mesh = data->meshes + i;
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
+         max_mesh_draws_count++;
+   }
+
+   size max_mesh_instances_count = max_mesh_draws_count;
+
    // preallocate meshes
-   context->mesh_draws.arena = context->storage;
-   array_resize(context->mesh_draws, data->meshes_count);
+   geometry->mesh_draws.arena = a;
+   array_resize(geometry->mesh_draws, max_mesh_draws_count);
 
    // preallocate instances
-   context->mesh_instances.arena = context->storage;
-   array_resize(context->mesh_instances, data->nodes_count);
+   geometry->mesh_instances.arena = a;
+   array_resize(geometry->mesh_instances, max_mesh_instances_count);
 
    // preallocate textures
-   context->textures.arena = context->storage;
+   context->textures.arena = a;
    array_resize(context->textures, data->textures_count);
 
    size index_offset = 0;
@@ -452,117 +482,128 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = data->meshes + i;
-      assert(gltf_mesh->primitives_count == 1);
-
-      cgltf_primitive* prim = gltf_mesh->primitives + 0;
-      assert(prim->type == cgltf_primitive_type_triangles);
-
-      usize vertex_count = 0;
-      cgltf_accessor* position_accessor = 0;
-      cgltf_accessor* normal_accessor = 0;
-      cgltf_accessor* texcoord_accessor = 0;
-
-      // parse attribute types
-      for(usize j = 0; j < prim->attributes_count; ++j)
+      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
       {
-         cgltf_attribute* attr = prim->attributes + j;
 
-         cgltf_attribute_type attr_type;
-         i32 attr_index;
-         cgltf_parse_attribute_type(attr->name, &attr_type, &attr_index);
+         cgltf_primitive* prim = gltf_mesh->primitives + p;
+         assert(prim->type == cgltf_primitive_type_triangles);
 
-         switch(attr_type)
+         usize vertex_count = 0;
+         cgltf_accessor* position_accessor = 0;
+         cgltf_accessor* normal_accessor = 0;
+         cgltf_accessor* texcoord_accessor = 0;
+
+         // parse attribute types
+         for(usize j = 0; j < prim->attributes_count; ++j)
          {
-            case cgltf_attribute_type_position:
+            cgltf_attribute* attr = prim->attributes + j;
+
+            cgltf_attribute_type attr_type;
+            i32 attr_index;
+            cgltf_parse_attribute_type(attr->name, &attr_type, &attr_index);
+
+            switch(attr_type)
+            {
+               case cgltf_attribute_type_position:
                position_accessor = attr->data;
                vertex_count = position_accessor->count;
                break;
 
-            case cgltf_attribute_type_normal:
+               case cgltf_attribute_type_normal:
                normal_accessor = attr->data;
                break;
 
-            case cgltf_attribute_type_texcoord:
+               case cgltf_attribute_type_texcoord:
                if(attr_index == 0) // first uv set only
                   texcoord_accessor = attr->data;
                break;
 
-            default:
+               default:
                // ignore other attributes (e.g., color, joints, etc.)
                break;
+            }
          }
+
+         // load vertices
+         for(usize k = 0; k < vertex_count; ++k)
+         {
+            vertex vert = {0};
+
+            if(position_accessor)
+            {
+               f32 pos[3] = {0};
+               cgltf_accessor_read_float(position_accessor, k, pos, 3);
+               vert.vx = pos[0];
+               vert.vy = pos[1];
+               vert.vz = pos[2];
+            }
+            if(normal_accessor)
+            {
+               f32 norm[3] = {0};
+               cgltf_accessor_read_float(normal_accessor, k, norm, 3);
+               // pack normals
+               vert.nx = (uint8_t)((norm[0] * 0.5f + 0.5f) * 255.0f);
+               vert.ny = (uint8_t)((norm[1] * 0.5f + 0.5f) * 255.0f);
+               vert.nz = (uint8_t)((norm[2] * 0.5f + 0.5f) * 255.0f);
+            }
+            if(texcoord_accessor)
+            {
+               f32 uv[2] = {0};
+               cgltf_accessor_read_float(texcoord_accessor, k, uv, 2);
+               vert.tu = uv[0];
+               vert.tv = uv[1];
+            }
+
+            array_add(vertices, vert);
+         }
+
+         // load indices
+         usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
+         indices.count += index_count;
+
+         // add this mesh geometry
+         vk_mesh_draw md = {0};
+         md.index_count = index_count;
+         md.index_offset = index_offset;
+         md.vertex_offset = vertex_offset;
+         md.vertex_count = vertex_count;
+
+         array_add(geometry->mesh_draws, md);
+
+         index_offset += index_count;
+         vertex_offset += vertex_count;
       }
-
-      // load vertices
-      for(usize k = 0; k < vertex_count; ++k)
-      {
-         vertex vert = {0};
-
-         if(position_accessor)
-         {
-            f32 pos[3] = {0};
-            cgltf_accessor_read_float(position_accessor, k, pos, 3);
-            vert.vx = pos[0];
-            vert.vy = pos[1];
-            vert.vz = pos[2];
-         }
-         if(normal_accessor)
-         {
-            f32 norm[3] = {0};
-            cgltf_accessor_read_float(normal_accessor, k, norm, 3);
-            // pack normals
-            vert.nx = (uint8_t)((norm[0] * 0.5f + 0.5f) * 255.0f);
-            vert.ny = (uint8_t)((norm[1] * 0.5f + 0.5f) * 255.0f);
-            vert.nz = (uint8_t)((norm[2] * 0.5f + 0.5f) * 255.0f);
-         }
-         if(texcoord_accessor)
-         {
-            f32 uv[2] = {0};
-            cgltf_accessor_read_float(texcoord_accessor, k, uv, 2);
-            vert.tu = uv[0];
-            vert.tv = uv[1];
-         }
-
-         array_push(vertices) = vert;
-      }
-
-      // load indices
-      cgltf_accessor* accessor = prim->indices;
-      usize index_count = cgltf_accessor_unpack_indices(prim->indices, indices.data + indices.count, 4, prim->indices->count);
-      indices.count += index_count;
-
-      // mesh offsets
-      vk_mesh_draw md = {0};
-      md.index_count = index_count;
-      md.index_offset = index_offset;
-      md.vertex_offset = vertex_offset;
-
-      array_add(context->mesh_draws, md);
-
-      index_offset += index_count;
-      vertex_offset += vertex_count;
    }
+
+   if(data->cameras_count == 0)
+      printf("No camera in the scene: %s\n", s8_data(gltf_path));
 
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = data->nodes + i;
-      if(!node->mesh)
+
+      if(!node->mesh && !node->camera)
          continue;
+
+      if(node->camera)
+      {
+         // TODO: handle camera
+      }
 
       cgltf_mesh* mesh = node->mesh;
 
       for(cgltf_size pi = 0; pi < mesh->primitives_count; ++pi)
       {
-         cgltf_primitive* prim = &mesh->primitives[pi];
+         cgltf_primitive* prim = mesh->primitives + pi;
          cgltf_material* material = prim->material;
 
          mat4 wm = {0};
          cgltf_node_transform_world(node, wm.data);
 
          vk_mesh_instance mi = {0};
-         u32 mesh_index = (u32)cgltf_mesh_index(data, node->mesh);
+         u32 mesh_index = (u32)cgltf_mesh_index(data, mesh);
          // index into the mesh to draw
-         mi.mesh_index = mesh_index;
+         mi.mesh_index = mesh_index + (u32)pi;
          mi.world = wm;
 
          cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
@@ -591,7 +632,7 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
          mi.ao = (u32)ao_index;
          mi.emissive = (u32)emissive_index;
 
-         array_add(context->mesh_instances, mi);
+         array_add(geometry->mesh_instances, mi);
       }
    }
 
@@ -605,13 +646,60 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
 
       cgltf_decode_uri(img->uri);
 
-      vk_texture_load(context, s8(img->uri), gltf_path);
+      // TODO: pass just textures, devices instead of entire context
+      vk_texture_load(context, s, s8(img->uri), gltf_path);
    }
 
-   vk_meshlet_buffer mlb = meshlet_build(*context->storage, vertices.count, indices.data, indices.count);
-   context->meshlet_count = (u32)mlb.meshlets.count;
+   size max_vertex_count = 0;
+   const size mesh_draws_count = geometry->mesh_draws.count;
+   for(size i = 0; i < mesh_draws_count; ++i)
+   {
+      size vertex_count = geometry->mesh_draws.data[i].vertex_count;
+      if(vertex_count > max_vertex_count)
+         max_vertex_count = vertex_count;
+   }
 
-   usize mb_size = mlb.meshlets.count * sizeof(meshlet);
+   u8* meshlet_vertices = push(&s, u8, max_vertex_count);
+
+   context->meshlet_counts.arena = a;
+   array_resize(context->meshlet_counts, mesh_draws_count);
+
+   context->meshlet_offsets.arena = a;
+   array_resize(context->meshlet_offsets, mesh_draws_count);
+
+   context->vertex_offsets.arena = a;
+   array_resize(context->vertex_offsets, mesh_draws_count);
+
+   context->meshlets.arena = a;
+   array_resize(context->meshlets, max_vertex_count);
+
+   size meshlet_offset = 0;
+   vertex_offset = 0;
+
+   for(size i = 0; i < mesh_draws_count; ++i)
+   {
+      // 0xff means the vertex index is not in use yet
+      memset(meshlet_vertices, 0xff, max_vertex_count);
+
+      size vertex_count = geometry->mesh_draws.data[i].vertex_count;
+      size index_count = geometry->mesh_draws.data[i].index_count;
+
+      array_meshlet meshlets = {a};
+      meshlet_build(&meshlets, meshlet_vertices, indices.data, index_count,
+                    (u32)geometry->mesh_draws.data[i].index_offset);
+
+      for(size j = 0; j < meshlets.count; ++j)
+         array_add(context->meshlets, meshlets.data[j]);
+
+      array_add(context->meshlet_counts, meshlets.count);
+      array_add(context->meshlet_offsets, meshlet_offset);
+      array_add(context->vertex_offsets, vertex_offset);
+
+      meshlet_offset += meshlets.count;
+      vertex_offset += vertex_count;
+   }
+
+   usize mb_size = context->meshlets.count * sizeof(meshlet);
    usize vb_size = vertices.count * sizeof(vertex);
    usize ib_size = indices.count * sizeof(u32);
 
@@ -622,31 +710,34 @@ static bool gltf_load_mesh(vk_context* context, cgltf_data* data, s8 gltf_path)
    usize scratch_buffer_size = max(mb.size, max(vb.size, ib.size));
    vk_buffer scratch_buffer = { .size = scratch_buffer_size };
 
-   if(!vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   if(!vk_buffer_create_and_bind(&vb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      return false;
+   VkBufferUsageFlagBits buffer_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+   if(context->raytracing_supported)
+      buffer_usage_flags |= (VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
 
    // vertex data
+   if(!vk_buffer_create_and_bind(&vb, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
    vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
    buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
 
-   if (!vk_buffer_create_and_bind(&mb, context->devices.logical, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      return false;
-
    // meshlet data
-   vk_buffer_upload(context, &mb, &scratch_buffer, mlb.meshlets.data, mb.size);
+   if (!vk_buffer_create_and_bind(&mb, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
+   vk_buffer_upload(context, &mb, &scratch_buffer, context->meshlets.data, mb.size);
    buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
 
-   if (!vk_buffer_create_and_bind(&ib, context->devices.logical, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, context->devices.physical, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-      return false;
-
    // index data
+   buffer_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+   if (!vk_buffer_create_and_bind(&ib, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+      return false;
    vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
    buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
 
-   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    return true;
 }

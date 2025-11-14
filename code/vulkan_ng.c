@@ -1,13 +1,20 @@
+#include "priority_queue.h"
+#include "vulkan_ng.h"
+
 #include "win32_file_io.c"
 
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
 #include "texture.c"
 #include "buffer.c"
-#include "mesh.c"
+#include "gltf.c"
+#include "rt.c"
 
 static void obj_file_read_callback(void *ctx, const char *filename, int is_mtl, const char *obj_filename, char **buf, size_t *len)
 {
+   (void)obj_filename;
+   (void)is_mtl;
+
    obj_user_ctx* user_data = (obj_user_ctx*)ctx;
    arena file_read = {0};
 
@@ -92,14 +99,13 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
 
    s8 gltf_path = {.data = (u8*)file_path.data, .len = file_path.count};
 
-   assert(strcmp(gltf_path.data + gltf_path.len - s8(".gltf").len, ".gltf") == 0);
-
+   assert(s8_equals(s8_slice(gltf_path, gltf_path.len - s8(".gltf").len, gltf_path.len), s8(".gltf")));
    return gltf_load(context, gltf_path);
 }
 
-static void vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name, vk_shader_modules* shader_table)
+static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name)
 {
-   assert(vk_valid_handle(logical_device));
+   vk_shader_module result = {0};
 
    s8 exe_dir = vk_exe_directory(&scratch);
 
@@ -132,21 +138,26 @@ static void vk_shader_load(VkDevice logical_device, arena scratch, const char* s
       }
    }
 
-   VkShaderModule shader_module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, s8(shader_name));
+   VkShaderModule module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, s8(shader_name));
 
    switch(shader_stage)
    {
       case VK_SHADER_STAGE_MESH_BIT_EXT:
-         shader_table->ms = shader_module;
+         result.handle = module;
+         result.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
          break;
       case VK_SHADER_STAGE_VERTEX_BIT:
-         shader_table->vs = shader_module;
+         result.handle = module;
+         result.stage = VK_SHADER_STAGE_VERTEX_BIT;
          break;
       case VK_SHADER_STAGE_FRAGMENT_BIT:
-         shader_table->fs = shader_module;
+         result.handle = module;
+         result.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
          break;
       default: break;
    }
+
+   return result;
 }
 
 static bool spirv_initialize(vk_context* context)
@@ -165,48 +176,56 @@ static bool spirv_initialize(vk_context* context)
 
    // TODO: make function for hash tables
    table->keys = push(context->storage, const char*, table->max_count);
-   table->values = push(context->storage, vk_shader_modules, table->max_count);
+   table->values = push(context->storage, vk_shader_module, table->max_count);
 
-   memset(table->values, 0, table->max_count * sizeof(vk_shader_modules));
+   memset(table->values, 0, table->max_count * sizeof(vk_shader_module));
 
    for(size i = 0; i < table->max_count; ++i)
       table->keys[i] = 0;
 
-   // Compile all the shaders
    for(const char** p = shader_names; p && *p; ++p)
    {
       usize shader_len = strlen(*p);
       const char* shader_name = *p;
 
+      // TODO: use s8 substring
       for(usize i = 0; i < shader_len; ++i)
       {
+         // TODO: use s8 equals
          if(strncmp(shader_name + i, meshlet_module_name, strlen(meshlet_module_name)) == 0)
          {
-            vk_shader_modules ms = spv_hash_lookup(table, meshlet_module_name);
-            // TODO: optimize shader loading - load all the shaders at once
-            vk_shader_load(context->devices.logical, *context->storage, *p, &ms);
-            spv_hash_insert(table, meshlet_module_name, ms);
+            vk_shader_module mm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            if (mm.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
+               spv_hash_insert(table, meshlet_module_name"_ms", mm);
+            else if (mm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+               spv_hash_insert(table, meshlet_module_name"_fs", mm);
             break;
          }
          if(strncmp(shader_name + i, graphics_module_name, strlen(graphics_module_name)) == 0)
          {
-            vk_shader_modules gm = spv_hash_lookup(table, graphics_module_name);
-            vk_shader_load(context->devices.logical, *context->storage, *p, &gm);
-            spv_hash_insert(table, graphics_module_name, gm);
+            vk_shader_module gm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            if(gm.stage == VK_SHADER_STAGE_VERTEX_BIT)
+               spv_hash_insert(table, graphics_module_name"_vs", gm);
+            else if(gm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+               spv_hash_insert(table, graphics_module_name"_fs", gm);
             break;
          }
          if(strncmp(shader_name + i, axis_module_name, strlen(axis_module_name)) == 0)
          {
-            vk_shader_modules am = spv_hash_lookup(table, axis_module_name);
-            vk_shader_load(context->devices.logical, *context->storage, *p, &am);
-            spv_hash_insert(table, axis_module_name, am);
+            vk_shader_module am = vk_shader_load(context->devices.logical, *context->storage, *p);
+            if(am.stage == VK_SHADER_STAGE_VERTEX_BIT)
+               spv_hash_insert(table, axis_module_name"_vs", am);
+            else if(am.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+               spv_hash_insert(table, axis_module_name"_fs", am);
             break;
          }
          if(strncmp(shader_name + i, frustum_module_name, strlen(frustum_module_name)) == 0)
          {
-            vk_shader_modules fm = spv_hash_lookup(table, frustum_module_name);
-            vk_shader_load(context->devices.logical, *context->storage, *p, &fm);
-            spv_hash_insert(table, frustum_module_name, fm);
+            vk_shader_module fm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            if(fm.stage == VK_SHADER_STAGE_VERTEX_BIT)
+               spv_hash_insert(table, frustum_module_name"_vs", fm);
+            else if(fm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+               spv_hash_insert(table, frustum_module_name"_fs", fm);
             break;
          }
       }
@@ -248,9 +267,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void* user_data)
 {
-   hw* h = (hw*)user_data;
+   (void)severity_flags;
+   (void)type;
+   (void)user_data;
 #if _DEBUG
    printf("VALIDATION LAYER MESSAGE: %s\n", data->pMessage);
+#else
+   (void)data;
 #endif
 #ifdef vk_break_on_validation
    assert((type & VK_DEBUG_REPORT_ERROR_BIT_EXT) != 0);
@@ -286,7 +309,7 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    return formats.data[0].format;
 }
 
-static vk_swapchain_surface vk_window_swapchain_surface(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
 {
    assert(vk_valid_handle(physical_device));
    assert(vk_valid_handle(surface));
@@ -314,15 +337,16 @@ static vk_swapchain_surface vk_window_swapchain_surface(arena scratch, VkPhysica
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, arena scratch)
+static VkPhysicalDevice vk_physical_device_select(vk_context* context)
 {
-   assert(vk_valid_handle(context->instance));
+   u32 dev_count = 0;
+   vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, 0));
 
-   VkPhysicalDevice devs[MAX_VULKAN_OBJECT_COUNT] = {0};
-   VkPhysicalDevice fallback_gpu = 0;
-   u32 dev_count = array_count(devs);
+   arena scratch = *context->storage;
+   VkPhysicalDevice* devs = push(&scratch, VkPhysicalDevice, dev_count);
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
 
+   u32 fallback_gpu = 0;
    for(u32 i = 0; i < dev_count; ++i)
    {
       VkPhysicalDeviceProperties props;
@@ -337,32 +361,39 @@ static VkPhysicalDevice vk_physical_device_select(hw* hw, vk_context* context, a
          continue;
 
       // dedicated gpu
-      if(props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+      if(!props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+         continue;
+
+      fallback_gpu = i;
+      context->time_period = props.limits.timestampPeriod;
+      u32 extension_count = 0;
+      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+
+      VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
+      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
+
+      for(u32 j = 0; j < extension_count; ++j)
       {
-         context->time_period = props.limits.timestampPeriod;
-         u32 extension_count = 0;
-         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+         s8 e = s8(extensions[j].extensionName);
+         printf("Available Vulkan device extension[%u]: %s\n", j, s8_data(e));
 
-         VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
-         vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
+         if(s8_equals(e, s8(VK_EXT_MESH_SHADER_EXTENSION_NAME)))
+            context->mesh_shading_supported = true;
 
-         for(u32 j = 0; j < extension_count; ++j)
+         if(s8_equals(e, s8(VK_KHR_RAY_QUERY_EXTENSION_NAME)))
+            context->raytracing_supported = true;
+
+         if(context->raytracing_supported && context->mesh_shading_supported)
          {
-            printf("Available Vulkan device extension[%u]: %s\n", j, extensions[j].extensionName);
-            if(strcmp(extensions[j].extensionName, VK_EXT_MESH_SHADER_EXTENSION_NAME) == 0)
-            {
-               context->rtx_supported = true;
-               return devs[i];
-            }
-         }
+            printf("Ray tracing supported\n");
+            printf("Mesh shading supported\n");
 
-         // use fallback as the first discrete gpu
-         fallback_gpu = devs[i];
-         break;
+            return devs[i];
+         }
       }
    }
 
-   return fallback_gpu;
+   return devs[fallback_gpu];
 }
 
 static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
@@ -387,33 +418,40 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
    return 0;
 }
 
-static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scratch)
+static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
 {
-   assert(vk_valid_handle(context->devices.physical));
-   f32 queue_prio = 1.0f;
-
-   VkDeviceQueueCreateInfo queue_info = {vk_info(DEVICE_QUEUE)};
-   queue_info.queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
-   queue_info.queueCount = 1;
-   queue_info.pQueuePriorities = &queue_prio;
-
-   VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
-
    array(s8) extensions = {&scratch};
 
    array_push(extensions) = s8(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
-   if(context->rtx_supported)
+   if(context->mesh_shading_supported)
    {
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+   }
+   if(context->raytracing_supported)
+   {
+      array_push(extensions) = s8(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      array_push(extensions) = s8(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
    }
 
    VkPhysicalDeviceFeatures2 features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
    VkPhysicalDeviceVulkan12Features features12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+
+   VkPhysicalDeviceMultiviewFeatures features_multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
+
+   VkPhysicalDeviceFragmentShadingRateFeaturesKHR features_frag_shading = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
+
+   VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
+
+   VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+
+   VkPhysicalDeviceRayQueryFeaturesKHR ray_query = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+
    features12.storageBuffer8BitAccess = true;
    features12.uniformAndStorageBuffer8BitAccess = true;
    features12.storagePushConstant8 = true;
@@ -421,25 +459,34 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
    features12.descriptorBindingSampledImageUpdateAfterBind = true;
    features12.descriptorBindingUpdateUnusedWhilePending = true;
    features12.descriptorBindingPartiallyBound = true;
+   features12.bufferDeviceAddress = true;
 
-   VkPhysicalDeviceMultiviewFeatures features_multiview = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES};
    features_multiview.multiview = true;
 
-   VkPhysicalDeviceFragmentShadingRateFeaturesKHR features_frag_shading = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR};
    features_frag_shading.primitiveFragmentShadingRate = true;
 
    features.pNext = &features12;
    features12.pNext = &features_multiview;
    features_multiview.pNext = &features_frag_shading;
 
-   VkPhysicalDeviceMeshShaderFeaturesEXT features_mesh_shader = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT};
-
-   if(context->rtx_supported)
+   if(context->mesh_shading_supported)
    {
-      features_frag_shading.pNext = &features_mesh_shader;
+      features_mesh_shader.pNext = features.pNext;
+      features.pNext = &features_mesh_shader;
+
       features_mesh_shader.meshShader = true;
       features_mesh_shader.taskShader = true;
       features_mesh_shader.multiviewMeshShader = true;
+   }
+
+   if(context->raytracing_supported)
+   {
+      ray_query.pNext = &acceleration_features;
+      acceleration_features.pNext = features.pNext;
+      features.pNext = &ray_query;
+
+      ray_query.rayQuery = true;
+      acceleration_features.accelerationStructure = true;
    }
 
    vkGetPhysicalDeviceFeatures2(context->devices.physical, &features);
@@ -458,8 +505,18 @@ static VkDevice vk_logical_device_create(hw* hw, vk_context* context, arena scra
       printf("Using Vulkan device extension[%u]: %s\n", i, extension_names[i]);
    }
 
+   enum { queue_count = 1 };
+   f32 priorities[queue_count] = {1.0f};
+   VkDeviceQueueCreateInfo queue_info[queue_count] = {vk_info(DEVICE_QUEUE)};
+
+   queue_info[0].queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
+   queue_info[0].queueCount = queue_count;
+   queue_info[0].pQueuePriorities = priorities;
+
+   VkDeviceCreateInfo ldev_info = {vk_info(DEVICE)};
+
    ldev_info.queueCreateInfoCount = 1;
-   ldev_info.pQueueCreateInfos = &queue_info;
+   ldev_info.pQueueCreateInfos = queue_info;
    ldev_info.enabledExtensionCount = (u32)extensions.count;
    ldev_info.ppEnabledExtensionNames = extension_names;
    ldev_info.pNext = &features;
@@ -543,7 +600,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
    swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
 
@@ -786,11 +843,6 @@ static void cmd_push_all_rtx_constants(VkCommandBuffer command_buffer, VkPipelin
    cmd_push_rtx_constants(command_buffer, layout, mvp, 0);
 }
 
-static void cmd_draw_indexed(VkCommandBuffer command_buffer, vk_mesh_draw md, u32 instance_count, u32 instance)
-{
-   vkCmdDrawIndexed(command_buffer, (u32)md.index_count, instance_count, (u32)md.index_offset, (u32)md.vertex_offset, instance);
-}
-
 static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
 {
    assert(buffer->handle && buffer->size > 0);
@@ -803,15 +855,24 @@ static VkDescriptorBufferInfo cmd_buffer_descriptor_create(vk_buffer* buffer)
    return result;
 }
 
-static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_buffer, VkPipelineLayout layout, u32 binding, VkDescriptorBufferInfo* buffer_info)
+static VkWriteDescriptorSet cmd_write_descriptor_create(u32 binding, VkDescriptorType type, VkDescriptorBufferInfo* buffer_info, void* extras)
 {
-   VkWriteDescriptorSet result = {0};
+   VkWriteDescriptorSet result = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
 
-   result.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   VkWriteDescriptorSetAccelerationStructureKHR acceleration_write_descriptor =
+   {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+
+   if(type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+   {
+      acceleration_write_descriptor.pAccelerationStructures = extras;
+      acceleration_write_descriptor.accelerationStructureCount = 1;
+      result.pNext = &acceleration_write_descriptor;
+   }
+
    result.dstBinding = binding;
    result.dstSet = VK_NULL_HANDLE;
    result.descriptorCount = 1;
-   result.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+   result.descriptorType = type;
    result.pBufferInfo = buffer_info;
 
    return result;
@@ -819,21 +880,38 @@ static VkWriteDescriptorSet cmd_write_descriptor_create(VkCommandBuffer command_
 
 static void cmd_push_storage_buffer(VkCommandBuffer command_buffer, arena scratch, VkPipelineLayout layout, vk_buffer_binding* bindings, u32 binding_count, u32 set_number)
 {
-   VkWriteDescriptorSet* write_set = push(&scratch, VkWriteDescriptorSet, binding_count);
+   VkWriteDescriptorSet* write_sets = push(&scratch, VkWriteDescriptorSet, binding_count);
    VkDescriptorBufferInfo* infos = push(&scratch, VkDescriptorBufferInfo, binding_count);
+
+   VkWriteDescriptorSetAccelerationStructureKHR acceleration_write_descriptor =
+   {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
 
    for(u32 i = 0; i < binding_count; ++i)
    {
       infos[i] = cmd_buffer_descriptor_create(&bindings[i].buffer);
 
-      VkWriteDescriptorSet set = cmd_write_descriptor_create(command_buffer, layout, bindings[i].binding, &infos[i]);
-      write_set[i] = set;
+      VkWriteDescriptorSet set = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+
+      if(bindings[i].type == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+      {
+         acceleration_write_descriptor.pAccelerationStructures = bindings[i].extras;
+         acceleration_write_descriptor.accelerationStructureCount = 1;
+         set.pNext = &acceleration_write_descriptor;
+      }
+
+      set.dstBinding = bindings[i].binding;
+      set.dstSet = VK_NULL_HANDLE;
+      set.descriptorCount = 1;
+      set.descriptorType = bindings[i].type;
+      set.pBufferInfo = &infos[i];
+
+      write_sets[i] = set;
    }
 
-   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_set);
+   vkCmdPushDescriptorSetKHR(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, set_number, binding_count, write_sets);
 }
 
-static void cmd_bind_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset, VkIndexType type)
+static void cmd_bind_index_buffer(VkCommandBuffer command_buffer, VkBuffer buffer, VkDeviceSize offset)
 {
    vkCmdBindIndexBuffer(command_buffer, buffer, offset, VK_INDEX_TYPE_UINT32);
 }
@@ -856,8 +934,7 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
-// TODO: split this into rendering and presenting
-static void vk_present(hw* hw, vk_context* context, app_state* state)
+static void vk_present(hw* hw, vk_context* context)
 {
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
@@ -874,13 +951,47 @@ static void vk_present(hw* hw, vk_context* context, app_state* state)
    if(present_result != VK_SUCCESS)
       return;
 
+   u64 query_results[2] = {0};
+   vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT);
+
+#if 1
+   f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
+   f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
+
+   static i64 cpu_begin = 0;
+   static i64 cpu_counter = 0;
+   static i64 log_time = 0;
+   if(cpu_begin == 0)
+      cpu_begin = hw->timer.time();
+
+   if(cpu_counter == 0)
+      cpu_counter = hw->timer.time();
+
+   if(log_time == 0)
+      log_time = (i64)(hw->timer.time_to_counter(1) + .5f);
+
+   i64 cpu_end = hw->timer.time();
+
+   f64 frame_delta_ms = hw->timer.seconds_elapsed(cpu_begin, cpu_end) * 1000.f;
+
+   cpu_begin = cpu_end;
+
+   if(cpu_end - cpu_counter > log_time)
+   {
+      cpu_counter = cpu_end;
+      // frame logs
+      // TODO: this should really be in app.c
+      if(hw->state.is_mesh_shading)
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, gpu_end - gpu_begin, context->meshlets.count);
+      else
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, gpu_end - gpu_begin);
+   }
+#endif
+
    // wait until all queue ops are done
-   // essentialy run gpu and cpu in sync (60 FPS usually)
+   // essentialy run gpu and cpu in sync (driver decides this)
    // TODO: This is bad way to do sync but who cares for now
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
-
-   u64 query_results[2];
-   vk_assert(vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT));
 }
 
 static void vk_render(hw* hw, vk_context* context, app_state* state)
@@ -914,8 +1025,6 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
    vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
-   const f32 ar = (f32)context->swapchain_surface.image_width / context->swapchain_surface.image_height;
-
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
@@ -928,9 +1037,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    mvp.view = mat4_view(eye, dir);
 
    //mvp.world = mat4_identity();
-   mvp.meshlet_offset = 0;
 
-   const f32 c = 255.0f;
    VkClearValue clear[2] = {0};
    //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
    //clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
@@ -972,11 +1079,9 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
-   vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);  // TODO: Use strip for ground planes
+   vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-   // TODO: Currently this is broken
-   // TODO: Handle multi-meshes in the mesh shader
-   if(state->rtx_enabled)
+   if(state->is_mesh_shading)
    {
       VkPipeline pipeline = context->rtx_pipeline;
       VkPipelineLayout pipeline_layout = context->rtx_pipeline_layout;
@@ -984,22 +1089,41 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
-      vk_buffer_binding bbs[3] = {0};
-      bbs[0].buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-      bbs[0].binding = 0;
+      arena s = *context->storage;
+      array(vk_buffer_binding) bindings = {&s};
 
-      bbs[1].buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
-      bbs[1].binding = 1;
+      if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+      }
 
-      bbs[2].buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
-      bbs[2].binding = 2;
+      if(buffer_hash_lookup(&context->buffer_table, mb_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+      }
 
-      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs, array_count(bbs), 0);
+      if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
+      }
+
+      if(buffer_hash_lookup(&context->buffer_table, rt_buffer_name))
+      {
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, rt_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 3, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, &context->tlas};
+      }
+
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
       cmd_push_all_rtx_constants(command_buffer, pipeline_layout, &mvp);
 
-
-      if (buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
-         vkCmdDrawMeshTasksIndirectEXT(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+      if(buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name))
+         vkCmdDrawMeshTasksIndirectEXT(command_buffer,
+                                       buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name)->handle,
+                                       0, (u32)context->geometry.mesh_draws.count,
+                                       sizeof(VkDrawMeshTasksIndirectCommandEXT));
    }
    else
    {
@@ -1008,31 +1132,32 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
-      if (buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
-         cmd_bind_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0, VK_INDEX_TYPE_UINT32);
+      if(buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
+         cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
-      // TODO: Compress drawing to pass scratch
-      arena scratch = *context->storage;
-      array(vk_buffer_binding) bbs = {&scratch};
+      arena s = *context->storage;
+      array(vk_buffer_binding) bindings = {&s};
 
-      // TODO: Compress
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 0 };
+         array_push(bindings) = (vk_buffer_binding){buffer, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
-      if(buffer_hash_lookup(&context->buffer_table, transform_buffer_name))
+      if(buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name))
       {
-         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
-         array_push(bbs) = (vk_buffer_binding){ buffer, 1 };
+         vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
+         array_push(bindings) = (vk_buffer_binding){buffer, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER};
       }
 
-      cmd_push_storage_buffer(command_buffer, *context->storage, pipeline_layout, bbs.data, (u32)bbs.count, 0);
+      cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
       cmd_push_all_constants(command_buffer, pipeline_layout, &mvp);
 
-      if (buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
-         vkCmdDrawIndexedIndirect(command_buffer, buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle, 0, (u32)context->mesh_draws.count, sizeof(VkDrawIndexedIndirectCommand));
+      if(buffer_hash_lookup(&context->buffer_table, indirect_buffer_name))
+         vkCmdDrawIndexedIndirect(command_buffer,
+                                  buffer_hash_lookup(&context->buffer_table, indirect_buffer_name)->handle,
+                                  0, (u32)context->geometry.mesh_draws.count,
+                                  sizeof(VkDrawIndexedIndirectCommand));
 
       vkCmdSetPrimitiveTopology(command_buffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
 
@@ -1081,43 +1206,16 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    submit_info.pSignalSemaphores = &context->image_done_semaphore;
 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
-
-#if 0
-   f64 gpu_begin = (f64)query_results[0] * context->time_period * 1e-6;
-   f64 gpu_end = (f64)query_results[1] * context->time_period * 1e-6;
-
-   static u32 begin = 0;
-   static u32 timer = 0;
-   u32 time = hw->timer.time();
-   if(begin == 0)
-      begin = time;
-   u32 end = hw->timer.time();
-
-   {
-      // frame logs
-      // TODO: this should really be in app.c
-      if(hw->timer.time() - timer > 100)
-      {
-         if(hw->state.rtx_enabled)
-            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: %u; Press 'R' to toggle RTX; RTX ON"), end - begin, gpu_end - gpu_begin, context->meshlet_count);
-         else
-            hw->window_title(hw, s8("cpu: %u ms; gpu: %.2f ms; #Meshlets: 0; Press 'R' to toggle RTX; RTX OFF"), end - begin, gpu_end - gpu_begin);
-
-         timer = hw->timer.time();
-      }
-   }
-
-   begin = end;
-#endif
 }
 
 // TODO: pass amount of bindings to create here
-static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool rtx_supported)
+// TODO: dont pass any booleans?
+static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkDevice device, bool is_rtx)
 {
-   // TODO: cleanup
-   if(rtx_supported)
+   // TODO: cleanup this nonsense
+   if(is_rtx)
    {
-      VkDescriptorSetLayoutBinding bindings[3] = {0};
+      VkDescriptorSetLayoutBinding bindings[4] = {0};
       bindings[0].binding = 0;
       bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[0].descriptorCount = 1;
@@ -1131,7 +1229,12 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
       bindings[2].binding = 2;
       bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       bindings[2].descriptorCount = 1;
-      bindings[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_EXT;
+      bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
+
+      bindings[3].binding = 3;
+      bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+      bindings[3].descriptorCount = 1;
+      bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
       VkDescriptorSetLayoutCreateInfo info = {vk_info(DESCRIPTOR_SET_LAYOUT)};
 
@@ -1168,12 +1271,12 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
    return true;
 }
 
-static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool rtx_supported)
+static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical_device, VkDescriptorSetLayout* set_layouts, size set_layout_count, bool mesh_shading_supported)
 {
    VkPipelineLayoutCreateInfo info = {vk_info(PIPELINE_LAYOUT)};
 
    VkPushConstantRange push_constants = {0};
-   if(rtx_supported)
+   if(mesh_shading_supported)
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_MESH_BIT_EXT;
    else
       push_constants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -1193,23 +1296,34 @@ static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical
    return true;
 }
 
-// TODO: Cleanup these pipelines
-static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static VkPipelineShaderStageCreateInfo vk_shader_stage_create_info(vk_shader_module shader_module)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-   stages[0].module = shaders->ms;
-   stages[0].pName = "main";
+   assert(shader_module.handle);
+   assert(shader_module.stage);
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   VkPipelineShaderStageCreateInfo result =
+   {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = shader_module.stage,
+      .module = shader_module.handle,
+      .pName = "main"
+   };
+
+   return result;
+}
+
+static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
+{
+   arena scratch = *context->storage;
+
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
+
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
@@ -1281,22 +1395,18 @@ static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
-   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   stages[0].module = shaders->vs;
-   stages[0].pName = "main";
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   arena scratch = *context->storage;
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
+
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
@@ -1368,23 +1478,18 @@ static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* contex
    return true;
 }
 
-static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_modules* shaders)
+static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
-   VkPipelineShaderStageCreateInfo stages[OBJECT_SHADER_COUNT] = {0};
+   arena scratch = *context->storage;
 
-   stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-   stages[0].module = shaders->vs;
-   stages[0].pName = "main";
+   array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
-   stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-   stages[1].module = shaders->fs;
-   stages[1].pName = "main";
+   for (size i = 0; i < shader_module_count; ++i)
+      array_push(stages) = vk_shader_stage_create_info(shader_modules[i]);
 
    VkGraphicsPipelineCreateInfo pipeline_info = {vk_info(GRAPHICS_PIPELINE)};
-   pipeline_info.stageCount = array_count(stages);
-   pipeline_info.pStages = stages;
+   pipeline_info.stageCount = (u32)stages.count;
+   pipeline_info.pStages = stages.data;
 
    VkPipelineVertexInputStateCreateInfo vertex_input_info = {vk_info(PIPELINE_VERTEX_INPUT_STATE)};
    pipeline_info.pVertexInputState = &vertex_input_info;
@@ -1479,29 +1584,33 @@ bool vk_instance_create(VkInstance* instance, arena scratch)
 
 static bool vk_buffers_create(vk_context* context)
 {
-   vk_buffer indirect_buffer = { 0 };
-   vk_buffer indirect_rtx_buffer = { 0 };
-   vk_buffer world_transform = { 0 };
+   vk_buffer indirect_buffer = {0};
+   vk_buffer indirect_rtx_buffer = {0};
+   vk_buffer mesh_draw_buffer = {0};
+   vk_buffer rt_buffer = {0};
 
-   arena scratch = *context->storage;
+   arena s = *context->storage;
 
-   // TODO: pass devices
-   if(!buffer_indirect_create(&indirect_buffer, context, scratch, false))
+   // TODO: pass devices and geometry
+   if(!buffer_indirect_create(&indirect_buffer, context, s, false))
       return false;
 
    buffer_hash_insert(&context->buffer_table, indirect_buffer_name, indirect_buffer);
 
-   // TODO: pass devices
-   if(!buffer_indirect_create(&indirect_rtx_buffer, context, scratch, true))
+   if(!buffer_indirect_create(&indirect_rtx_buffer, context, s, true))
       return false;
 
    buffer_hash_insert(&context->buffer_table, indirect_rtx_buffer_name, indirect_rtx_buffer);
 
-   // TODO: pass devices
-   if(!buffer_transforms_create(&world_transform, context, scratch))
+   if(!buffer_draws_create(&mesh_draw_buffer, context, s))
       return false;
 
-   buffer_hash_insert(&context->buffer_table, transform_buffer_name, world_transform);
+   buffer_hash_insert(&context->buffer_table, mesh_draw_buffer_name, mesh_draw_buffer);
+
+   if(!buffer_rt_create(&rt_buffer, context))
+      return false;
+
+   buffer_hash_insert(&context->buffer_table, rt_buffer_name, rt_buffer);
 
    return true;
 }
@@ -1513,8 +1622,10 @@ static bool vk_pipelines_create(vk_context* context)
 
    if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context->devices.logical, false))
       return false;
-   if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
-      return false;
+
+   if(context->mesh_shading_supported && context->raytracing_supported)
+      if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
+         return false;
 
    VkPipelineLayout non_rtx_pipeline_layout = 0;
    VkPipelineLayout rtx_pipeline_layout = 0;
@@ -1552,27 +1663,58 @@ static bool vk_pipelines_create(vk_context* context)
    VkPipeline frustum = 0;
    VkPipeline mesh = 0;
 
-   // TODO: static global const char* names for shader modules
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, graphics_module_name);
+   enum {shader_module_count = 2};
+   vk_shader_module shader_modules[shader_module_count] = {0};
 
-   if (!vk_graphics_pipeline_create(&graphics, context, cache, &gm))
+   vk_shader_module gm_vs = spv_hash_lookup(&context->shader_table, graphics_module_name"_vs");
+   vk_shader_module gm_fs = spv_hash_lookup(&context->shader_table, graphics_module_name"_fs");
+
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].handle = gm_vs.handle;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].handle = gm_fs.handle;
+
+   if (!vk_graphics_pipeline_create(&graphics, context, cache, shader_modules, shader_module_count))
       return false;
    context->non_rtx_pipeline = graphics;
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, meshlet_module_name);
+   vk_shader_module mm_ms = spv_hash_lookup(&context->shader_table, meshlet_module_name"_ms");
+   vk_shader_module mm_fs = spv_hash_lookup(&context->shader_table, meshlet_module_name"_fs");
 
-   if(!vk_mesh_pipeline_create(&mesh, context, cache, &mm))
+   shader_modules[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+   shader_modules[0].handle = mm_ms.handle;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].handle = mm_fs.handle;
+
+   if(!vk_mesh_pipeline_create(&mesh, context, cache, shader_modules, shader_module_count))
       return false;
    context->rtx_pipeline = mesh;
 
-   vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
+   vk_shader_module am_vs = spv_hash_lookup(&context->shader_table, axis_module_name"_vs");
+   vk_shader_module am_fs = spv_hash_lookup(&context->shader_table, axis_module_name"_fs");
 
-   if(!vk_axis_pipeline_create(&axis, context, cache, &am))
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].handle = am_vs.handle;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].handle = am_fs.handle;
+
+   if(!vk_axis_pipeline_create(&axis, context, cache, shader_modules, shader_module_count))
       return false;
    context->axis_pipeline = axis;
 
-   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
-   if (!vk_graphics_pipeline_create(&frustum, context, cache, &fm))
+   vk_shader_module fm_vs = spv_hash_lookup(&context->shader_table, frustum_module_name"_vs");
+   vk_shader_module fm_fs = spv_hash_lookup(&context->shader_table, frustum_module_name"_fs");
+
+   shader_modules[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+   shader_modules[0].handle = fm_vs.handle;
+
+   shader_modules[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   shader_modules[1].handle = fm_fs.handle;
+
+   if (!vk_graphics_pipeline_create(&frustum, context, cache, shader_modules, shader_module_count))
       return false;
    context->frustum_pipeline = frustum;
 
@@ -1581,7 +1723,6 @@ static bool vk_pipelines_create(vk_context* context)
 
 bool vk_initialize(hw* hw)
 {
-   VkResult volk_result = volkInitialize();
    if (!vk_valid(volkInitialize()))
       return false;
 
@@ -1595,6 +1736,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
    context->storage = &hw->vk_storage;
+   context->scratch = hw->scratch;
 
    VkInstance instance = 0;
    if(!vk_instance_create(&instance, *context->storage))
@@ -1632,11 +1774,12 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   // TODO: wide contracts for all these
-   context->devices.physical = vk_physical_device_select(hw, context, *context->storage);
+   // TODO: wide contracts for all these since vk_initialize is wide
+   // TODO: should pass the scratch arenas instead of the context
+   context->devices.physical = vk_physical_device_select(context);
    context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
    context->queue_family_index = vk_logical_device_select_family_index(context, *context->storage);
-   context->devices.logical = vk_logical_device_create(hw, context, *context->storage);
+   context->devices.logical = vk_logical_device_create(context, *context->storage);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(context);
@@ -1661,8 +1804,8 @@ bool vk_initialize(hw* hw)
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
       array_add(context->framebuffers, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.images, (vk_image){});
-      array_add(context->swapchain_images.depths, (vk_image){});
+      array_add(context->swapchain_images.images, (vk_image){0});
+      array_add(context->swapchain_images.depths, (vk_image){0});
    }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
@@ -1682,27 +1825,42 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
+   if(context->raytracing_supported)
+      if(!rt_acceleration_structures_create(context))
+      {
+         printf("Could not create acceleration structures for ray tracing\n");
+         return false;
+      }
+
    if(!vk_buffers_create(context))
    {
       printf("Could not create all the buffer objects\n");
       return false;
    }
 
-   if(!texture_descriptor_create(&context->texture_descriptor, context, &context->devices, 1 << 16))
+   if(!texture_descriptor_create(context, 1 << 16))
    {
       printf("Could not create bindless textures\n");
       return false;
    }
 
+   // TODO: remove vk_* prefix
    if(!vk_pipelines_create(context))
    {
       printf("Could not create all the pipelines\n");
       return false;
    }
 
-   vk_textures_log(context);
+   spv_hash_function(&context->shader_table, spv_hash_log_module_name, 0);
 
    return true;
+}
+
+static void vk_shader_module_destroy(void* ctx, vk_shader_module_name shader_module)
+{
+   ctx_shader_destroy* p = (ctx_shader_destroy*)ctx;
+
+   vkDestroyShaderModule(p->devices->logical, shader_module.module.handle, 0);
 }
 
 void vk_uninitialize(hw* hw)
@@ -1710,10 +1868,7 @@ void vk_uninitialize(hw* hw)
    // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
 
-   vk_shader_modules mm = spv_hash_lookup(&context->shader_table, meshlet_module_name);
-   vk_shader_modules gm = spv_hash_lookup(&context->shader_table, graphics_module_name);
-   vk_shader_modules am = spv_hash_lookup(&context->shader_table, axis_module_name);
-   vk_shader_modules fm = spv_hash_lookup(&context->shader_table, frustum_module_name);
+   spv_hash_function(&context->shader_table, vk_shader_module_destroy, &(ctx_shader_destroy){&context->devices});
 
    // TODO: iterate buffer objects here
    vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
@@ -1722,7 +1877,7 @@ void vk_uninitialize(hw* hw)
 
    vk_buffer indirect = *buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
    vk_buffer indirect_rtx = *buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
-   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, transform_buffer_name);
+   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
 
    vkDeviceWaitIdle(context->devices.logical);
 
@@ -1740,28 +1895,16 @@ void vk_uninitialize(hw* hw)
    vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, 0);
    vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, 0);
 
-   vkDestroyShaderModule(context->devices.logical, mm.ms, 0);
-   vkDestroyShaderModule(context->devices.logical, mm.fs, 0);
-
-   vkDestroyShaderModule(context->devices.logical, gm.vs, 0);
-   vkDestroyShaderModule(context->devices.logical, gm.fs, 0);
-
-   vkDestroyShaderModule(context->devices.logical, am.vs, 0);
-   vkDestroyShaderModule(context->devices.logical, am.fs, 0);
-
-   vkDestroyShaderModule(context->devices.logical, fm.vs, 0);
-   vkDestroyShaderModule(context->devices.logical, fm.fs, 0);
-
    vkDestroyCommandPool(context->devices.logical, context->command_pool, 0);
    vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
 
-   vk_buffer_destroy(context->devices.logical, &ib);
-   vk_buffer_destroy(context->devices.logical, &vb);
-   vk_buffer_destroy(context->devices.logical, &mb);
+   vk_buffer_destroy(&context->devices, &ib);
+   vk_buffer_destroy(&context->devices, &vb);
+   vk_buffer_destroy(&context->devices, &mb);
 
-   vk_buffer_destroy(context->devices.logical, &indirect);
-   vk_buffer_destroy(context->devices.logical, &indirect_rtx);
-   vk_buffer_destroy(context->devices.logical, &transform);
+   vk_buffer_destroy(&context->devices, &indirect);
+   vk_buffer_destroy(&context->devices, &indirect_rtx);
+   vk_buffer_destroy(&context->devices, &transform);
 
    vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
    vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);

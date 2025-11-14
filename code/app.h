@@ -60,8 +60,9 @@ align_struct app_state
    app_camera camera;
    s8 asset_file;  // TODO: for testing
    f64 frame_delta_in_seconds;
-   bool rtx_enabled;
    bool is_fullscreen;
+   bool is_raytracing; // TODO: replace with just rtx boolean
+   bool is_mesh_shading;
    bool draw_axis;
 } app_state;
 

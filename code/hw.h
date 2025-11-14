@@ -38,7 +38,7 @@ align_struct hw_renderer
 {
    void* backends[RENDERER_COUNT];
    void(*frame_render)(struct hw* hw, void* context, app_state* state);
-   void(*frame_present)(struct hw* hw, void* context, app_state* state);
+   void(*frame_present)(struct hw* hw, void* context);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
    void(*frame_wait)(void* renderer);
    void* (*window_surface_create)(void* instance, void* window_handle);
@@ -55,12 +55,15 @@ align_struct hw_timer
 {
    void(*sleep)(u32 ms);
    i64(*time)();
+   f64(*seconds_elapsed)(i64 begin, i64 end);
+   f64(*time_to_counter)(f64 time);
 } hw_timer;
 
 align_struct hw
 {
    hw_renderer renderer;
    arena vk_storage;
+   arena scratch;
    hw_timer timer;
    app_state state;
    void (*window_title)(struct hw* hw, s8 message, ...);

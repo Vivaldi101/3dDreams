@@ -1,8 +1,6 @@
 #if !defined(_MESH_H)
 #define _MESH_H
 
-#include "../../code/math.h"
-
 struct vertex
 {
    float vx, vy, vz;    // pos
@@ -25,7 +23,10 @@ struct mesh_draw
    uint32_t metal;
    uint32_t emissive;
    uint32_t ao;
-   mat4 world;           // world transform
+   uint32_t mesh_offset;
+   uint32_t vertex_offset;
+
+   mat4 world;           // world transform - TODO: use pos, quat, scale in future
 };
 
 #endif

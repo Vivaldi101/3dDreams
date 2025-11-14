@@ -87,6 +87,10 @@ static bool vk_depth_image_create(vk_image* image, vk_context* context, VkFormat
 
 static size vk_texture_size_blocked(u32 w, u32 h, u32 levels, u32 block_size)
 {
+   (void)w;
+   (void)h;
+   (void)levels;
+   (void)block_size;
    size result = 0;
 
    return result;
@@ -98,7 +102,7 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
 }
 
 // TODO: wide contract
-static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
+static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path)
 {
    u8* gltf_end = gltf_path.data + gltf_path.len;
    size tex_path_start = gltf_path.len;
@@ -116,16 +120,18 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
    size tex_len = img_uri.len + tex_dir.len;
 
    vk_texture tex = {0};
-   tex.path.arena = context->storage;
-   array_resize(tex.path, tex_len + 1); // for null terminate
+   array(char) tex_path = {&s};
+   array_resize(tex_path, tex_len + 1); // for null terminate
 
-   memcpy(tex.path.data, tex_dir.data, tex_dir.len);
-   memcpy(tex.path.data + tex_dir.len, img_uri.data, img_uri.len);
+   memcpy(tex_path.data, tex_dir.data, tex_dir.len);
+   memcpy(tex_path.data + tex_dir.len, img_uri.data, img_uri.len);
 
-   tex.path.data[tex_len] = 0;        // null terminate
+   tex_path.data[tex_len] = 0;        // null terminate
 
-   i32 tex_width, tex_height, tex_channels;
-   stbi_uc* tex_pixels = stbi_load(s8_data(tex.path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+   i32 tex_width = 0;
+   i32 tex_height = 0;
+   i32 tex_channels = 0;
+   stbi_uc* tex_pixels = stbi_load(s8_data(tex_path), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
 
    VkExtent3D extents = {.width = tex_width, .height = tex_height, .depth = 1};
    VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -137,34 +143,22 @@ static void vk_texture_load(vk_context* context, s8 img_uri, s8 gltf_path)
 
    VkImageView image_view = vk_image_view_create(context, format, image.handle, VK_IMAGE_ASPECT_COLOR_BIT);
 
-   // TODO: enable for mip textures
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
    vk_buffer scratch_buffer = {.size = tex_size};
-   vk_buffer_create_and_bind(&scratch_buffer, context->devices.logical, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, context->devices.physical, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-   // TODO: narrow
-   if(vk_valid_handle(image.handle))
-   {
-      vk_buffer_to_image_upload(context, scratch_buffer, image.handle, extents, tex_pixels, scratch_buffer.size);
+   vk_buffer_to_image_upload(context, scratch_buffer, image.handle, extents, tex_pixels, scratch_buffer.size);
 
-      tex.image.handle = image.handle;
-      tex.image.memory = image.memory;
-      tex.image.view = image_view;
+   tex.image.handle = image.handle;
+   tex.image.memory = image.memory;
+   tex.image.view = image_view;
 
-      array_add(context->textures, tex);
-   }
+   array_add(context->textures, tex);
 
-   vk_buffer_destroy(context->devices.logical, &scratch_buffer);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    stbi_image_free(tex_pixels);
-}
-
-
-static void vk_textures_log(vk_context* context)
-{
-   for(size i = 0; i < context->textures.count; i++)
-      printf("Texture loaded: %s\n", context->textures.data[i].path.data);
 }

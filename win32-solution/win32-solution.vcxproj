@@ -100,7 +100,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
@@ -108,6 +108,7 @@
       <AdditionalIncludeDirectories>C:\Work\3dDreams\extern\volk;C:\VulkanSDK\1.4.321.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <CompileAs>CompileAsC</CompileAs>
+      <DisableSpecificWarnings>4324;</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -117,7 +118,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -127,6 +128,7 @@
       <AdditionalIncludeDirectories>C:\Work\3dDreams\extern\volk;C:\VulkanSDK\1.4.321.1\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <CompileAs>CompileAsC</CompileAs>
+      <DisableSpecificWarnings>4324;</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,7 +158,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\code\mesh.c">
+    <ClCompile Include="..\code\gltf.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\code\rt.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -183,6 +189,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\assets\shaders\mesh.h" />
     <ClInclude Include="..\code\app.h" />
     <ClInclude Include="..\code\arena.h" />
     <ClInclude Include="..\code\common.h" />
@@ -201,6 +208,15 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.vert.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.frag.glsl" />
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.mesh.glsl" />
+    <None Include="..\assets\shaders\common.glsl" />
     <None Include="..\code\build.bat" />
   </ItemGroup>
   <ItemGroup>

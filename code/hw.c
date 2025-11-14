@@ -124,7 +124,7 @@ static void hw_frame_present(hw* hw)
       return;
 
    pre(renderer_index < RENDERER_COUNT);
-   hw->renderer.frame_present(hw, renderers[renderer_index], &hw->state);
+   hw->renderer.frame_present(hw, renderers[renderer_index]);
 
 }
 
@@ -152,14 +152,15 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 {
    clock_query_frequency();
 
-   f32 altitude = PI / 8.f;
-   //f32 altitude = 0;
-   f32 azimuth = PI / 2.f; // 1/4 turn to align camera in -z
-   //f32 azimuth = 0;
+   f32 altitude = PI / 10.f;
+   f32 azimuth = PI * 2.f;
    vec3 origin = {0, 0, 0};
-   app_camera_reset(&hw->state.camera, origin, 50.f, altitude, azimuth);
+   app_camera_reset(&hw->state.camera, origin, 1.0f, altitude, azimuth);
+
+   i64 fps_log_counter = (i64)(clock_time_to_counter(.5f) + .5f);
 
    i64 begin = clock_query_counter();
+   i64 fps_counter = begin;
    for (;;)
    {
       if (!hw->platform_loop())
@@ -181,9 +182,15 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
       hw->state.frame_delta_in_seconds = clock_seconds_elapsed(begin, end);
 
+      fps_counter += (end - begin);
+
       begin = end;
 
-      hw->window_title(hw, s8("FPS: %u; 'A': world axis"), (u32)((1.f/hw->state.frame_delta_in_seconds)+.5f));
+      if(fps_counter >= fps_log_counter)
+      {
+         //hw->window_title(hw, s8("FPS: %u; 'A': world axis"), (u32)((1.f / hw->state.frame_delta_in_seconds) + .5f));
+         fps_counter= 0;
+      }
    }
 }
 
@@ -209,18 +216,18 @@ static int cmd_get_arg_count(char* cmd)
 
 static char** cmd_parse(arena* storage, char* cmd, int* argc)
 {
-	*argc = cmd_get_arg_count(cmd);
+   *argc = cmd_get_arg_count(cmd);
    char* arg_start = cmd;
 
    arena_result result = arena_alloc(*storage, sizeof(cmd), *argc);
    for(size i = 0; i < result.count; ++i)
    {
       char* arg_end = strchr(arg_start, ' ');
-		((char**)result.data)[i] = arg_start;
+      ((char**)result.data)[i] = arg_start;
 
-		if(!arg_end)
-			break;
-		*arg_end = 0;	// cut it
+      if(!arg_end)
+         break;
+      *arg_end = 0;	// cut it
       arg_start = arg_end + 1;
    }
 

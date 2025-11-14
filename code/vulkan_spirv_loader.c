@@ -54,7 +54,6 @@ static s8 win32_module_path(arena* a)
 
 static s8 vk_exe_directory(arena* a)
 {
-   u32 count = 0;
    s8 buffer = win32_module_path(a);
 
    if(buffer.len == 0)

@@ -17,63 +17,20 @@ typedef float           f32;
 typedef double          f64;
 typedef uintptr_t       uptr;
 typedef unsigned char   byte;
-typedef ptrdiff_t       size;
 typedef size_t          usize;
+typedef usize           size;
 
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
-
-// string view
-typedef struct
-{
-   u8* data;
-   size len;
-} s8;
-
-static bool s8_is_same(s8 a, s8 b)
-{
-   return strcmp(s8_data(a), s8_data(b));
-}
-
-// TODO: Should really be just strncmp this too
-static bool s8_is_substr(s8 str, s8 sub)
-{
-   for(size i = 0; i < str.len; ++i)
-      if (!strcmp((char*)str.data + i, (char*)sub.data))
-         return true;
-
-   return false;
-}
-
-static size s8_is_substr_count(s8 str, s8 sub)
-{
-   for(size i = 0; i < str.len; ++i)
-      if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
-         return i;
-
-   return -1;
-}
-
-static s8 s8_slice(s8 str, size beg, size end)
-{
-   if(end - beg > str.len)
-      return str;
-   if(beg == 0 && end == 0)
-      return str;
-
-   assert(end - beg <= str.len);
-
-   return (s8){str.data + beg, end - beg};
-}
 
 #ifdef _DEBUG
 #define pre(p)  {if(!(p))hw_message_box(p)}
 #define post(p) {if(!(p))hw_message_box(p)}
 #define inv(p)  {if(!(p))hw_message_box(p)}
 #else
-#define pre(p)
-#define post(p)
-#define inv(p)
+#define pre(p) (void)(p)
+#define post(p) (void)(p)
+#define inv(p) (void)(p)
 #endif
 
 #define fault(p)  {hw_message_box(p); __debugbreak();}
@@ -90,7 +47,6 @@ static_assert(custom_alignment == 64, "");
 #define align_struct __declspec(align(custom_alignment)) typedef struct
 #define align_union __declspec(align(custom_alignment)) typedef union
 
-#define array_clear(a) memset((a), 0, array_count(a)*sizeof(*(a)))
 #define array_count(a) sizeof((a)) / sizeof((a)[0])
 
 #define defer(start, end) \
@@ -112,9 +68,52 @@ static_assert(custom_alignment == 64, "");
 
 #define PI 3.14159265358979323846f
 
-#define struct_clear(s) memset(&(s), 0, sizeof(s))
+#define pointer_clear(p, s) memset((p), 0, (s))
+#define struct_clear(s) {static_assert(sizeof(*(s)) != sizeof(void*)); pointer_clear((s), sizeof(*s));}
 
 #define page_size (4096)
 #define align_page_size (4096 -1)
+
+typedef struct s8
+{
+   u8* data;
+   size len;
+} s8;
+
+static int s8_compare(s8 a, s8 b)
+{
+   return strcmp(s8_data(a), s8_data(b));
+}
+
+static bool s8_equals(s8 a, s8 b)
+{
+   return s8_compare(a, b) == 0;
+}
+
+static bool s8_is_substr(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strcmp((char*)str.data + i, (char*)sub.data))
+         return true;
+
+   return false;
+}
+
+static size s8_is_substr_count(s8 str, s8 sub)
+{
+   for(size i = 0; i < str.len; ++i)
+      if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
+         return i;
+
+   return (size)-1;
+}
+
+static s8 s8_slice(s8 str, size beg, size end)
+{
+   assert(0 <= end - beg);
+   assert(end - beg <= str.len);
+
+   return (s8){str.data + beg, end - beg};
+}
 
 #endif

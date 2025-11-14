@@ -8,7 +8,7 @@
 
 static void win32_log(s8 format, ...)
 {
-   static char temp[1 << 12] = {};
+   static char temp[1 << 12] = {0};
    assert(strlen((const char*)format.data)+1 <= array_count(temp));
 
    va_list args;
@@ -28,6 +28,11 @@ static void win32_sleep(u32 ms)
 static i64 win32_query_counter()
 {
    return clock_query_counter();
+}
+
+static f64 win32_time_to_counter(f64 time)
+{
+   return clock_time_to_counter(time);
 }
 
 static f64 win32_seconds_elapsed(i64 begin, i64 end)
@@ -325,25 +330,117 @@ static void arena_free(arena* a)
    hw_virtual_memory_release(a->beg, arena_left(a));
 }
 
+align_struct scratch_foo
+{
+   i64 i, j;
+} scratch_foo;
+
+align_struct arena_foo
+{
+   i64 k;
+} arena_foo;
+
+static arena_foo** arena_test_compute1(arena* a, size sz)
+{
+   arena_foo** result = push(a, arena_foo*);
+
+   for(size i = 0; i < sz; ++i)
+   {
+      scratch_foo* foo = push(a, scratch_foo);
+      foo->i = i;
+      foo->j = i+1;
+
+      result[i] = push(a, arena_foo);
+      //result[i]->k = foo->i - 442 + foo->j*2 + foo->i;
+      result[i]->k = foo->i + foo->j;
+   }
+
+   return result;
+}
+
+static void arena_test_compute2(arena* a, arena_foo** result, size sz)
+{
+   for(size i = 0; i < sz; ++i)
+   {
+      scratch_foo* foo = push(a, scratch_foo);
+      foo->i = i;
+      foo->j = i+1;
+
+      foo->i = -(i64)result[i]->k;
+      foo->j = -(i64)result[i]->k;
+      result[i]->k += foo->i + foo->j;
+      assert(result[i]->k * 2 == foo->i + foo->j);
+
+      // wp(S, result[i].k*2 == foo->i + foo->j);
+      // wp(result[i].k = result[i].k + foo->i + foo->j, result[i].k*2 == foo->i + foo->j);
+
+      // wp((result[i].k + foo->i + foo->j)*2 == foo->i + foo->j);
+
+      // (result[i].k*2 + foo->i + foo->j == 0)
+   }
+}
+
+#if 0
+static bool arena_test_bool(arena* a, arena_foo** result, size sz)
+{
+   *result = push(a, arena_foo, sz);
+
+   arena s = *a;
+   arena_test_compute1(s, *result, sz);
+   arena_test_compute2(s, *result, sz);
+
+   return true;
+}
+#endif
+
+static arena_foo** arena_test_result(arena* a, size sz)
+{
+   arena_foo** result = 0;
+
+   result = arena_test_compute1(a, sz);
+
+   for(size i = 0; i < sz; ++i)
+      printf("arena_test_compute1: %lld\n", result[i]->k);
+
+   arena_test_compute2(a, result, sz);
+
+   printf("\n");
+
+   for(size i = 0; i < sz; ++i)
+      printf("arena_test_compute2: %lld\n", result[i]->k);
+
+   return result;
+}
+
 int main(int argc, char** argv)
 {
+   (void)argc;
+   (void)argv;
    hw hw = {0};
 
    hw_virtual_memory_init();
 
    // max virtual limit
-   size arena_size = 1ull << 46;
-   void* base = global_allocate(0, arena_size, MEM_RESERVE, PAGE_READWRITE);
+   void* base = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
 
    arena base_arena = {0};
    base_arena.end = base;
+   base_arena.commit_end = (byte*)base_arena.end + arena_max_commit_size/2;
 
-   size initial_arena_size = KB(256);
+   arena scratch_arena = {0};
+   scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
+   scratch_arena.commit_end = (byte*)scratch_arena.end + arena_max_commit_size/2;
+
+   size initial_arena_size = KB(4);
    arena base_storage = arena_new(&base_arena, initial_arena_size);
    assert(arena_left(&base_storage) == initial_arena_size);
 
+   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size);
+   assert(arena_left(&scratch_storage) == initial_arena_size);
+
    hw.vk_storage = base_storage;
+   hw.scratch = scratch_storage;
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
@@ -351,6 +448,8 @@ int main(int argc, char** argv)
 
    hw.timer.sleep = win32_sleep;
    hw.timer.time = win32_query_counter;
+   hw.timer.seconds_elapsed = win32_seconds_elapsed;
+   hw.timer.time_to_counter = win32_time_to_counter;
 
    hw.platform_loop = win32_platform_loop;
 
@@ -360,10 +459,15 @@ int main(int argc, char** argv)
 
    app_start(&hw);
 
+   #if 0
+   size sz = 10;
+   arena_test_result(&base_storage, sz);
+   #endif
+
    bool gr = global_free(base, 0, MEM_RELEASE);
 
-   // should always be valid
-   assert(gr);
+   // must always be valid
+   post(gr);
 
    return 0;
 }

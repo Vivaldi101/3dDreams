@@ -43,9 +43,6 @@
 #define vk_assert(v) (v)
 #endif
 
-// TODO: Remove these and use arena arrays
-enum { MAX_VULKAN_OBJECT_COUNT = 16, OBJECT_SHADER_COUNT = 2 };   // For mesh shading - ms and fs, for regular pipeline - vs and fs
-
 align_struct vk_swapchain_surface
 {
    u32 image_width;
@@ -80,28 +77,23 @@ align_struct vk_buffer_binding
 {
    vk_buffer buffer;
    u32 binding;
+   VkDescriptorType type;
+   void* extras;
 } vk_buffer_binding;
 
-align_struct vk_meshlet
-{
-   vk_buffer buffer;
-   u32 count;
-} vk_meshlet;
-
 typedef struct meshlet meshlet;
-align_struct vk_meshlet_buffer
-{
-   array(meshlet) meshlets;
-} vk_meshlet_buffer;
+
+typedef array(meshlet) array_meshlet;
 
 align_struct vk_mesh_instance
 {
-   u32 mesh_index;  // which mesh this instance draws
+   u32 mesh_index;  // which vk_mesh_draw this instance draws
    u32 albedo; 
    u32 normal;
    u32 ao; 
    u32 metal;
    u32 emissive;
+   u32 index_offset;
    mat4 world;
 } vk_mesh_instance;
 
@@ -110,12 +102,12 @@ align_struct vk_mesh_draw
    // TODO: u32 sizes?
    size index_offset;
    size index_count;
+   size vertex_count;
    size vertex_offset;
 } vk_mesh_draw;
 
 align_struct vk_texture
 {
-   array(char) path;
    vk_image image;
 } vk_texture;
 
@@ -146,12 +138,45 @@ align_struct vk_device
    VkDevice logical;
 } vk_device;
 
+align_struct ctx_shader_destroy
+{
+   vk_device* devices;
+} ctx_shader_destroy;
+
+align_struct vk_geometry
+{
+   array(vk_mesh_draw) mesh_draws;
+   array(vk_mesh_instance) mesh_instances;
+} vk_geometry; 
+
+align_struct vk_cmd
+{
+   VkCommandBuffer buffer;
+   VkCommandPool pool;
+} vk_cmd;
+
+align_struct vk_rt_as
+{
+   // TODO: fill this acceleration structures
+   int foo;
+} vk_rt_as;
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
-   array(vk_mesh_draw) mesh_draws;
-   array(vk_mesh_instance) mesh_instances;
    array(vk_texture) textures;
+
+   array(meshlet) meshlets;
+   array(size) meshlet_counts;
+   array(size) meshlet_offsets;
+   array(size) vertex_offsets;
+
+   // TODO: into vk_rt_as structure
+   VkAccelerationStructureKHR* blases;
+   VkAccelerationStructureKHR tlas;
+   size blas_count;
+
+   vk_geometry geometry;
 
    VkDescriptorSetLayout non_rtx_set_layout;
    VkDescriptorSetLayout rtx_set_layout;
@@ -171,9 +196,12 @@ align_struct vk_context
    u32 image_index;
 
    VkQueue graphics_queue;
-   VkCommandPool command_pool;
    VkQueryPool query_pool;
+
+   // TODO: vk_cmd
+   VkCommandPool command_pool;
    VkCommandBuffer command_buffer;
+
    VkRenderPass renderpass;
 
    VkPipeline rtx_pipeline;
@@ -188,17 +216,17 @@ align_struct vk_context
 
    vk_buffer_hash_table buffer_table;
 
-   u32 meshlet_count;
-
    vk_swapchain_surface swapchain_surface;
    vk_swapchain_images swapchain_images;
 
    arena* storage;
+   arena scratch;
 
    u32 queue_family_index;
    f32 time_period;
 
-   bool rtx_supported;
+   bool mesh_shading_supported;
+   bool raytracing_supported;
 
 #ifdef _DEBUG
    VkDebugUtilsMessengerEXT messenger;
@@ -212,8 +240,9 @@ void vk_uninitialize(hw* hw);
 // TODO: these in buffer.h
 static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from, const void* data, VkDeviceSize dev_size);
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
-static void vk_buffer_destroy(VkDevice device, vk_buffer* buffer);
-static bool vk_buffer_create_and_bind(vk_buffer* buffer, VkDevice logical_device, VkBufferUsageFlags usage, VkPhysicalDevice physical_device, VkMemoryPropertyFlags memory_flags);
-static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDevice physical, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
+static void vk_buffer_destroy(vk_device* device, vk_buffer* buffer);
+// TODO: pass the size for the buffer to be created instead of embedding it inside the buffer
+// TODO: (vk_buffer* buffer, size buffer_size, vk_device* device, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags)
+static bool vk_buffer_create_and_bind(vk_buffer* buffer, vk_device* device, VkBufferUsageFlags usage, VkMemoryPropertyFlags memory_flags);
 
 #endif

@@ -5,6 +5,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{26a2b514-63f9-418b-905a-8b8eb4815f9c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\code\app.c">
@@ -25,7 +28,7 @@
     <ClCompile Include="..\code\hw_arena.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\code\mesh.c">
+    <ClCompile Include="..\code\gltf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\code\soft.c">
@@ -44,6 +47,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\code\win32_file_io.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\code\rt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -87,10 +93,40 @@
     <ClInclude Include="..\code\vulkan_shader_module.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\assets\shaders\mesh.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\code\build.bat">
       <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.frag.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.axis.vert.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.frag.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.frustum.vert.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.frag.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.graphics.vert.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.frag.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\Builtin.ObjectShader.meshlet.mesh.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="..\assets\shaders\common.glsl">
+      <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
