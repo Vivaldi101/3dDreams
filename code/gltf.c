@@ -575,11 +575,20 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
       }
    }
 
+   if(data->cameras_count == 0)
+      printf("No camera in the scene: %s\n", s8_data(gltf_path));
+
    for(usize i = 0; i < data->nodes_count; ++i)
    {
       cgltf_node* node = data->nodes + i;
-      if(!node->mesh)
+
+      if(!node->mesh && !node->camera)
          continue;
+
+      if(node->camera)
+      {
+         // TODO: handle camera
+      }
 
       cgltf_mesh* mesh = node->mesh;
 
