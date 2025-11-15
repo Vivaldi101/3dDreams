@@ -1727,7 +1727,7 @@ bool vk_initialize(hw* hw)
    if (!vk_valid(volkInitialize()))
       return false;
 
-   vk_context* context = push(&hw->vk_storage, vk_context);
+   vk_context* context = push(hw->vk_storage, vk_context);
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1736,7 +1736,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.frame_resize = vk_resize;
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
-   context->storage = &hw->vk_storage;
+   context->storage = hw->vk_storage;
    context->scratch = hw->scratch;
 
    arena* a = context->storage;
