@@ -62,7 +62,7 @@ align_struct hw_timer
 align_struct hw
 {
    hw_renderer renderer;
-   arena* vk_storage;
+   arena* storage;
    arena scratch;
    hw_timer timer;
    app_state state;

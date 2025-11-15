@@ -444,7 +444,7 @@ int main(int argc, char** argv)
    arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size);
    assert(arena_left(scratch_storage) == initial_arena_size);
 
-   hw.vk_storage = base_storage;
+   hw.storage = base_storage;
    hw.scratch = *scratch_storage;
 
    hw.renderer.window.open = win32_window_open;

@@ -445,8 +445,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    arena* a = context->storage;
    arena s = context->scratch;
 
-   vk_geometry* geometry = &context->geometry;
-
+   // preallocate vertices
    array(vertex) vertices = {&s};
    array_resize(vertices, gltf_vertex_count(data));
 
@@ -454,37 +453,17 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    array(u32) indices = {&s};
    array_resize(indices, gltf_index_count(data));
 
-   size max_mesh_draws_count = 0;
-   for(usize i = 0; i < data->meshes_count; ++i)
-   {
-      cgltf_mesh* gltf_mesh = data->meshes + i;
-      for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
-         max_mesh_draws_count++;
-   }
-
-   size max_mesh_instances_count = max_mesh_draws_count;
-
-   // preallocate meshes
-   geometry->mesh_draws.arena = a;
-   array_resize(geometry->mesh_draws, max_mesh_draws_count);
-
-   // preallocate instances
-   geometry->mesh_instances.arena = a;
-   array_resize(geometry->mesh_instances, max_mesh_instances_count);
-
-   // preallocate textures
-   context->textures.arena = a;
-   array_resize(context->textures, data->textures_count);
-
    size index_offset = 0;
    size vertex_offset = 0;
+
+   vk_geometry* geometry = &context->geometry;
+   geometry->mesh_draws.arena = a;
 
    for(usize i = 0; i < data->meshes_count; ++i)
    {
       cgltf_mesh* gltf_mesh = data->meshes + i;
       for(usize p = 0; p < gltf_mesh->primitives_count; ++p)
       {
-
          cgltf_primitive* prim = gltf_mesh->primitives + p;
          assert(prim->type == cgltf_primitive_type_triangles);
 
@@ -568,7 +547,8 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
          md.vertex_offset = vertex_offset;
          md.vertex_count = vertex_count;
 
-         array_add(geometry->mesh_draws, md);
+         //array_add(geometry->mesh_draws, md);
+         array_push(geometry->mesh_draws) = md;
 
          index_offset += index_count;
          vertex_offset += vertex_count;
@@ -577,6 +557,8 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
 
    if(data->cameras_count == 0)
       printf("No camera in the scene: %s\n", s8_data(gltf_path));
+
+   geometry->mesh_instances.arena = a;
 
    for(usize i = 0; i < data->nodes_count; ++i)
    {
@@ -632,9 +614,14 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
          mi.ao = (u32)ao_index;
          mi.emissive = (u32)emissive_index;
 
-         array_add(geometry->mesh_instances, mi);
+         //array_add(geometry->mesh_instances, mi);
+         array_push(geometry->mesh_instances) = mi;
       }
    }
+
+   // preallocate textures
+   context->textures.arena = a;
+   array_resize(context->textures, data->textures_count);
 
    for(usize i = 0; i < data->textures_count; ++i)
    {
