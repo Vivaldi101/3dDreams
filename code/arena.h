@@ -8,8 +8,8 @@
 
 typedef enum arena_flags
 {
-   arena_persistent = 0,
-   arena_scratch
+   arena_persistent_kind = 0,
+   arena_scratch_kind
 } arena_flags;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
@@ -96,6 +96,8 @@ static arena* arena_new(arena* base, size cap)
 
    p->beg = p + sizeof(arena);
    p->end = (byte*)p->beg + cap;
+
+   p->kind = base->kind;
 
    assert((byte*)p->beg + cap == p->end);
 
