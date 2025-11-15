@@ -77,7 +77,7 @@ static arena* arena_new(arena* base, size cap)
 
    arena* a = base;
 
-   if(hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
+   if(base->kind == arena_scratch_kind && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       a->beg = base->end;
       a->end = (byte*)base->end + cap;
