@@ -72,12 +72,12 @@ static vk_buffer_objects vk_obj_read(vk_context* context, s8 filename)
 
    user_data.mtl_path = mtl_path;
 
-   user_data.scratch = *context->storage;
+   user_data.scratch = context->scratch;
 
    if(tinyobj_parse_obj(&attrib, &shapes, &shape_count, &materials, &material_count, s8_data(obj_path), obj_file_read_callback, &user_data, TINYOBJ_FLAG_TRIANGULATE) != TINYOBJ_SUCCESS)
       hw_message_box("Could not load .obj file");
 
-   result = obj_load(context, *context->storage, &attrib);
+   result = obj_load(context, context->scratch, &attrib);
 
    tinyobj_materials_free(materials, material_count);
    tinyobj_shapes_free(shapes, shape_count);
@@ -194,7 +194,7 @@ static bool spirv_initialize(vk_context* context)
          // TODO: use s8 equals
          if(strncmp(shader_name + i, meshlet_module_name, strlen(meshlet_module_name)) == 0)
          {
-            vk_shader_module mm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            vk_shader_module mm = vk_shader_load(context->devices.logical, context->scratch, *p);
             if (mm.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
                spv_hash_insert(table, meshlet_module_name"_ms", mm);
             else if (mm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -203,7 +203,7 @@ static bool spirv_initialize(vk_context* context)
          }
          if(strncmp(shader_name + i, graphics_module_name, strlen(graphics_module_name)) == 0)
          {
-            vk_shader_module gm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            vk_shader_module gm = vk_shader_load(context->devices.logical, context->scratch, *p);
             if(gm.stage == VK_SHADER_STAGE_VERTEX_BIT)
                spv_hash_insert(table, graphics_module_name"_vs", gm);
             else if(gm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -212,7 +212,7 @@ static bool spirv_initialize(vk_context* context)
          }
          if(strncmp(shader_name + i, axis_module_name, strlen(axis_module_name)) == 0)
          {
-            vk_shader_module am = vk_shader_load(context->devices.logical, *context->storage, *p);
+            vk_shader_module am = vk_shader_load(context->devices.logical, context->scratch, *p);
             if(am.stage == VK_SHADER_STAGE_VERTEX_BIT)
                spv_hash_insert(table, axis_module_name"_vs", am);
             else if(am.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -221,7 +221,7 @@ static bool spirv_initialize(vk_context* context)
          }
          if(strncmp(shader_name + i, frustum_module_name, strlen(frustum_module_name)) == 0)
          {
-            vk_shader_module fm = vk_shader_load(context->devices.logical, *context->storage, *p);
+            vk_shader_module fm = vk_shader_load(context->devices.logical, context->scratch, *p);
             if(fm.stage == VK_SHADER_STAGE_VERTEX_BIT)
                spv_hash_insert(table, frustum_module_name"_vs", fm);
             else if(fm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -342,7 +342,7 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context)
    u32 dev_count = 0;
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, 0));
 
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
    VkPhysicalDevice* devs = push(&scratch, VkPhysicalDevice, dev_count);
    vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
 
@@ -600,7 +600,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
       swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
    }
 
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(*context->storage, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
+   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(context->scratch, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
    swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
 
@@ -759,7 +759,7 @@ static void vk_swapchain_destroy(vk_context* context)
 // TODO: wide contract
 static void vk_swapchain_update(vk_context* context)
 {
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
 
    VkImage* swapchain_images = push(&scratch, VkImage, context->swapchain_surface.image_count);
 
@@ -1090,7 +1090,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       cmd_bind_descriptor_set(command_buffer, pipeline_layout, &context->texture_descriptor.set, 1, 1);
       cmd_bind_pipeline(command_buffer, pipeline);
 
-      arena s = *context->storage;
+      arena s = context->scratch;
       array(vk_buffer_binding) bindings = {&s};
 
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
@@ -1136,7 +1136,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if(buffer_hash_lookup(&context->buffer_table, ib_buffer_name))
          cmd_bind_index_buffer(command_buffer, buffer_hash_lookup(&context->buffer_table, ib_buffer_name)->handle, 0);
 
-      arena s = *context->storage;
+      arena s = context->scratch;
       array(vk_buffer_binding) bindings = {&s};
 
       if(buffer_hash_lookup(&context->buffer_table, vb_buffer_name))
@@ -1315,7 +1315,7 @@ static VkPipelineShaderStageCreateInfo vk_shader_stage_create_info(vk_shader_mod
 
 static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
@@ -1398,7 +1398,7 @@ static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, V
 
 static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
@@ -1481,7 +1481,7 @@ static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* contex
 
 static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, VkPipelineCache cache, const vk_shader_module* shader_modules, size shader_module_count)
 {
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
 
    array(VkPipelineShaderStageCreateInfo) stages = {&scratch};
 
@@ -1590,7 +1590,7 @@ static bool vk_buffers_create(vk_context* context)
    vk_buffer mesh_draw_buffer = {0};
    vk_buffer rt_buffer = {0};
 
-   arena s = *context->storage;
+   arena s = context->scratch;
 
    // TODO: pass devices and geometry
    if(!buffer_indirect_create(&indirect_buffer, context, s, false))
@@ -1632,7 +1632,7 @@ static bool vk_pipelines_create(vk_context* context)
    VkPipelineLayout rtx_pipeline_layout = 0;
 
    // set 0 for vertex SSBO, set 1 for bindless textures
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
    array(VkDescriptorSetLayout) set_layouts = {&scratch};
    array_push(set_layouts) = non_rtx_set_layout;
 
@@ -1740,7 +1740,7 @@ bool vk_initialize(hw* hw)
    context->scratch = hw->scratch;
 
    arena* a = context->storage;
-   arena s = *context->storage;
+   arena s = context->scratch;
 
    VkInstance instance = 0;
    if(!vk_instance_create(&instance, s))

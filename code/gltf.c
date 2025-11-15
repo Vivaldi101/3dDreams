@@ -191,7 +191,7 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
 
-   vk_meshlet_buffer mb = meshlet_build(*context->storage, vb_data.count, ib_data, index_count);
+   vk_meshlet_buffer mb = meshlet_build(context->scratch, vb_data.count, ib_data, index_count);
 
    usize vb_size = vb_data.count * sizeof(vertex);
    usize mb_size = mb.meshlets.count * sizeof(meshlet);
@@ -282,7 +282,7 @@ static size gltf_vertex_count(const cgltf_data* data)
 
 static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_count)
 {
-   arena scratch = *context->storage;
+   arena scratch = context->scratch;
 
    // descriptor_count image samplers
    VkDescriptorPoolSize pool_size =

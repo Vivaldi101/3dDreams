@@ -429,22 +429,20 @@ int main(int argc, char** argv)
    arena base_arena = {0};
    base_arena.end = base;
    base_arena.commit_end = (byte*)base_arena.end + arena_max_commit_size/2;
-   base_arena.kind = arena_persistent;
+   base_arena.kind = arena_persistent_kind;
 
    arena scratch_arena = {0};
    scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
    scratch_arena.commit_end = (byte*)scratch_arena.end + arena_max_commit_size/2;
-   scratch_arena.kind = arena_scratch;
+   scratch_arena.kind = arena_scratch_kind;
 
    const size initial_arena_size = KB(4);
 
    arena* base_storage = arena_new(&base_arena, initial_arena_size);
-   size base_size = arena_left(base_storage);
-   assert(base_size == initial_arena_size);
+   assert(arena_left(base_storage) == initial_arena_size);
 
    arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size);
-   size scratch_size = arena_left(scratch_storage);
-   assert(scratch_size == initial_arena_size);
+   assert(arena_left(scratch_storage) == initial_arena_size);
 
    hw.vk_storage = *base_storage;
    hw.scratch = *scratch_storage;
