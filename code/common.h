@@ -71,8 +71,8 @@ static_assert(custom_alignment == 64, "");
 #define pointer_clear(p, s) memset((p), 0, (s))
 #define struct_clear(s) {static_assert(sizeof(*(s)) != sizeof(void*)); pointer_clear((s), sizeof(*s));}
 
-#define page_size (4096)
-#define align_page_size (4096 -1)
+#define page_size KB(4)
+#define align_page_size (page_size - 1)
 
 typedef struct s8
 {

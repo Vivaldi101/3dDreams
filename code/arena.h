@@ -41,7 +41,6 @@ align_struct arena
 {
    void* beg;
    void* end;         // one past the end
-   void* commit_end;  // one past the commit end
    arena_flags kind;
 } arena;
 
