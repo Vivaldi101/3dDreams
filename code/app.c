@@ -27,7 +27,7 @@ static void app_camera_update(app_state* state)
    f32 delta_x = (f32)state->input.mouse_pos[0] - (f32)state->input.mouse_prev_pos[0];
    f32 delta_y = (f32)state->input.mouse_pos[1] - (f32)state->input.mouse_prev_pos[1];
 
-   f32 zoom_speed = 5.f;
+   f32 zoom_speed = 2.f;
 
    if(state->input.mouse_wheel_state & MOUSE_WHEEL_STATE_UP)
    {
@@ -56,12 +56,15 @@ static void app_camera_update(app_state* state)
 
       // dont go below the ground plane
       //state->camera.target_altitude = max(state->camera.target_altitude, deg2rad(5.f));
+
+      // stop when rotating
+      state->camera.target_radius = state->camera.smoothed_radius;
    }
 
    // smooth damping
    state->camera.smoothed_azimuth += (state->camera.target_azimuth - state->camera.smoothed_azimuth) * smoothing_factor;
    state->camera.smoothed_altitude += (state->camera.target_altitude - state->camera.smoothed_altitude) * smoothing_factor;
-   state->camera.smoothed_radius += (state->camera.target_radius - state->camera.smoothed_radius) * smoothing_factor;
+   state->camera.smoothed_radius += (state->camera.target_radius - state->camera.smoothed_radius) * smoothing_factor*.25f;
 
    // use smoothed values for position
    f32 azimuth = state->camera.smoothed_azimuth;
@@ -92,8 +95,8 @@ static void app_camera_update(app_state* state)
       xz = vec3_scale(&xz, delta_x);
       up = vec3_scale(&up, delta_y);
 
-      xz = vec3_scale(&xz, smoothing_factor);
-      up = vec3_scale(&up, smoothing_factor);
+      xz = vec3_scale(&xz, smoothing_factor * .045f);
+      up = vec3_scale(&up, smoothing_factor * .045f);
 
       state->camera.origin = vec3_sub(&xz, &state->camera.origin);
       state->camera.origin = vec3_add(&up, &state->camera.origin);
