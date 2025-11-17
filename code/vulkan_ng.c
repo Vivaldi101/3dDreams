@@ -903,12 +903,13 @@ static void vk_present(hw* hw, vk_context* context)
    {
       const f64 ms = 1e6;
       cpu_counter = cpu_end;
+      const f64 gpu_delta = max(gpu_end - gpu_begin, 0.f);
       // frame logs
       // TODO: this should really be in app.c
       if(hw->state.is_mesh_shading)
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, (gpu_end - gpu_begin) / ms, context->meshlets.count);
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, gpu_delta / ms, context->meshlets.count);
       else
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, (gpu_end - gpu_begin) / ms);
+         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, gpu_delta / ms);
    }
 #endif
 
