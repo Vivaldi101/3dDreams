@@ -460,7 +460,8 @@ int main(int argc, char** argv)
 
    if(argc < 2)
    {
-      printf("Correct usage: program_name.exe <gltf-dir/gltf-name.gltf>");
+      printf("Place the gltf asset in assets/gltf directory and ");
+      printf("use like so: program_name.exe <gltf-dir/gltf-name.gltf>");
       return 0;
    }
 
