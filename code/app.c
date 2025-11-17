@@ -190,10 +190,12 @@ void app_start(hw* hw)
       return;
    }
 
-   printf("Vulkan backend initialized!\n");
+   printf("Vulkan backend initialized succesfully!\n");
 
    hw_event_loop_start(hw, app_frame, app_input_handle);
    vk_uninitialize(hw);
+
+   printf("Vulkan backend uninitialized succesfully!\n");
 
    hw_window_close(hw);
 }

@@ -5,6 +5,8 @@ static const char* vb_buffer_name = "vb";
 static const char* ib_buffer_name = "ib";
 static const char* mb_buffer_name = "mb";
 
+static const char* blas_buffer_name = "blas";
+static const char* tlas_buffer_name = "tlas";
 static const char* indirect_buffer_name = "indirect";
 static const char* indirect_rtx_buffer_name = "indirect_rtx";
 static const char* mesh_draw_buffer_name = "mesh_draw";

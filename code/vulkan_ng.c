@@ -1794,17 +1794,22 @@ void vk_uninitialize(hw* hw)
 {
    // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
+   vk_buffer_hash_table* buffer_table = &context->buffer_table;
 
    spv_hash_function(&context->shader_table, vk_shader_module_destroy, &(ctx_shader_destroy){&context->devices});
 
    // TODO: iterate buffer objects here
-   vk_buffer vb = *buffer_hash_lookup(&context->buffer_table, vb_buffer_name);
-   vk_buffer ib = *buffer_hash_lookup(&context->buffer_table, ib_buffer_name);
-   vk_buffer mb = *buffer_hash_lookup(&context->buffer_table, mb_buffer_name);
+   vk_buffer vb = *buffer_hash_lookup(buffer_table, vb_buffer_name);
+   vk_buffer ib = *buffer_hash_lookup(buffer_table, ib_buffer_name);
+   vk_buffer mb = *buffer_hash_lookup(buffer_table, mb_buffer_name);
 
-   vk_buffer indirect = *buffer_hash_lookup(&context->buffer_table, indirect_buffer_name);
-   vk_buffer indirect_rtx = *buffer_hash_lookup(&context->buffer_table, indirect_rtx_buffer_name);
-   vk_buffer transform = *buffer_hash_lookup(&context->buffer_table, mesh_draw_buffer_name);
+   vk_buffer indirect = *buffer_hash_lookup(buffer_table, indirect_buffer_name);
+   vk_buffer indirect_rtx = *buffer_hash_lookup(buffer_table, indirect_rtx_buffer_name);
+   vk_buffer transform = *buffer_hash_lookup(buffer_table, mesh_draw_buffer_name);
+
+   vk_buffer tlas = *buffer_hash_lookup(buffer_table, tlas_buffer_name);
+   vk_buffer blas = *buffer_hash_lookup(buffer_table, blas_buffer_name);
+   vk_buffer rt = *buffer_hash_lookup(buffer_table, rt_buffer_name);
 
    vkDeviceWaitIdle(context->devices.logical);
 
@@ -1832,6 +1837,15 @@ void vk_uninitialize(hw* hw)
    vk_buffer_destroy(&context->devices, &indirect);
    vk_buffer_destroy(&context->devices, &indirect_rtx);
    vk_buffer_destroy(&context->devices, &transform);
+
+   vk_buffer_destroy(&context->devices, &tlas);
+   vk_buffer_destroy(&context->devices, &blas);
+   vk_buffer_destroy(&context->devices, &rt);
+
+   for(size i = 0; i < context->blas_count; i++)
+      vkDestroyAccelerationStructureKHR(context->devices.logical, context->blases[i], 0);
+
+   vkDestroyAccelerationStructureKHR(context->devices.logical, context->tlas, 0);
 
    vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
    vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);

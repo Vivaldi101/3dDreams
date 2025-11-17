@@ -86,6 +86,8 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
 
+   buffer_hash_insert(buffer_table, blas_buffer_name, blas_buffer);
+
    vk_buffer scratch_buffer = {.size = total_scratch_size};
 
    if(!vk_buffer_create_and_bind(&scratch_buffer, devices,
@@ -159,6 +161,7 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
 
 static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationStructureKHR* tlas)
 {
+   vk_buffer_hash_table* buffer_table = &context->buffer_table;
    vk_geometry* geometry = &context->geometry;
    vk_device* devices = &context->devices;
    const size draw_count = geometry->mesh_draws.count;
@@ -229,6 +232,8 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
+
+   buffer_hash_insert(buffer_table, tlas_buffer_name, tlas_buffer);
 
    vk_buffer scratch_buffer = {.size = size_info.buildScratchSize};
 
