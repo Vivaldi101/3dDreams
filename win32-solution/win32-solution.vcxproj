@@ -154,10 +154,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\code\hw_arena.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\code\gltf.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -193,7 +189,6 @@
     <ClInclude Include="..\code\d3dx12.h" />
     <ClInclude Include="..\code\fixed_point.h" />
     <ClInclude Include="..\code\hw.h" />
-    <ClInclude Include="..\code\hw_arena.h" />
     <ClInclude Include="..\code\math.h" />
     <ClInclude Include="..\code\priority_queue.h" />
     <ClInclude Include="..\code\vulkan_ng.h" />

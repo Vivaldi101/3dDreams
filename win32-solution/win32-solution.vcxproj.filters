@@ -25,9 +25,6 @@
     <ClCompile Include="..\code\hw.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\code\hw_arena.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\code\gltf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -70,9 +67,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\code\hw.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\code\hw_arena.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\code\math.h">
