@@ -86,7 +86,7 @@ static void app_camera_update(app_state* state)
 
    if(state->input.mouse_buttons & MOUSE_BUTTON_STATE_RIGHT)
    {
-      vec3 xz = {};
+      vec3 xz = {0};
       vec3 up = {0, 1, 0};
 
       vec3_cross(orbit_dir, up, xz);
@@ -164,7 +164,7 @@ static void app_input_handle(app_state* state)
    }
 }
 
-void app_start(hw* hw)
+void app_start(hw* hw, s8 asset_file)
 {
    int w = 800, h = 600;
 	int x = 100, y = 100;
@@ -176,13 +176,7 @@ void app_start(hw* hw)
       return;
    }
 
-   //hw->state.asset_file = s8("lantern/lantern.gltf");
-   //hw->state.asset_file = s8("dragon/DragonAttenuation.gltf");
-   //hw->state.asset_file = s8("glassbrokenwindow/glassbrokenwindow.gltf");
-   //hw->state.asset_file = s8("glamvelvetsofa/glamvelvetsofa.gltf");
-   //hw->state.asset_file = s8("damagedhelmet/damagedhelmet.gltf");
-   //hw->state.asset_file = s8("flighthelmet/flighthelmet.gltf");
-   hw->state.asset_file = s8("sponza/sponza.gltf");
+   hw->state.asset_file = asset_file;
 
    if(!vk_initialize(hw))
    {

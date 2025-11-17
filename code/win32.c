@@ -414,8 +414,6 @@ static arena_foo** arena_test_result(arena* a, size sz)
 
 int main(int argc, char** argv)
 {
-   (void)argc;
-   (void)argv;
    hw hw = {0};
 
    hw_virtual_memory_init();
@@ -460,7 +458,13 @@ int main(int argc, char** argv)
 
    hw.log = win32_log;
 
-   app_start(&hw);
+   if(argc < 2)
+   {
+      printf("Correct usage: program_name.exe <gltf-dir/gltf-name.gltf>");
+      return 0;
+   }
+
+   app_start(&hw, s8(argv[1]));
 
    #if 0
    size sz = 10;
