@@ -1,10 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 
-// TODO: Rename to gltf.c
-
-#define TINYOBJ_LOADER_C_IMPLEMENTATION
-#include "../extern/tinyobjloader-c/tinyobj_loader_c.h"
-
 #define CGLTF_IMPLEMENTATION
 #include "../extern/cgltf/cgltf.h"
 #include "../assets/shaders/mesh.h"
@@ -14,11 +9,6 @@
 static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path);
 
 typedef struct vertex vertex;
-typedef struct 
-{
-   arena scratch;
-} obj_user_ctx;
-
 typedef struct 
 {
    arena scratch;
