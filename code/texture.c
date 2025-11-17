@@ -101,8 +101,7 @@ static size vk_texture_size(u32 w, u32 h, u32 levels)
    return vk_texture_size_blocked(w, h, levels, 0);
 }
 
-// TODO: wide contract
-static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path)
+static bool vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path)
 {
    u8* gltf_end = gltf_path.data + gltf_path.len;
    size tex_path_start = gltf_path.len;
@@ -139,11 +138,17 @@ static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_pa
 
    vk_image image = {0};
    if(!vk_image_create(&image, context, VK_FORMAT_R8G8B8A8_UNORM, extents, usage))
-      return;  // false
+      return false;
 
    VkImageView image_view = vk_image_view_create(context, format, image.handle, VK_IMAGE_ASPECT_COLOR_BIT);
 
    size tex_size = tex_width * tex_height * STBI_rgb_alpha;
+
+   if(tex_size == 0)
+   {
+      printf("Bad or missing texture: %s\n", s8_data(tex_path));
+      return false;
+   }
 
    VkPhysicalDeviceMemoryProperties memory_props;
    vkGetPhysicalDeviceMemoryProperties(context->devices.physical, &memory_props);
@@ -161,4 +166,6 @@ static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_pa
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    stbi_image_free(tex_pixels);
+
+   return true;
 }

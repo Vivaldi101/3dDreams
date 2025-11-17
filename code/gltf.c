@@ -6,7 +6,7 @@
 
 #include "vulkan_ng.h"
 
-static void vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path);
+static bool vk_texture_load(vk_context* context, arena s, s8 img_uri, s8 gltf_path);
 
 typedef struct vertex vertex;
 typedef struct 
@@ -561,51 +561,53 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
       {
          // TODO: handle camera
       }
-
-      cgltf_mesh* mesh = node->mesh;
-
-      for(cgltf_size pi = 0; pi < mesh->primitives_count; ++pi)
+      if(node->mesh)
       {
-         cgltf_primitive* prim = mesh->primitives + pi;
-         cgltf_material* material = prim->material;
+         cgltf_mesh* mesh = node->mesh;
 
-         mat4 wm = {0};
-         cgltf_node_transform_world(node, wm.data);
+         for(cgltf_size pi = 0; pi < mesh->primitives_count; ++pi)
+         {
+            cgltf_primitive* prim = mesh->primitives + pi;
+            cgltf_material* material = prim->material;
 
-         vk_mesh_instance mi = {0};
-         u32 mesh_index = (u32)cgltf_mesh_index(data, mesh);
-         // index into the mesh to draw
-         mi.mesh_index = mesh_index + (u32)pi;
-         mi.world = wm;
+            mat4 wm = {0};
+            cgltf_node_transform_world(node, wm.data);
 
-         cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
-            ? cgltf_texture_index(data, material->pbr_metallic_roughness.base_color_texture.texture)
-            : -1;
+            vk_mesh_instance mi = {0};
+            u32 mesh_index = (u32)cgltf_mesh_index(data, mesh);
+            // index into the mesh to draw
+            mi.mesh_index = mesh_index + (u32)pi;
+            mi.world = wm;
 
-         cgltf_size normal_index = material && material->normal_texture.texture
-            ? cgltf_texture_index(data, material->normal_texture.texture)
-            : -1;
+            cgltf_size albedo_index = material && material->pbr_metallic_roughness.base_color_texture.texture
+               ? cgltf_texture_index(data, material->pbr_metallic_roughness.base_color_texture.texture)
+               : -1;
 
-         cgltf_size ao_index = material && material->occlusion_texture.texture
-            ? cgltf_texture_index(data, material->occlusion_texture.texture)
-            : -1;
+            cgltf_size normal_index = material && material->normal_texture.texture
+               ? cgltf_texture_index(data, material->normal_texture.texture)
+               : -1;
 
-         cgltf_size metal_index = material && material->pbr_metallic_roughness.metallic_roughness_texture.texture
-            ? cgltf_texture_index(data, material->pbr_metallic_roughness.metallic_roughness_texture.texture)
-            : -1;
+            cgltf_size ao_index = material && material->occlusion_texture.texture
+               ? cgltf_texture_index(data, material->occlusion_texture.texture)
+               : -1;
 
-         cgltf_size emissive_index = material && material->emissive_texture.texture
-            ? cgltf_texture_index(data, material->emissive_texture.texture)
-            : -1;
+            cgltf_size metal_index = material && material->pbr_metallic_roughness.metallic_roughness_texture.texture
+               ? cgltf_texture_index(data, material->pbr_metallic_roughness.metallic_roughness_texture.texture)
+               : -1;
 
-         mi.albedo = (u32)albedo_index;
-         mi.normal = (u32)normal_index;
-         mi.metal = (u32)metal_index;
-         mi.ao = (u32)ao_index;
-         mi.emissive = (u32)emissive_index;
+            cgltf_size emissive_index = material && material->emissive_texture.texture
+               ? cgltf_texture_index(data, material->emissive_texture.texture)
+               : -1;
 
-         //array_add(geometry->mesh_instances, mi);
-         array_push(geometry->mesh_instances) = mi;
+            mi.albedo = (u32)albedo_index;
+            mi.normal = (u32)normal_index;
+            mi.metal = (u32)metal_index;
+            mi.ao = (u32)ao_index;
+            mi.emissive = (u32)emissive_index;
+
+            //array_add(geometry->mesh_instances, mi);
+            array_push(geometry->mesh_instances) = mi;
+         }
       }
    }
 
@@ -624,7 +626,8 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
       cgltf_decode_uri(img->uri);
 
       // TODO: pass just textures, devices instead of entire context
-      vk_texture_load(context, s, s8(img->uri), gltf_path);
+      if(!vk_texture_load(context, s, s8(img->uri), gltf_path))
+         return false;
    }
 
    size max_vertex_count = 0;
