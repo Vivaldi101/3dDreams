@@ -31,9 +31,6 @@
     <ClCompile Include="..\code\gltf.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\code\soft.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\code\texture.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -82,9 +79,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\code\priority_queue.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\code\soft.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\code\vulkan_ng.h">
