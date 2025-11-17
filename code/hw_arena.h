@@ -72,8 +72,8 @@ static void* hw_virtual_memory_reserve(usize size)
 
 static void hw_virtual_memory_commit(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_reserved((byte*)address+size-1));
-	pre(!hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_reserved((byte*)address+size-1));
+	assert(!hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	// commit the reserved address range
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
@@ -81,14 +81,14 @@ static void hw_virtual_memory_commit(void* address, usize size)
 
 static void hw_virtual_memory_release(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	global_release(address, size);
 }
 
 static void hw_virtual_memory_decommit(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	global_allocate(address, size, MEM_DECOMMIT, PAGE_READWRITE);
 }
@@ -104,14 +104,14 @@ static void hw_virtual_memory_init()
       global_release = (VirtualReleasePtr)(GetProcAddress(hKernel32, "VirtualFree"));
    }
 
-	post(global_allocate);
-	post(global_release);
+	assert(global_allocate);
+	assert(global_release);
 }
 
 static hw_arena hw_buffer_create(usize byte_count) 
 {
    hw_arena result = {0};
-   pre(global_allocate);
+   assert(global_allocate);
 
    void* base = hw_virtual_memory_reserve(byte_count);
    hw_virtual_memory_commit(base, byte_count);
@@ -136,15 +136,15 @@ static void hw_buffer_decommit(hw_arena *buffer)
 static hw_frame_arena hw_sub_memory_buffer_create(const hw_arena *buffer)
 {
    hw_frame_arena result = {0};
-   pre(buffer->max_size >= buffer->bytes_used);
+   assert(buffer->max_size >= buffer->bytes_used);
 
    result.bytes_used = 0;
    result.max_size = buffer->max_size - buffer->bytes_used;
    result.base = (byte*)buffer->base + buffer->bytes_used;
 
-   post(result.bytes_used == 0);
-   post(result.max_size == buffer->max_size - buffer->bytes_used);
-   post(result.base == (byte*)buffer->base + buffer->bytes_used);
+   assert(result.bytes_used == 0);
+   assert(result.max_size == buffer->max_size - buffer->bytes_used);
+   assert(result.base == (byte*)buffer->base + buffer->bytes_used);
 
    return result;
 }
@@ -172,7 +172,7 @@ static hw_arena hw_buffer_push(hw_arena *buffer, usize bytes, usize element_size
 static void* hw_buffer_pop(hw_arena *buffer, usize bytes) 
 {
    void *result;
-   pre(buffer->bytes_used >= bytes);
+   assert(buffer->bytes_used >= bytes);
 
    buffer->bytes_used -= bytes;
    result = (byte*)buffer->base + buffer->bytes_used;

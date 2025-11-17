@@ -23,20 +23,7 @@ typedef usize           size;
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
 
-#ifdef _DEBUG
-#define pre(p)  {if(!(p))hw_message_box(p)}
-#define post(p) {if(!(p))hw_message_box(p)}
-#define inv(p)  {if(!(p))hw_message_box(p)}
-#else
-#define pre(p) (void)(p)
-#define post(p) (void)(p)
-#define inv(p) (void)(p)
-#endif
-
 #define fault(p)  {hw_message_box(p); __debugbreak();}
-
-//#undef assert
-//#define assert(cond) do { if (DoYouWantToBreak(cond, __FILE__, __LINE__)) __debugbreak(); } while (0)
 
 #define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))

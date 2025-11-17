@@ -45,7 +45,7 @@ bool hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)
 
 void hw_window_close(hw* hw)
 {
-	pre(hw->renderer.window.handle);
+	assert(hw->renderer.window.handle);
    hw->renderer.window.close(hw->renderer.window);
 }
 
@@ -123,7 +123,7 @@ static void hw_frame_present(hw* hw)
    if(hw->renderer.window.width == 0 || hw->renderer.window.height == 0)
       return;
 
-   pre(renderer_index < RENDERER_COUNT);
+   assert(renderer_index < RENDERER_COUNT);
    hw->renderer.frame_present(hw, renderers[renderer_index]);
 
 }
@@ -139,7 +139,7 @@ static void hw_frame_render(hw* hw)
    if(hw->renderer.window.width == 0 || hw->renderer.window.height == 0)
       return;
 
-   pre(renderer_index < RENDERER_COUNT);
+   assert(renderer_index < RENDERER_COUNT);
    hw->renderer.frame_render(hw, renderers[renderer_index], &hw->state);
 }
 

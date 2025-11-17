@@ -199,7 +199,7 @@ static inline mat4 mat4_translate(vec3 t)
    return result;
 }
 
-// transform a by b, post-multiplication
+// transform a by b, assert-multiplication
 static inline mat4 mat4_mul(mat4 b, mat4 a)
 {
    mat4 result = mat4_identity();

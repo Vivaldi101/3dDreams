@@ -289,8 +289,8 @@ static void* hw_virtual_memory_reserve(usize size)
 
 static void hw_virtual_memory_commit(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_reserved((byte*)address+size-1));
-	pre(!hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_reserved((byte*)address+size-1));
+	assert(!hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	// commit the reserved address range
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
@@ -298,14 +298,14 @@ static void hw_virtual_memory_commit(void* address, usize size)
 
 static void hw_virtual_memory_release(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	global_free(address, 0, MEM_RELEASE);
 }
 
 static void hw_virtual_memory_decommit(void* address, usize size)
 {
-	pre(hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
 
 	global_allocate(address, size, MEM_DECOMMIT, PAGE_READWRITE);
 }
@@ -316,13 +316,13 @@ static void hw_virtual_memory_init()
 
    HMODULE hkernel32 = GetModuleHandleA("kernel32.dll");
 
-   inv(hkernel32);
+   assert(hkernel32);
 
    global_allocate = (VirtualAllocPtr)(GetProcAddress(hkernel32, "VirtualAlloc"));
    global_free = (VirtualFreePtr)(GetProcAddress(hkernel32, "VirtualFree"));
 
-   post(global_allocate);
-   post(global_free);
+   assert(global_allocate);
+   assert(global_free);
 }
 
 static void arena_free(arena* a)
@@ -474,8 +474,7 @@ int main(int argc, char** argv)
 
    bool gr = global_free(base, 0, MEM_RELEASE);
 
-   // must always be valid
-   post(gr);
+   assert(gr);
 
    return 0;
 }
