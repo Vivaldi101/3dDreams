@@ -100,13 +100,13 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
 
    memcpy(scratch.data, data, dev_size);
 
-   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
 
    VkCommandBufferBeginInfo begin_info = {0};
    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   vk_assert(vkBeginCommandBuffer(context->command_buffer, &begin_info));
+   vk_assert(vkBeginCommandBuffer(context->cmd.buffer, &begin_info));
 
    VkImageMemoryBarrier img_barrier_to_transfer = {0};
    img_barrier_to_transfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -124,7 +124,7 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    img_barrier_to_transfer.subresourceRange.layerCount = 1;
 
    vkCmdPipelineBarrier(
-      context->command_buffer,
+      context->cmd.buffer,
       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
       VK_PIPELINE_STAGE_TRANSFER_BIT,
       0,
@@ -147,7 +147,7 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    region.imageExtent = image_extent;
 
    vkCmdCopyBufferToImage(
-      context->command_buffer,
+      context->cmd.buffer,
       scratch.handle,
       image,
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -171,7 +171,7 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
    img_barrier_to_shader.subresourceRange.layerCount = 1;
 
    vkCmdPipelineBarrier(
-      context->command_buffer,
+      context->cmd.buffer,
       VK_PIPELINE_STAGE_TRANSFER_BIT,
       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
       0,
@@ -180,13 +180,13 @@ static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, Vk
       1, &img_barrier_to_shader
    );
 
-   vk_assert(vkEndCommandBuffer(context->command_buffer));
+   vk_assert(vkEndCommandBuffer(context->cmd.buffer));
 
    VkSubmitInfo submit_info = {0};
    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
    submit_info.waitSemaphoreCount = 0;
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.pCommandBuffers = &context->cmd.buffer;
    submit_info.signalSemaphoreCount = 0;
 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
@@ -202,15 +202,15 @@ static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from
    assert(from->data && from->size >= (size)dev_size);
    memcpy(from->data, data, dev_size);
 
-   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   vk_assert(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info));
+   vk_assert(vkBeginCommandBuffer(context->cmd.buffer, &buffer_begin_info));
 
    VkBufferCopy buffer_region = {0, 0, dev_size};
-   vkCmdCopyBuffer(context->command_buffer, from->handle, to->handle, 1, &buffer_region);
+   vkCmdCopyBuffer(context->cmd.buffer, from->handle, to->handle, 1, &buffer_region);
 
    VkBufferMemoryBarrier copy_barrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
    copy_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -221,14 +221,14 @@ static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from
    copy_barrier.size = dev_size;
    copy_barrier.offset = 0;
 
-   vkCmdPipelineBarrier(context->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+   vkCmdPipelineBarrier(context->cmd.buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_MESH_SHADER_BIT_EXT|VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                         VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 1, &copy_barrier, 0, 0);
 
-   vk_assert(vkEndCommandBuffer(context->command_buffer));
+   vk_assert(vkEndCommandBuffer(context->cmd.buffer));
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.pCommandBuffers = &context->cmd.buffer;
 
    vk_assert(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE));
    // instead of explicit memory sync between queue submissions with fences etc we wait for all gpu jobs to complete before moving on

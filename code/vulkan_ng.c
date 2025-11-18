@@ -533,13 +533,13 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
 static VkCommandBuffer vk_command_buffer_create(vk_context* context)
 {
    assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_handle(context->command_pool));
+   assert(vk_valid_handle(context->cmd.pool));
 
    VkCommandBuffer buffer = 0;
    VkCommandBufferAllocateInfo buffer_allocate_info = {vk_info_allocate(COMMAND_BUFFER)};
 
    buffer_allocate_info.commandBufferCount = 1;
-   buffer_allocate_info.commandPool = context->command_pool;
+   buffer_allocate_info.commandPool = context->cmd.pool;
    buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
    vk_assert(vkAllocateCommandBuffers(context->devices.logical, &buffer_allocate_info, &buffer));
@@ -932,7 +932,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
 
-   vk_assert(vkResetCommandPool(context->devices.logical, context->command_pool, 0));
+   vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -943,12 +943,12 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    renderpass_info.renderArea.extent = (VkExtent2D)
    {context->swapchain_surface.image_width, context->swapchain_surface.image_height};
 
-   VkCommandBuffer command_buffer = context->command_buffer;
+   VkCommandBuffer command_buffer = context->cmd.buffer;
 
    vk_assert(vkBeginCommandBuffer(command_buffer, &buffer_begin_info));
 
-   vkCmdResetQueryPool(context->command_buffer, context->query_pool, 0, context->query_pool_size);
-   vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
+   vkCmdResetQueryPool(context->cmd.buffer, context->query_pool, 0, context->query_pool_size);
+   vkCmdWriteTimestamp(context->cmd.buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
    mvp_transform mvp = hw->renderer.mvp;
    assert(mvp.n > 0.0f);
@@ -1113,7 +1113,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
       VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_end_barrier);
 
-   vkCmdWriteTimestamp(context->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1);
+   vkCmdWriteTimestamp(context->cmd.buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 1);
 
    // end command buffer
    vk_assert(vkEndCommandBuffer(command_buffer));
@@ -1712,8 +1712,8 @@ bool vk_initialize(hw* hw)
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(context);
    context->query_pool = vk_query_pool_create(context);
-   context->command_pool = vk_command_pool_create(context);
-   context->command_buffer = vk_command_buffer_create(context);
+   context->cmd.pool = vk_command_pool_create(context);
+   context->cmd.buffer = vk_command_buffer_create(context);
    context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
    context->renderpass = vk_renderpass_create(context);
 
@@ -1828,7 +1828,7 @@ void vk_uninitialize(hw* hw)
    vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, 0);
    vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, 0);
 
-   vkDestroyCommandPool(context->devices.logical, context->command_pool, 0);
+   vkDestroyCommandPool(context->devices.logical, context->cmd.pool, 0);
    vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
 
    vk_buffer_destroy(&context->devices, &ib);

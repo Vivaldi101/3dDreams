@@ -130,23 +130,23 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
       build_range_ptrs[i] = build_ranges + i;
    }
 
-   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->cmd.pool, 0)))
       return false;
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   if(!vk_valid(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info)))
+   if(!vk_valid(vkBeginCommandBuffer(context->cmd.buffer, &buffer_begin_info)))
       return false;
 
-   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, (u32)geometry_count, build_infos, build_range_ptrs);
+   vkCmdBuildAccelerationStructuresKHR(context->cmd.buffer, (u32)geometry_count, build_infos, build_range_ptrs);
 
-   if(!vk_valid(vkEndCommandBuffer(context->command_buffer)))
+   if(!vk_valid(vkEndCommandBuffer(context->cmd.buffer)))
       return false;
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.pCommandBuffers = &context->cmd.buffer;
 
    if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
       return false;
@@ -260,26 +260,26 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
 
    VkAccelerationStructureBuildRangeInfoKHR* build_range_ptrs = &build_ranges;
 
-   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->cmd.pool, 0)))
       return false;
 
    VkCommandBufferBeginInfo buffer_begin_info = {vk_info_begin(COMMAND_BUFFER)};
    buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-   if(!vk_valid(vkBeginCommandBuffer(context->command_buffer, &buffer_begin_info)))
+   if(!vk_valid(vkBeginCommandBuffer(context->cmd.buffer, &buffer_begin_info)))
       return false;
 
-   vkCmdBuildAccelerationStructuresKHR(context->command_buffer, 1, &build_info, &build_range_ptrs);
+   vkCmdBuildAccelerationStructuresKHR(context->cmd.buffer, 1, &build_info, &build_range_ptrs);
 
    printf("TLAS Ray tracing acceleration structure size: \t%zu bytes\n", size_info.accelerationStructureSize / 1);
    printf("TLAS Ray tracing build scratch size: \t\t%zu bytes\n", size_info.buildScratchSize / 1);
 
-   if(!vk_valid(vkEndCommandBuffer(context->command_buffer)))
+   if(!vk_valid(vkEndCommandBuffer(context->cmd.buffer)))
       return false;
 
    VkSubmitInfo submit_info = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
    submit_info.commandBufferCount = 1;
-   submit_info.pCommandBuffers = &context->command_buffer;
+   submit_info.pCommandBuffers = &context->cmd.buffer;
 
    if(!vk_valid(vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE)))
       return false;
@@ -299,7 +299,7 @@ static bool rt_acceleration_structures_create(vk_context* context)
 
    arena* a = context->storage;
 
-   if(!vk_valid(vkResetCommandPool(devices->logical, context->command_pool, 0)))
+   if(!vk_valid(vkResetCommandPool(devices->logical, context->cmd.pool, 0)))
       return false;
 
    context->blases =

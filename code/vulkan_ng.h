@@ -167,6 +167,7 @@ align_struct vk_context
    array(vk_texture) textures;
 
    array(meshlet) meshlets;
+
    array(size) meshlet_counts;
    array(size) meshlet_offsets;
    array(size) vertex_offsets;
@@ -187,8 +188,6 @@ align_struct vk_context
    VkSurfaceKHR surface;
    u32 query_pool_size;
 
-   VkAllocationCallbacks allocator;
-
    vk_descriptor texture_descriptor;
 
    VkSemaphore image_ready_semaphore;
@@ -198,12 +197,11 @@ align_struct vk_context
    VkQueue graphics_queue;
    VkQueryPool query_pool;
 
-   // TODO: vk_cmd
-   VkCommandPool command_pool;
-   VkCommandBuffer command_buffer;
+   vk_cmd cmd;
 
    VkRenderPass renderpass;
 
+   // TODO: vk_pipeline
    VkPipeline rtx_pipeline;
    VkPipeline non_rtx_pipeline;
    VkPipeline axis_pipeline;
@@ -222,15 +220,17 @@ align_struct vk_context
    arena* storage;
    arena scratch;
 
+#ifdef _DEBUG
+   VkDebugUtilsMessengerEXT messenger;
+#endif
+
+   VkAllocationCallbacks allocator;
+
    u32 queue_family_index;
    f32 time_period;
 
    bool mesh_shading_supported;
    bool raytracing_supported;
-
-#ifdef _DEBUG
-   VkDebugUtilsMessengerEXT messenger;
-#endif
 } vk_context;
 
 typedef struct hw hw;
