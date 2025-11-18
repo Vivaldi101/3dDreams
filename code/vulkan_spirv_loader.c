@@ -54,21 +54,21 @@ static s8 win32_module_path(arena* a)
 
 static s8 vk_exe_directory(arena* a)
 {
-   s8 buffer = win32_module_path(a);
+   s8 module_path = win32_module_path(a);
 
-   if(buffer.len == 0)
+   if(module_path.len == 0)
       return (s8){0};
 
    s8 project_name = s8("3dDreams");
-   size index = s8_is_substr_count(buffer, project_name);
+   size index = s8_is_substr_count(module_path, project_name);
 
    if(index == -1)
       return (s8){0};
 
-   buffer.len = index + project_name.len;
-   buffer.data[buffer.len] = 0;
+   module_path.len = index + project_name.len;
+   module_path.data[module_path.len] = 0;
 
-   return buffer;
+   return module_path;
 }
 
 static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
