@@ -300,10 +300,8 @@ static void hw_virtual_memory_commit(void* address, usize size)
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-static void hw_virtual_memory_release(void* address, usize size)
+static void hw_virtual_memory_release(void* address)
 {
-	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
-
 	global_free(address, 0, MEM_RELEASE);
 }
 
@@ -331,7 +329,7 @@ static void hw_virtual_memory_init()
 
 static void arena_free(arena* a)
 {
-   hw_virtual_memory_release(a->beg, arena_left(a));
+   hw_virtual_memory_release(a->beg);
 }
 
 align_struct scratch_foo
@@ -476,9 +474,7 @@ int main(int argc, char** argv)
    arena_test_result(&base_storage, sz);
    #endif
 
-   bool gr = global_free(base, 0, MEM_RELEASE);
-
-   assert(gr);
+   global_free(base, 0, MEM_RELEASE);
 
    return 0;
 }

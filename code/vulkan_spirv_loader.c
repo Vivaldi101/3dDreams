@@ -19,7 +19,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
 
    arena shader_file = win32_file_read(storage, shader_path.data);
 
-   VkShaderModuleCreateInfo module_info = {};
+   VkShaderModuleCreateInfo module_info = {0};
    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
    module_info.pCode = (u32*)shader_file.beg;
    module_info.codeSize = arena_left(&shader_file);
