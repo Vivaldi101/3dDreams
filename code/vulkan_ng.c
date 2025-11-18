@@ -1038,7 +1038,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       if(buffer_hash_lookup(&context->buffer_table, rt_buffer_name))
       {
          vk_buffer buffer = *buffer_hash_lookup(&context->buffer_table, rt_buffer_name);
-         array_push(bindings) = (vk_buffer_binding){buffer, 3, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, &context->tlas};
+         array_push(bindings) = (vk_buffer_binding){buffer, 3, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, &context->rt_as.tlas};
       }
 
       cmd_push_storage_buffer(command_buffer, s, pipeline_layout, bindings.data, (u32)bindings.count, 0);
@@ -1843,10 +1843,10 @@ void vk_uninitialize(hw* hw)
    vk_buffer_destroy(&context->devices, &blas);
    vk_buffer_destroy(&context->devices, &rt);
 
-   for(size i = 0; i < context->blas_count; i++)
-      vkDestroyAccelerationStructureKHR(context->devices.logical, context->blases[i], 0);
+   for(size i = 0; i < context->rt_as.blas_count; i++)
+      vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.blases[i], 0);
 
-   vkDestroyAccelerationStructureKHR(context->devices.logical, context->tlas, 0);
+   vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.tlas, 0);
 
    vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
    vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);

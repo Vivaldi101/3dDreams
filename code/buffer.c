@@ -274,7 +274,7 @@ static bool buffer_rt_create(vk_buffer* rt_buffer, vk_context* context)
 {
    VkAccelerationStructureDeviceAddressInfoKHR acceleration_info =
    {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-   acceleration_info.accelerationStructure = context->tlas;
+   acceleration_info.accelerationStructure = context->rt_as.tlas;
 
    VkDeviceAddress tlas_address =
       vkGetAccelerationStructureDeviceAddressKHR(context->devices.logical, &acceleration_info);

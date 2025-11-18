@@ -157,8 +157,9 @@ align_struct vk_cmd
 
 align_struct vk_rt_as
 {
-   // TODO: fill this acceleration structures
-   int foo;
+   VkAccelerationStructureKHR* blases;
+   VkAccelerationStructureKHR tlas;
+   size blas_count;   // TODO: array
 } vk_rt_as;
 
 align_struct vk_context
@@ -172,10 +173,7 @@ align_struct vk_context
    array(size) meshlet_offsets;
    array(size) vertex_offsets;
 
-   // TODO: into vk_rt_as structure
-   VkAccelerationStructureKHR* blases;
-   VkAccelerationStructureKHR tlas;
-   size blas_count;
+   vk_rt_as rt_as;
 
    vk_geometry geometry;
 

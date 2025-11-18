@@ -114,10 +114,10 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
       assert(blas_buffer.size >= info->size + info->offset);
       assert((info->offset & 0xff) == 0);
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->blases + i)))
+      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->rt_as.blases + i)))
          return false;
 
-      context->blas_count++;
+      context->rt_as.blas_count++;
 
       u32 max_primitive_count = (u32)draw->index_count / 3;
 
@@ -167,7 +167,7 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
    const size draw_count = geometry->mesh_draws.count;
 
    VkDeviceAddress* blas_addresses =
-      push(&s, typeof(*blas_addresses), context->blas_count);
+      push(&s, typeof(*blas_addresses), context->rt_as.blas_count);
 
    vk_buffer instance_buffer = {.size = draw_count * sizeof(VkAccelerationStructureInstanceKHR)};
 
@@ -196,11 +196,11 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
                                            VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                            &build_info, &(u32)draw_count, &size_info);
 
-   for(size i = 0; i < context->blas_count; ++i)
+   for(size i = 0; i < context->rt_as.blas_count; ++i)
    {
       VkAccelerationStructureDeviceAddressInfoKHR info =
       {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-      info.accelerationStructure = context->blases[i];
+      info.accelerationStructure = context->rt_as.blases[i];
 
       blas_addresses[i] = vkGetAccelerationStructureDeviceAddressKHR(devices->logical, &info);
    }
@@ -302,14 +302,14 @@ static bool rt_acceleration_structures_create(vk_context* context)
    if(!vk_valid(vkResetCommandPool(devices->logical, context->cmd.pool, 0)))
       return false;
 
-   context->blases =
-      push(a, typeof(*context->blases), context->geometry.mesh_draws.count);
+   context->rt_as.blases =
+      push(a, typeof(*context->rt_as.blases), context->geometry.mesh_draws.count);
 
    arena s = *a;
 
-   if(!rt_blas_geometry_build(s, context, context->blases))
+   if(!rt_blas_geometry_build(s, context, context->rt_as.blases))
       return false;
-   if(!rt_tlas_geometry_build(s, context, &context->tlas))
+   if(!rt_tlas_geometry_build(s, context, &context->rt_as.tlas))
       return false;
 
    return true;
