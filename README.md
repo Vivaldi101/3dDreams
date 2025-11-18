@@ -17,6 +17,6 @@ For command line build, follow these steps:
 1. run 'find-cl.bat'
 2. run 'shader_build.bat'
 3. run 'code\build.bat r' for release build
-4. run 'build\vulkan_3d_release.exe'
+4. run 'build\vulkan_3d_release.exe sponza/sponza.gltf'
 
 For msvc build, open the project under win32-solution
