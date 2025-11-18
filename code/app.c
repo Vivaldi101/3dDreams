@@ -1,3 +1,7 @@
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202000L
+#   error "This code requires C23 or later"
+#endif
+
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #include "hw.h"

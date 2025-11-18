@@ -1,3 +1,7 @@
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202000L
+#   error "This code requires C23 or later"
+#endif
+
 #include <Windows.h>
 
 #include "common.h"
