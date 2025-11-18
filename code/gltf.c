@@ -683,7 +683,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    usize vb_size = vertices.count * sizeof(vertex);
    usize ib_size = indices.count * sizeof(u32);
 
-   vk_buffer scratch_buffer = {};
+   vk_buffer scratch_buffer = {0};
    vk_buffer mb = {.size = mb_size};
    vk_buffer vb = {.size = vb_size};
    vk_buffer ib = {.size = ib_size};
@@ -701,7 +701,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
+   vk_buffer_upload(context, &vb, vertices.data);
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
@@ -714,7 +714,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   vk_buffer_upload(context, &mb, &scratch_buffer, context->meshlets.data, mb.size);
+   vk_buffer_upload(context, &mb, context->meshlets.data);
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
@@ -728,7 +728,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
       return false;
 
-   vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
+   vk_buffer_upload(context, &ib, indices.data);
    vk_buffer_destroy(&context->devices, &scratch_buffer);
 
    buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);

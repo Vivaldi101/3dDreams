@@ -236,7 +236,7 @@ bool vk_initialize(hw* hw);
 void vk_uninitialize(hw* hw);
 
 // TODO: these in buffer.h
-static void vk_buffer_upload(vk_context* context, vk_buffer* to, vk_buffer* from, const void* data, VkDeviceSize dev_size);
+static void vk_buffer_upload(vk_context* context, vk_buffer* to, const void* data);
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize size);
 static void vk_buffer_destroy(vk_device* device, vk_buffer* buffer);
 // TODO: pass the size for the buffer to be created instead of embedding it inside the buffer
