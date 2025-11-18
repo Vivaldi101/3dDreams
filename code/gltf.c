@@ -683,15 +683,10 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    usize vb_size = vertices.count * sizeof(vertex);
    usize ib_size = indices.count * sizeof(u32);
 
+   vk_buffer scratch_buffer = {};
    vk_buffer mb = {.size = mb_size};
    vk_buffer vb = {.size = vb_size};
    vk_buffer ib = {.size = ib_size};
-
-   usize scratch_buffer_size = max(mb.size, max(vb.size, ib.size));
-   vk_buffer scratch_buffer = { .size = scratch_buffer_size };
-
-   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
-      return false;
 
    VkBufferUsageFlagBits buffer_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -701,23 +696,42 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    // vertex data
    if(!vk_buffer_create_and_bind(&vb, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
+
+   scratch_buffer.size = vb.size;
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
    vk_buffer_upload(context, &vb, &scratch_buffer, vertices.data, vb.size);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
+
    buffer_hash_insert(&context->buffer_table, vb_buffer_name, vb);
 
    // meshlet data
    if (!vk_buffer_create_and_bind(&mb, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
+
+   scratch_buffer.size = mb.size;
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
    vk_buffer_upload(context, &mb, &scratch_buffer, context->meshlets.data, mb.size);
+   vk_buffer_destroy(&context->devices, &scratch_buffer);
+
    buffer_hash_insert(&context->buffer_table, mb_buffer_name, mb);
 
    // index data
    buffer_usage_flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
    if (!vk_buffer_create_and_bind(&ib, &context->devices, buffer_usage_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       return false;
-   vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
-   buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
 
+   scratch_buffer.size = ib.size;
+   if(!vk_buffer_create_and_bind(&scratch_buffer, &context->devices, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+      return false;
+
+   vk_buffer_upload(context, &ib, &scratch_buffer, indices.data, ib.size);
    vk_buffer_destroy(&context->devices, &scratch_buffer);
+
+   buffer_hash_insert(&context->buffer_table, ib_buffer_name, ib);
 
    return true;
 }

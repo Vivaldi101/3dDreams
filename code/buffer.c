@@ -61,8 +61,8 @@ static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDev
 
    vkAllocateMemory(device, &allocate_info, 0, &buffer->memory);
 
-   // for possible alignment
-   assert(buffer->size >= (size)allocate_info.allocationSize);
+   // might need more than requested due to alignment in the driver etc.
+   assert(buffer->size <= (size)allocate_info.allocationSize);
 
    buffer->size = allocate_info.allocationSize;
 
