@@ -37,12 +37,8 @@ IF /I "%1"=="r" (
 
 IF %ERRORLEVEL% EQU 0 (
     echo Build succeeded!
-    REM Update ctags and cscope in code folder
 
     pushd %ROOT%
-    REM ctags -R --languages=C,C++ --c++-kinds=+p --fields=+iaS --extras=+q .
-    ctags -R --languages=C,C++ --fields=+iaS --extras=+q .
-    cscope -R -b
     popd
 ) ELSE (
     echo Build failed with error %ERRORLEVEL%

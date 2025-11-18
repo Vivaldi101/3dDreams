@@ -10,5 +10,13 @@ Orbit camera usage: left-click to orbit eye, right-click to pan, wheel to zoom i
 
 <img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/5092893f-1abe-4755-a838-b97330c3e65d" />
 
+For command line build, follow these steps:
 
+0. run 'git submodule update --init'
 
+1. run 'find-cl.bat'
+2. run 'shader_build.bat'
+3. run 'code\build.bat r' for release build
+4. run 'build\vulkan_3d_release.exe'
+
+For msvc build, open the project under win32-solution
