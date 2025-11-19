@@ -10,20 +10,6 @@
 
 #include "hw.c"
 
-static void win32_log(s8 format, ...)
-{
-   static char temp[1 << 12] = {0};
-   assert(strlen((const char*)format.data)+1 <= array_count(temp));
-
-   va_list args;
-   va_start(args, format);
-
-   wvsprintfA(temp, (const char*)format.data, args);
-
-   va_end(args);
-   OutputDebugStringA(temp);
-}
-
 static void win32_sleep(u32 ms)
 {
    Sleep(ms);
@@ -259,8 +245,6 @@ static void win32_abort(u32 code)
    ExitProcess(code);
 }
 
-#define hw_error(m) MessageBox(NULL, (m), "Engine", MB_OK | MB_ICONSTOP | MB_SYSTEMMODAL);
-
 typedef LPVOID(*VirtualAllocPtr)(LPVOID, SIZE_T, DWORD, DWORD);
 typedef BOOL(*VirtualFreePtr)(LPVOID, SIZE_T, DWORD);
 static VirtualAllocPtr global_allocate = 0;
@@ -457,8 +441,6 @@ int main(int argc, char** argv)
    hw.platform_loop = win32_platform_loop;
 
    hw.window_title = win32_window_title;
-
-   hw.log = win32_log;
 
    if(argc < 2)
    {

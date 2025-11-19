@@ -874,45 +874,6 @@ static void vk_present(hw* hw, vk_context* context)
    if(present_result != VK_SUCCESS)
       return;
 
-   u64 query_results[2] = {0};
-   vkGetQueryPoolResults(context->devices.logical, context->query_pool, 0, array_count(query_results), sizeof(query_results), query_results, sizeof(query_results[0]), VK_QUERY_RESULT_64_BIT);
-
-#if 1
-   f64 gpu_begin = (f64)(query_results[0]) * context->time_period;
-   f64 gpu_end = (f64)(query_results[1]) * context->time_period;
-
-   static i64 cpu_begin = 0;
-   static i64 cpu_counter = 0;
-   static i64 log_time = 0;
-   if(cpu_begin == 0)
-      cpu_begin = hw->timer.time();
-
-   if(cpu_counter == 0)
-      cpu_counter = hw->timer.time();
-
-   if(log_time == 0)
-      log_time = (i64)(hw->timer.time_to_counter(1) + .5f);
-
-   i64 cpu_end = hw->timer.time();
-
-   f64 frame_delta_ms = hw->timer.seconds_elapsed(cpu_begin, cpu_end) * 1000.f;
-
-   cpu_begin = cpu_end;
-
-   if(cpu_end - cpu_counter > log_time)
-   {
-      const f64 ms = 1e6;
-      cpu_counter = cpu_end;
-      const f64 gpu_delta = max(gpu_end - gpu_begin, 0.f);
-      // frame logs
-      // TODO: this should really be in app.c
-      if(hw->state.is_mesh_shading)
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"), frame_delta_ms, gpu_delta / ms, context->meshlets.count);
-      else
-         hw->window_title(hw, s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"), frame_delta_ms, gpu_delta / ms);
-   }
-#endif
-
    // wait until all queue ops are done
    // essentialy run gpu and cpu in sync (driver decides this)
    // TODO: This is bad way to do sync but who cares for now
