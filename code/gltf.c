@@ -690,7 +690,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
 
    VkBufferUsageFlagBits buffer_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-   if(context->raytracing_supported)
+   if(context->features.raytracing_supported)
       buffer_usage_flags |= (VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR);
 
    // vertex data

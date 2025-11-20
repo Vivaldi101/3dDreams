@@ -136,6 +136,8 @@ align_struct vk_device
 {
    VkPhysicalDevice physical;
    VkDevice logical;
+   VkInstance instance;
+   u32 queue_family_index;
 } vk_device;
 
 align_struct ctx_shader_destroy
@@ -162,6 +164,13 @@ align_struct vk_rt_as
    size blas_count;   // TODO: array
 } vk_rt_as;
 
+align_struct vk_features
+{
+   bool mesh_shading_supported;
+   bool raytracing_supported;
+   f32 time_period;
+} vk_features;
+
 align_struct vk_context
 {
    array(VkFramebuffer) framebuffers;
@@ -180,7 +189,6 @@ align_struct vk_context
    VkDescriptorSetLayout non_rtx_set_layout;
    VkDescriptorSetLayout rtx_set_layout;
 
-   VkInstance instance;
    vk_device devices;
 
    VkSurfaceKHR surface;
@@ -224,11 +232,7 @@ align_struct vk_context
 
    VkAllocationCallbacks allocator;
 
-   u32 queue_family_index;
-   f32 time_period;
-
-   bool mesh_shading_supported;
-   bool raytracing_supported;
+   vk_features features;
 } vk_context;
 
 typedef struct hw hw;

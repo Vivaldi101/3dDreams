@@ -260,14 +260,16 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, Vk
    return result;
 }
 
-static VkPhysicalDevice vk_physical_device_select(vk_context* context)
+// TODO: wrap into vk_device select
+static bool vk_physical_device_select(arena s, vk_device* device, vk_features* features)
 {
    u32 dev_count = 0;
-   vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, 0));
+   if(!vk_valid(vkEnumeratePhysicalDevices(device->instance, &dev_count, 0)))
+      return false;
 
-   arena scratch = context->scratch;
-   VkPhysicalDevice* devs = push(&scratch, VkPhysicalDevice, dev_count);
-   vk_assert(vkEnumeratePhysicalDevices(context->instance, &dev_count, devs));
+   VkPhysicalDevice* devs = push(&s, VkPhysicalDevice, dev_count);
+   if(!vk_valid(vkEnumeratePhysicalDevices(device->instance, &dev_count, devs)))
+      return false;
 
    u32 fallback_gpu = 0;
    for(u32 i = 0; i < dev_count; ++i)
@@ -287,13 +289,19 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context)
       if(!props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
          continue;
 
-      fallback_gpu = i;
-      context->time_period = props.limits.timestampPeriod;
-      u32 extension_count = 0;
-      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0));
+      features->time_period = props.limits.timestampPeriod;
 
-      VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, extension_count);
-      vk_assert(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions));
+      // pick the first one as the fallback
+      if(fallback_gpu == 0)
+         fallback_gpu = i;
+
+      u32 extension_count = 0;
+      if(!vk_valid(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0)))
+         return false;
+
+      VkExtensionProperties* extensions = push(&s, VkExtensionProperties, extension_count);
+      if(!vk_valid(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions)))
+         return false;
 
       for(u32 j = 0; j < extension_count; ++j)
       {
@@ -301,22 +309,24 @@ static VkPhysicalDevice vk_physical_device_select(vk_context* context)
          printf("Available Vulkan device extension[%u]: %s\n", j, s8_data(e));
 
          if(s8_equals(e, s8(VK_EXT_MESH_SHADER_EXTENSION_NAME)))
-            context->mesh_shading_supported = true;
+            features->mesh_shading_supported = true;
 
          if(s8_equals(e, s8(VK_KHR_RAY_QUERY_EXTENSION_NAME)))
-            context->raytracing_supported = true;
+            features->raytracing_supported = true;
 
-         if(context->raytracing_supported && context->mesh_shading_supported)
+         if(features->raytracing_supported && features->mesh_shading_supported)
          {
             printf("Ray tracing supported\n");
             printf("Mesh shading supported\n");
 
-            return devs[i];
+            device->physical = devs[i];
+            return true;
          }
       }
    }
 
-   return devs[fallback_gpu];
+   device->physical = devs[fallback_gpu];
+   return true;
 }
 
 static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
@@ -341,7 +351,7 @@ static u32 vk_logical_device_select_family_index(vk_context* context, arena scra
    return 0;
 }
 
-static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
+static VkDevice vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
 {
    array(s8) extensions = {&scratch};
 
@@ -349,19 +359,19 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
    array_push(extensions) = s8(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
    array_push(extensions) = s8(VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME);
 
-   if(context->mesh_shading_supported)
+   if(features->mesh_shading_supported)
    {
       array_push(extensions) = s8(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
    }
-   if(context->raytracing_supported)
+   if(features->raytracing_supported)
    {
       array_push(extensions) = s8(VK_KHR_RAY_QUERY_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       array_push(extensions) = s8(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
    }
 
-   VkPhysicalDeviceFeatures2 features = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+   VkPhysicalDeviceFeatures2 features2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
    VkPhysicalDeviceVulkan12Features features12 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 
@@ -388,36 +398,36 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
 
    features_frag_shading.primitiveFragmentShadingRate = true;
 
-   features.pNext = &features12;
+   features2.pNext = &features12;
    features12.pNext = &features_multiview;
    features_multiview.pNext = &features_frag_shading;
 
-   if(context->mesh_shading_supported)
+   if(features->mesh_shading_supported)
    {
-      features_mesh_shader.pNext = features.pNext;
-      features.pNext = &features_mesh_shader;
+      features_mesh_shader.pNext = features2.pNext;
+      features2.pNext = &features_mesh_shader;
 
       features_mesh_shader.meshShader = true;
       features_mesh_shader.taskShader = true;
       features_mesh_shader.multiviewMeshShader = true;
    }
 
-   if(context->raytracing_supported)
+   if(features->raytracing_supported)
    {
       ray_query.pNext = &acceleration_features;
-      acceleration_features.pNext = features.pNext;
-      features.pNext = &ray_query;
+      acceleration_features.pNext = features2.pNext;
+      features2.pNext = &ray_query;
 
       ray_query.rayQuery = true;
       acceleration_features.accelerationStructure = true;
    }
 
-   vkGetPhysicalDeviceFeatures2(context->devices.physical, &features);
+   vkGetPhysicalDeviceFeatures2(devices->physical, &features2);
 
-   features.features.depthBounds = true;
-   features.features.wideLines = true;
-   features.features.fillModeNonSolid = true;
-   features.features.sampleRateShading = true;
+   features2.features.depthBounds = true;
+   features2.features.wideLines = true;
+   features2.features.fillModeNonSolid = true;
+   features2.features.sampleRateShading = true;
 
    const char** extension_names = push(&scratch, char*, extensions.count);
 
@@ -432,7 +442,7 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
    f32 priorities[queue_count] = {1.0f};
    VkDeviceQueueCreateInfo queue_info[queue_count] = {vk_info(DEVICE_QUEUE)};
 
-   queue_info[0].queueFamilyIndex = context->queue_family_index; // TODO: query the right queue family
+   queue_info[0].queueFamilyIndex = devices->queue_family_index; // TODO: query the right queue family
    queue_info[0].queueCount = queue_count;
    queue_info[0].pQueuePriorities = priorities;
 
@@ -442,23 +452,23 @@ static VkDevice vk_logical_device_create(vk_context* context, arena scratch)
    ldev_info.pQueueCreateInfos = queue_info;
    ldev_info.enabledExtensionCount = (u32)extensions.count;
    ldev_info.ppEnabledExtensionNames = extension_names;
-   ldev_info.pNext = &features;
+   ldev_info.pNext = &features2;
 
    VkDevice logical_device;
-   vk_assert(vkCreateDevice(context->devices.physical, &ldev_info, 0, &logical_device));
+   vk_assert(vkCreateDevice(devices->physical, &ldev_info, 0, &logical_device));
 
    return logical_device;
 }
 
-static VkQueue vk_graphics_queue_create(vk_context* context)
+static VkQueue vk_graphics_queue_create(vk_device* devices)
 {
-   assert(vk_valid_handle(context->devices.logical));
+   assert(vk_valid_handle(devices->logical));
 
    VkQueue graphics_queue = 0;
    u32 queue_index = 0;
 
    // TODO: Get the queue index
-   vkGetDeviceQueue(context->devices.logical, context->queue_family_index, queue_index, &graphics_queue);
+   vkGetDeviceQueue(devices->logical, devices->queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }
@@ -525,7 +535,10 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
 
    vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(context->scratch, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
 
-   swapchain_info.handle = vk_swapchain_create(context->devices.logical, context->surface, &swapchain_info, context->queue_family_index);
+   swapchain_info.handle = vk_swapchain_create(context->devices.logical,
+                                               context->surface,
+                                               &swapchain_info,
+                                               context->devices.queue_family_index);
 
    return swapchain_info;
 }
@@ -547,16 +560,16 @@ static VkCommandBuffer vk_command_buffer_create(vk_context* context)
    return buffer;
 }
 
-static VkCommandPool vk_command_pool_create(vk_context* context)
+static VkCommandPool vk_command_pool_create(vk_device* devices)
 {
-   assert(vk_valid_handle(context->devices.logical));
+   assert(vk_valid_handle(devices->logical));
 
    VkCommandPool pool = 0;
 
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
-   pool_info.queueFamilyIndex = context->queue_family_index;
+   pool_info.queueFamilyIndex = devices->queue_family_index;
 
-   vk_assert(vkCreateCommandPool(context->devices.logical, &pool_info, 0, &pool));
+   vk_assert(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool));
 
    return pool;
 }
@@ -1431,7 +1444,7 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-bool vk_instance_create(VkInstance* instance, arena scratch)
+bool vk_instance_create(arena scratch, vk_device* devices)
 {
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
@@ -1462,7 +1475,7 @@ bool vk_instance_create(VkInstance* instance, arena scratch)
       instance_info.ppEnabledLayerNames = validation_layers;
    }
 #endif
-   if(!vk_valid(vkCreateInstance(&instance_info, 0, instance)))
+   if(!vk_valid(vkCreateInstance(&instance_info, 0, &devices->instance)))
       return false;
 
    return true;
@@ -1501,7 +1514,7 @@ static bool vk_buffers_create(vk_context* context)
    return true;
 }
 
-static bool vk_pipelines_create(vk_context* context)
+static bool vk_pipelines_create(vk_features* features, vk_context* context)
 {
    VkDescriptorSetLayout non_rtx_set_layout = 0;
    VkDescriptorSetLayout rtx_set_layout = 0;
@@ -1509,7 +1522,7 @@ static bool vk_pipelines_create(vk_context* context)
    if(!vk_pipeline_set_layout_create(&non_rtx_set_layout, context->devices.logical, false))
       return false;
 
-   if(context->mesh_shading_supported && context->raytracing_supported)
+   if(features->mesh_shading_supported && features->raytracing_supported)
       if(!vk_pipeline_set_layout_create(&rtx_set_layout, context->devices.logical, true))
          return false;
 
@@ -1609,10 +1622,12 @@ static bool vk_pipelines_create(vk_context* context)
 
 bool vk_initialize(hw* hw)
 {
-   if (!vk_valid(volkInitialize()))
+   if(!vk_valid(volkInitialize()))
       return false;
 
    vk_context* context = push(hw->storage, vk_context);
+   vk_device* devices = &context->devices;
+   vk_features* features = &context->features;
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1627,14 +1642,15 @@ bool vk_initialize(hw* hw)
    arena* a = context->storage;
    arena s = context->scratch;
 
-   VkInstance instance = 0;
-   if(!vk_instance_create(&instance, s))
+   if(!vk_instance_create(s, devices))
       return false;
 
-   volkLoadInstance(instance);
-   context->instance = instance;
+   volkLoadInstance(devices->instance);
 
-#ifdef _DEBUG
+   if(!vk_physical_device_select(s, devices, features))
+      return false;
+
+   #ifdef _DEBUG
    {
       VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
       messenger_info.messageSeverity =
@@ -1649,7 +1665,7 @@ bool vk_initialize(hw* hw)
       messenger_info.pUserData = hw;
 
       VkDebugUtilsMessengerEXT messenger = 0;
-      if(!vk_create_debugutils_messenger_ext(&messenger, instance, &messenger_info))
+      if(!vk_create_debugutils_messenger_ext(&messenger, devices->instance, &messenger_info))
       {
          printf("Could not create debug messenger");
          return false;
@@ -1657,23 +1673,22 @@ bool vk_initialize(hw* hw)
 
       context->messenger = messenger;
    }
-#endif
+   #endif
 
    // TODO: allocator
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   // TODO: wide contracts for all these since vk_initialize is wide
-   // TODO: should pass the scratch arenas instead of the context
-   context->devices.physical = vk_physical_device_select(context);
-   context->surface = hw->renderer.window_surface_create(context->instance, hw->renderer.window.handle);
-   context->queue_family_index = vk_logical_device_select_family_index(context, s);
-   context->devices.logical = vk_logical_device_create(context, s);
+   // TODO: wide contracts for all these below since vk_initialize is wide
+   // TODO: fine tune params instead of just passing context
+   context->surface = hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle);
+   devices->queue_family_index = vk_logical_device_select_family_index(context, s);
+   context->devices.logical = vk_logical_device_create(s, devices, features);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
-   context->graphics_queue = vk_graphics_queue_create(context);
+   context->graphics_queue = vk_graphics_queue_create(devices);
    context->query_pool = vk_query_pool_create(context);
-   context->cmd.pool = vk_command_pool_create(context);
+   context->cmd.pool = vk_command_pool_create(devices);
    context->cmd.buffer = vk_command_buffer_create(context);
    context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
    context->renderpass = vk_renderpass_create(context);
@@ -1693,13 +1708,14 @@ bool vk_initialize(hw* hw)
    for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
    {
       array_add(context->framebuffers, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.images, (vk_image){0});
-      array_add(context->swapchain_images.depths, (vk_image){0});
+      array_add(context->swapchain_images.images, (vk_image) { 0 });
+      array_add(context->swapchain_images.depths, (vk_image) { 0 });
    }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
 
-   context->buffer_table = buffer_hash_create(100, a);
+   const size buffer_table_size = 1 << 8;
+   context->buffer_table = buffer_hash_create(buffer_table_size, a);
    buffer_hash_clear(&context->buffer_table);
 
    if(!spirv_initialize(context))
@@ -1714,7 +1730,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
 
-   if(context->raytracing_supported)
+   if(features->raytracing_supported)
       if(!rt_acceleration_structures_create(context))
       {
          printf("Could not create acceleration structures for ray tracing\n");
@@ -1734,7 +1750,7 @@ bool vk_initialize(hw* hw)
    }
 
    // TODO: remove vk_* prefix
-   if(!vk_pipelines_create(context))
+   if(!vk_pipelines_create(features, context))
    {
       printf("Could not create all the pipelines\n");
       return false;
@@ -1756,6 +1772,7 @@ void vk_uninitialize(hw* hw)
 {
    // TODO: Semcompress this entire function
    vk_context* context = hw->renderer.backends[VULKAN_RENDERER_INDEX];
+   vk_device* devices = &context->devices;
    vk_buffer_hash_table* buffer_table = &context->buffer_table;
 
    spv_hash_function(&context->shader_table, vk_shader_module_destroy, &(ctx_shader_destroy){&context->devices});
@@ -1834,12 +1851,12 @@ void vk_uninitialize(hw* hw)
       vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
 
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
-   vkDestroySurfaceKHR(context->instance, context->surface, 0);
+   vkDestroySurfaceKHR(devices->instance, context->surface, 0);
 
    vkDestroyDevice(context->devices.logical, 0);
 #if _DEBUG
-   vkDestroyDebugUtilsMessengerEXT(context->instance, context->messenger, 0);
+   vkDestroyDebugUtilsMessengerEXT(devices->instance, context->messenger, 0);
 #endif
 
-   vkDestroyInstance(context->instance, 0);
+   vkDestroyInstance(devices->instance, 0);
 }
