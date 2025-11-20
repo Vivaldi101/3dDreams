@@ -1,7 +1,7 @@
 @echo off
 
 IF "%1"=="" (
-    echo "Usage: %0 d|r"
+    echo "Usage: %0 d|r|a"
     exit /b 1
 )
 
@@ -33,6 +33,20 @@ IF /I "%1"=="r" (
         /link %WIN32_LIBS% -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_release.exe
 
     popd
+)
+
+IF /I "%1"=="a" (
+   echo Building DEBUG and RELEASE version...
+
+   cl -MT -nologo -Od -Oi -Zi -FC -W3 /std:clatest /D_DEBUG %IGNORE_WARNINGS% ^
+   -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" "%ROOT%\app.c" "%ROOT%\win32.c" ^
+   /link %WIN32_LIBS% /DEBUG -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_debug.exe
+
+   cl -MT -nologo -O2 -Oi -Zi -FC -W3 /std:clatest %IGNORE_WARNINGS% ^
+   -I "%VULKAN_INC%" -I "%EXTERNAL_INC%" "%ROOT%\app.c" "%ROOT%\win32.c" ^
+   /link %WIN32_LIBS% -incremental:no /LIBPATH:"%VULKAN_LIBPATH%" /out:vulkan_3d_release.exe
+
+   popd
 )
 
 IF %ERRORLEVEL% EQU 0 (
