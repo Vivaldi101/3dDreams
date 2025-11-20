@@ -719,6 +719,40 @@ static void vk_swapchain_update(vk_context* context)
    }
 }
 
+static void gpu_log(hw* hw)
+{
+   u32 renderer_index = hw->renderer.renderer_index;
+   assert(renderer_index < RENDERER_COUNT);
+
+   vk_context* context = hw->renderer.backends[renderer_index];
+
+   u64 query_results[2] = {0};
+   vkGetQueryPoolResults(context->devices.logical,
+                         context->query_pool,
+                         0,
+                         array_count(query_results),
+                         sizeof(query_results),
+                         query_results,
+                         sizeof(query_results[0]),
+                         VK_QUERY_RESULT_64_BIT);
+
+   const f64 gpu_begin = (f64)(query_results[0]) * context->features.time_period;
+   const f64 gpu_end = (f64)(query_results[1]) * context->features.time_period;
+
+   const f64 ms = 1e3;
+   const f64 us = 1e6;
+   const f64 gpu_delta = max(gpu_end - gpu_begin, 0.f);
+
+   if(hw->state.is_mesh_shading)
+      hw->window_title(hw,
+                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"),
+                       hw->state.frame_delta_in_seconds * ms, gpu_delta / us, context->meshlets.count);
+   else
+      hw->window_title(hw,
+                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"),
+                       hw->state.frame_delta_in_seconds * ms, gpu_delta / us);
+}
+
 static void vk_resize(hw* hw, u32 width, u32 height)
 {
    if(width == 0 || height == 0)
@@ -1634,6 +1668,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.frame_render = vk_render;
    hw->renderer.frame_present = vk_present;
    hw->renderer.frame_resize = vk_resize;
+   hw->renderer.gpu_log = gpu_log;
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
    context->storage = hw->storage;

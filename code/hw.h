@@ -40,7 +40,7 @@ align_struct hw_renderer
    void(*frame_render)(struct hw* hw, void* context, app_state* state);
    void(*frame_present)(struct hw* hw, void* context);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
-   void(*frame_wait)(void* renderer);
+   void(*gpu_log)(hw* hw);
    void* (*window_surface_create)(void* instance, void* window_handle);
    hw_window window;
 
