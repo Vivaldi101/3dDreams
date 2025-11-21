@@ -19,4 +19,6 @@ For command line build, follow these steps:
 3. run 'code\build.bat r' for release build
 4. run 'build\vulkan_3d_release.exe sponza/sponza.gltf'
 
-For msvc build, open the project under win32-solution
+For msvc build, open the project under win32-solution.
+
+Tested on NVIDIA and AMD vendors.
