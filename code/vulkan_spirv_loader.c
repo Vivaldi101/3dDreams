@@ -71,15 +71,16 @@ static s8 vk_exe_directory(arena* a)
    return module_path;
 }
 
-static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
+typedef array(s8) s8_array;
+static s8_array vk_shader_names_read(arena* a, s8 shader_folder_path)
 {
-   array(char) shader_path = {files};
+   array(char) shader_path = {a}; // TODO: this should be scratch
 
    s8 prefix = s8("%sbin\\assets\\shaders\\%s");
-   s8 exe_dir = vk_exe_directory(files);
+   s8 exe_dir = vk_exe_directory(a);
 
    if(exe_dir.len == 0)
-      return 0;
+      return (s8_array) { 0 };
 
    shader_path.count = prefix.len + exe_dir.len + shader_folder_path.len;
    array_resize(shader_path, shader_path.count);
@@ -90,37 +91,41 @@ static const char** vk_shader_folder_read(arena* files, s8 shader_folder_path)
    HANDLE first_file = FindFirstFile(shader_path.data, &file_data);
 
    if(first_file == INVALID_HANDLE_VALUE)
-      return 0;
+      return (s8_array) { 0 };
 
    u32 shader_count = 0;
 
-   do {
+   do
+   {
       if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
          shader_count++;
-   } while(FindNextFile(first_file, &file_data) != 0);
+   }
+   while(FindNextFile(first_file, &file_data) != 0);
+
+   s8_array shader_names = {a};
+   array_resize(shader_names, shader_count);
 
    first_file = FindFirstFile(shader_path.data, &file_data);
 
-   const char** shader_names = push(files, const char*, shader_count+1);
-
-   u32 i = 0;
-   do {
+   size i = 0;
+   do
+   {
       if(!(file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
       {
          usize file_len = strlen(file_data.cFileName);
-         char* p = push(files, char, file_len+1);
 
-         if(p) 
-         {
-            memcpy(p, file_data.cFileName, file_len);
-            p[file_len] = 0;
+         shader_names.count++;
+         shader_names.data[i].data = push(a, u8, file_len + 1);
+         shader_names.data[i].data[file_len] = 0;
+         shader_names.data[i].len = file_len;
 
-            shader_names[i++] = p;
-         }
+         memcpy(shader_names.data[i].data, file_data.cFileName, file_len);
+
+         ++i;
       }
-   } while(FindNextFile(first_file, &file_data) != 0);
+   }
+   while(FindNextFile(first_file, &file_data) != 0);
 
-   shader_names[i] = 0;
    FindClose(first_file);
 
    return shader_names;
