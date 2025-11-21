@@ -1705,7 +1705,10 @@ bool vk_initialize(hw* hw)
    context->allocator = allocator;
 
    if(!hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle, &context->surface))
+   {
+      printf("Could not create the window surface\n");
       return false;
+   }
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
    devices->queue_family_index = vk_logical_device_select_family_index(context, s);
