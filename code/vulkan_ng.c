@@ -87,6 +87,12 @@ static bool spirv_initialize(vk_context* context)
 {
    const s8_array shaders = vk_shader_names_read(context->storage, s8("bin\\assets\\shaders"));
 
+   if(shaders.count == 0)
+   {
+      printf("No shaders found\n");
+      return false;
+   }
+
    spv_hash_table* table = &context->shader_table;
 
    table->max_count = shaders.count;
@@ -102,50 +108,39 @@ static bool spirv_initialize(vk_context* context)
 
    for(size i = 0; i < shaders.count; ++i)
    {
-      // compress just down to s8
-      usize shader_len = shaders.data[i].len;
-      const char* shader_name = s8_data(shaders.data[i]);
+      s8 shader = shaders.data[i];
 
-      // TODO: use s8 substring
-      for(usize j = 0; j < shader_len; ++j)
+      if(s8_is_substr_count(shader, s8(meshlet_module_name)) != -1)
       {
-         // TODO: use s8 equals
-         if(strncmp(shader_name + j, meshlet_module_name, strlen(meshlet_module_name)) == 0)
-         {
-            vk_shader_module mm = vk_shader_load(context->devices.logical, context->scratch, shader_name);
-            if (mm.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
-               spv_hash_insert(table, meshlet_module_name"_ms", mm);
-            else if (mm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
-               spv_hash_insert(table, meshlet_module_name"_fs", mm);
-            break;
-         }
-         if(strncmp(shader_name + j, graphics_module_name, strlen(graphics_module_name)) == 0)
-         {
-            vk_shader_module gm = vk_shader_load(context->devices.logical, context->scratch, shader_name);
-            if(gm.stage == VK_SHADER_STAGE_VERTEX_BIT)
-               spv_hash_insert(table, graphics_module_name"_vs", gm);
-            else if(gm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
-               spv_hash_insert(table, graphics_module_name"_fs", gm);
-            break;
-         }
-         if(strncmp(shader_name + j, axis_module_name, strlen(axis_module_name)) == 0)
-         {
-            vk_shader_module am = vk_shader_load(context->devices.logical, context->scratch, shader_name);
-            if(am.stage == VK_SHADER_STAGE_VERTEX_BIT)
-               spv_hash_insert(table, axis_module_name"_vs", am);
-            else if(am.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
-               spv_hash_insert(table, axis_module_name"_fs", am);
-            break;
-         }
-         if(strncmp(shader_name + j, frustum_module_name, strlen(frustum_module_name)) == 0)
-         {
-            vk_shader_module fm = vk_shader_load(context->devices.logical, context->scratch, shader_name);
-            if(fm.stage == VK_SHADER_STAGE_VERTEX_BIT)
-               spv_hash_insert(table, frustum_module_name"_vs", fm);
-            else if(fm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
-               spv_hash_insert(table, frustum_module_name"_fs", fm);
-            break;
-         }
+         vk_shader_module mm = vk_shader_load(context->devices.logical, context->scratch, s8_data(shader));
+         if(mm.stage == VK_SHADER_STAGE_MESH_BIT_EXT)
+            spv_hash_insert(table, meshlet_module_name"_ms", mm);
+         else if(mm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+            spv_hash_insert(table, meshlet_module_name"_fs", mm);
+      }
+      else if(s8_is_substr_count(shader, s8(graphics_module_name)) != -1)
+      {
+         vk_shader_module gm = vk_shader_load(context->devices.logical, context->scratch, s8_data(shader));
+         if(gm.stage == VK_SHADER_STAGE_VERTEX_BIT)
+            spv_hash_insert(table, graphics_module_name"_vs", gm);
+         else if(gm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+            spv_hash_insert(table, graphics_module_name"_fs", gm);
+      }
+      else if(s8_is_substr_count(shader, s8(axis_module_name)) != -1)
+      {
+         vk_shader_module am = vk_shader_load(context->devices.logical, context->scratch, s8_data(shader));
+         if(am.stage == VK_SHADER_STAGE_VERTEX_BIT)
+            spv_hash_insert(table, axis_module_name"_vs", am);
+         else if(am.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+            spv_hash_insert(table, axis_module_name"_fs", am);
+      }
+      else if(s8_is_substr_count(shader, s8(frustum_module_name)) != -1)
+      {
+         vk_shader_module fm = vk_shader_load(context->devices.logical, context->scratch, s8_data(shader));
+         if(fm.stage == VK_SHADER_STAGE_VERTEX_BIT)
+            spv_hash_insert(table, frustum_module_name"_vs", fm);
+         else if(fm.stage == VK_SHADER_STAGE_FRAGMENT_BIT)
+            spv_hash_insert(table, frustum_module_name"_fs", fm);
       }
    }
 
@@ -1750,7 +1745,7 @@ bool vk_initialize(hw* hw)
 
    if(!spirv_initialize(context))
    {
-      printf("Could not compile and load all the shader modules\n");
+      printf("Could not compile and load all the required shader modules\n");
       return false;
    }
 
