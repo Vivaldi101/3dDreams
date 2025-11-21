@@ -41,7 +41,7 @@ align_struct hw_renderer
    void(*frame_present)(struct hw* hw, void* context);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
    void(*gpu_log)(hw* hw);
-   void* (*window_surface_create)(void* instance, void* window_handle);
+   bool (*window_surface_create)(void* instance, void* window_handle, void* surface);
    hw_window window;
 
    // should be inside app.c

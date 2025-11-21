@@ -1704,9 +1704,10 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
+   if(!hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle, &context->surface))
+      return false;
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
-   context->surface = hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle);
    devices->queue_family_index = vk_logical_device_select_family_index(context, s);
    context->devices.logical = vk_logical_device_create(s, devices, features);
    context->image_ready_semaphore = vk_semaphore_create(context);
