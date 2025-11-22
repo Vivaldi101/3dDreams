@@ -319,26 +319,28 @@ static bool vk_physical_device_select(arena s, vk_device* device, vk_features* f
    return true;
 }
 
-static u32 vk_logical_device_select_family_index(vk_context* context, arena scratch)
+static bool vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
 {
    u32 queue_family_count = 0;
-   vkGetPhysicalDeviceQueueFamilyProperties(context->devices.physical, &queue_family_count, 0);
+   vkGetPhysicalDeviceQueueFamilyProperties(devices->physical, &queue_family_count, 0);
 
    VkQueueFamilyProperties* queue_families = push(&scratch, VkQueueFamilyProperties, queue_family_count);
-   vkGetPhysicalDeviceQueueFamilyProperties(context->devices.physical, &queue_family_count, queue_families);
+   vkGetPhysicalDeviceQueueFamilyProperties(devices->physical, &queue_family_count, queue_families);
 
    for(u32 i = 0; i < queue_family_count; i++)
    {
       VkBool32 present_support = false;
-      vkGetPhysicalDeviceSurfaceSupportKHR(context->devices.physical, i, context->surface, &present_support);
+      vkGetPhysicalDeviceSurfaceSupportKHR(devices->physical, i, surface, &present_support);
 
       // graphics and presentation within same queue for simplicity
       if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
-         return i;
+      {
+         devices->queue_family_index = i;
+         return true;
+      }
    }
 
-   // try to use the first as a last fallback
-   return 0;
+   return false;
 }
 
 static VkDevice vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
@@ -1709,9 +1711,13 @@ bool vk_initialize(hw* hw)
       printf("Could not create the window surface\n");
       return false;
    }
+   if(!vk_logical_device_select_family_index(s, devices, context->surface))
+   {
+      printf("Could not select queue family for surface\n");
+      return false;
+   }
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
-   devices->queue_family_index = vk_logical_device_select_family_index(context, s);
    context->devices.logical = vk_logical_device_create(s, devices, features);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
