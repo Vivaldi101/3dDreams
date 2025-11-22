@@ -43,6 +43,13 @@
 #define vk_assert(v) (v)
 #endif
 
+typedef union vk_result
+{
+   void* h;
+   VkResult r;
+   bool b;
+} vk_result;
+
 align_struct vk_swapchain_surface
 {
    u32 image_width;
