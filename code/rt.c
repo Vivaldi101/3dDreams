@@ -53,7 +53,7 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
       ag->geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
       ag->geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
       ag->geometry.triangles.vertexStride = sizeof(vertex);
-      ag->geometry.triangles.maxVertex = (u32)draw->vertex_count;
+      ag->geometry.triangles.maxVertex = (u32)draw->vertex_count - 1;
       ag->geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
       ag->geometry.triangles.vertexData.deviceAddress = vb_address + (draw->vertex_offset * sizeof(vertex));
       ag->geometry.triangles.indexData.deviceAddress = ib_address + (draw->index_offset * sizeof(u32));
