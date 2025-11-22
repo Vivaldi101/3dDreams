@@ -71,7 +71,7 @@ static bool hw_is_virtual_memory_commited(void* address)
 static arena* arena_new(arena* base, size cap)
 {
    assert(base->end && cap > 0);
-   assert(cap >= page_size);
+   assert(cap >= PAGE_SIZE);
    //assert((byte*)base->end + cap <= (byte*)base->commit_end);   TODO: re-enable
 
    arena* a = base;
@@ -106,7 +106,7 @@ static arena* arena_new(arena* base, size cap)
 static void arena_expand(arena* a, size new_cap)
 {
    assert(new_cap > 0);
-   assert((uptr)a->end <= ((1ull << 48)-1) - page_size);
+   assert((uptr)a->end <= ((1ull << 48)-1) - PAGE_SIZE);
 
    arena* new_arena = arena_new(a, new_cap);
    assert(new_arena->end >= a->end);
@@ -130,7 +130,7 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
       // page align allocs
-      arena_expand(a, ((count * alloc_size) + align_page_size) & ~align_page_size);
+      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
       p = a->beg;
    }
 

@@ -418,7 +418,7 @@ int main(int argc, char** argv)
    scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
    scratch_arena.kind = arena_scratch_kind;
 
-   const size initial_arena_size = page_size;
+   const size initial_arena_size = PAGE_SIZE;
 
    arena* base_storage = arena_new(&base_arena, initial_arena_size);
    assert(arena_left(base_storage) == initial_arena_size);

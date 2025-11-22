@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <stdbool.h>
+#include <stdbool.h> // TODO: this goes away soon
 #include <string.h>
 #include <assert.h>
 
@@ -47,8 +47,6 @@ static_assert(custom_alignment == 64, "");
 #define MB(m) (1024ull)*KB((m))
 #define GB(g) (1024ull)*MB((g))
 
-//static const size default_arena_size = KB(4096);
-
 #define clamp(t, min, max) ((t) <= (min) ? (min) : (t) >= (max) ? (max) : (t))
 
 #define EPSILON 1e-6  // Adjust this as needed
@@ -58,8 +56,8 @@ static_assert(custom_alignment == 64, "");
 #define pointer_clear(p, s) memset((p), 0, (s))
 #define struct_clear(s) {static_assert(sizeof(*(s)) != sizeof(void*)); pointer_clear((s), sizeof(*s));}
 
-#define page_size KB(4)
-#define align_page_size (page_size - 1)
+#define PAGE_SIZE KB(4)
+#define ALIGN_PAGE_SIZE (PAGE_SIZE - 1)
 
 typedef struct s8
 {
