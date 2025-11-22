@@ -251,15 +251,17 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, Vk
 }
 
 // TODO: wrap into vk_device select
-static bool vk_physical_device_select(arena s, vk_device* device, vk_features* features)
+static vk_result vk_physical_device_select(arena s, vk_device* device, vk_features* features)
 {
+   vk_result result = {0};
+
    u32 dev_count = 0;
    if(!vk_valid(vkEnumeratePhysicalDevices(device->instance, &dev_count, 0)))
-      return false;
+      return result;
 
    VkPhysicalDevice* devs = push(&s, VkPhysicalDevice, dev_count);
    if(!vk_valid(vkEnumeratePhysicalDevices(device->instance, &dev_count, devs)))
-      return false;
+      return result;
 
    u32 fallback_gpu = 0;
    for(u32 i = 0; i < dev_count; ++i)
@@ -287,11 +289,11 @@ static bool vk_physical_device_select(arena s, vk_device* device, vk_features* f
 
       u32 extension_count = 0;
       if(!vk_valid(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, 0)))
-         return false;
+         return result;
 
       VkExtensionProperties* extensions = push(&s, VkExtensionProperties, extension_count);
       if(!vk_valid(vkEnumerateDeviceExtensionProperties(devs[i], 0, &extension_count, extensions)))
-         return false;
+         return result;
 
       for(u32 j = 0; j < extension_count; ++j)
       {
@@ -309,14 +311,12 @@ static bool vk_physical_device_select(arena s, vk_device* device, vk_features* f
             printf("Ray tracing supported\n");
             printf("Mesh shading supported\n");
 
-            device->physical = devs[i];
-            return true;
+            return (vk_result){.h = devs[i]};
          }
       }
    }
 
-   device->physical = devs[fallback_gpu];
-   return true;
+   return (vk_result){.h = devs[fallback_gpu]};
 }
 
 static bool vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
@@ -1470,15 +1470,17 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-bool vk_instance_create(arena scratch, vk_device* devices)
+vk_result vk_instance_create(arena scratch)
 {
+   vk_result result = {0};
+
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
-      return false;
+      return result;
 
    VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count);
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
-      return false;
+      return result;
 
    const char** ext_names = push(&scratch, const char*, ext_count);
 
@@ -1501,10 +1503,11 @@ bool vk_instance_create(arena scratch, vk_device* devices)
       instance_info.ppEnabledLayerNames = validation_layers;
    }
 #endif
-   if(!vk_valid(vkCreateInstance(&instance_info, 0, &devices->instance)))
-      return false;
+   VkInstance instance = 0;
+   if(!vk_valid(vkCreateInstance(&instance_info, 0, &instance)))
+      return result;
 
-   return true;
+   return (vk_result){.h = instance};
 }
 
 static bool vk_buffers_create(vk_context* context)
@@ -1669,12 +1672,12 @@ bool vk_initialize(hw* hw)
    arena* a = context->storage;
    arena s = context->scratch;
 
-   if(!vk_instance_create(s, devices))
+   if(!(context->devices.instance = vk_instance_create(s).h))
       return false;
 
    volkLoadInstance(devices->instance);
 
-   if(!vk_physical_device_select(s, devices, features))
+   if(!(context->devices.physical = vk_physical_device_select(s, devices, features).h))
       return false;
 
    #ifdef _DEBUG
