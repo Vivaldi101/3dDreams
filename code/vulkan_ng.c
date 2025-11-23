@@ -462,29 +462,25 @@ static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_
    return (vk_result){logical_device};
 }
 
-static VkQueue vk_graphics_queue_create(vk_device* devices)
+static VkQueue vk_graphics_queue_get(vk_device* devices)
 {
-   assert(vk_valid_handle(devices->logical));
-
    VkQueue graphics_queue = 0;
    u32 queue_index = 0;
 
-   // TODO: Get the queue index
    vkGetDeviceQueue(devices->logical, (u32)devices->queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }
 
-static VkSemaphore vk_semaphore_create(vk_context* context)
+static vk_result vk_semaphore_create(vk_device* devices)
 {
-   assert(vk_valid_handle(context->devices.logical));
-
    VkSemaphore sema = 0;
 
    VkSemaphoreCreateInfo sema_info = {vk_info(SEMAPHORE)};
-   vk_assert(vkCreateSemaphore(context->devices.logical, &sema_info, 0, &sema));
+   if(!vk_valid(vkCreateSemaphore(devices->logical, &sema_info, 0, &sema)))
+      return (vk_result){0};
 
-   return sema;
+   return (vk_result){sema};
 }
 
 static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR surface, vk_swapchain_surface* surface_info, u32 queue_family_index)
@@ -545,35 +541,31 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
    return swapchain_info;
 }
 
-static VkCommandBuffer vk_command_buffer_create(vk_context* context)
+static vk_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_handle(context->cmd.pool));
-
-   VkCommandBuffer buffer = 0;
    VkCommandBufferAllocateInfo buffer_allocate_info = {vk_info_allocate(COMMAND_BUFFER)};
 
    buffer_allocate_info.commandBufferCount = 1;
-   buffer_allocate_info.commandPool = context->cmd.pool;
+   buffer_allocate_info.commandPool = cmd->pool;
    buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-   vk_assert(vkAllocateCommandBuffers(context->devices.logical, &buffer_allocate_info, &buffer));
+   VkCommandBuffer buffer = 0;
+   if(!vk_valid(vkAllocateCommandBuffers(devices->logical, &buffer_allocate_info, &buffer)))
+      return (vk_result){0};
 
-   return buffer;
+   return (vk_result){buffer};
 }
 
-static VkCommandPool vk_command_pool_create(vk_device* devices)
+static vk_result vk_command_pool_create(vk_device* devices)
 {
-   assert(vk_valid_handle(devices->logical));
-
-   VkCommandPool pool = 0;
-
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
    pool_info.queueFamilyIndex = (u32)devices->queue_family_index;
 
-   vk_assert(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool));
+   VkCommandPool pool = 0;
+   if(!vk_valid(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool)))
+      return (vk_result){0};
 
-   return pool;
+   return (vk_result){pool};
 }
 
 
@@ -784,19 +776,17 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    printf("Viewport resized: [%u %u]\n", width, height);
 }
 
-static VkQueryPool vk_query_pool_create(vk_context* context)
+static vk_result vk_query_pool_create(vk_device* devices, size query_pool_size)
 {
-   VkQueryPool result = 0;
-
-   context->query_pool_size = 128;
-
    VkQueryPoolCreateInfo info = {vk_info(QUERY_POOL)};
    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-   info.queryCount = context->query_pool_size;
+   info.queryCount = (u32)query_pool_size;
 
-   vk_assert(vkCreateQueryPool(context->devices.logical, &info, 0, &result));
+   VkQueryPool pool = 0;
+   if(!vk_valid(vkCreateQueryPool(devices->logical, &info, 0, &pool)))
+      return (vk_result){0};
 
-   return result;
+   return (vk_result){pool};
 }
 
 // TODO: these into cmd.c
@@ -1664,6 +1654,7 @@ bool vk_initialize(hw* hw)
 
    vk_context* context = push(hw->storage, vk_context);
    vk_device* devices = &context->devices;
+   vk_cmd* cmd = &context->cmd;
    vk_features* features = &context->features;
    VkSurfaceKHR* surface = &context->surface;
 
@@ -1720,16 +1711,42 @@ bool vk_initialize(hw* hw)
       printf("Could not create logical device\n");
       return false;
    }
+   if(!(context->image_ready_semaphore = vk_semaphore_create(devices).h))
+   {
+      printf("Could not create image ready semaphore\n");
+      return false;
+   }
+   if(!(context->image_done_semaphore = vk_semaphore_create(devices).h))
+   {
+      printf("Could not create image done semaphore\n");
+      return false;
+   }
+
+   const u32 query_pool_size = 128;
+   if(!(context->query_pool = vk_query_pool_create(devices, query_pool_size).h))
+   {
+      printf("Could not create query pool\n");
+      return false;
+   }
+   context->query_pool_size = query_pool_size;
+
+   if(!(context->cmd.pool = vk_command_pool_create(devices).h))
+   {
+      printf("Could not create command pool\n");
+      return false;
+   }
+   if(!(context->cmd.buffer = vk_command_buffer_create(cmd, devices).h))
+   {
+      printf("Could not create command buffer\n");
+      return false;
+   }
+   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
+
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
-   context->image_ready_semaphore = vk_semaphore_create(context);
-   context->image_done_semaphore = vk_semaphore_create(context);
-   context->graphics_queue = vk_graphics_queue_create(devices);
-   context->query_pool = vk_query_pool_create(context);
-   context->cmd.pool = vk_command_pool_create(devices);
-   context->cmd.buffer = vk_command_buffer_create(context);
-   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
    context->renderpass = vk_renderpass_create(context);
+
+   context->graphics_queue = vk_graphics_queue_get(devices);
 
    // framebuffers
    context->framebuffers.arena = a;
