@@ -46,7 +46,6 @@
 typedef union vk_result
 {
    void* h;
-   VkResult r;
    bool b;
 } vk_result;
 
