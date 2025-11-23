@@ -47,6 +47,7 @@ typedef union vk_result
 {
    void* h;
    bool b;
+   size i;
 } vk_result;
 
 align_struct vk_swapchain_surface
@@ -143,7 +144,7 @@ align_struct vk_device
    VkPhysicalDevice physical;
    VkDevice logical;
    VkInstance instance;
-   u32 queue_family_index;
+   size queue_family_index;
 } vk_device;
 
 align_struct ctx_shader_destroy

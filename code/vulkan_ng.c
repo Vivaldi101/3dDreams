@@ -331,7 +331,7 @@ static vk_result vk_physical_device_select(arena s, vk_device* device, vk_featur
    return (vk_result){.h = devs[fallback_gpu]};
 }
 
-static bool vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
+static vk_result vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
 {
    u32 queue_family_count = 0;
    vkGetPhysicalDeviceQueueFamilyProperties(devices->physical, &queue_family_count, 0);
@@ -346,13 +346,10 @@ static bool vk_logical_device_select_family_index(arena scratch, vk_device* devi
 
       // graphics and presentation within same queue for simplicity
       if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
-      {
-         devices->queue_family_index = i;
-         return true;
-      }
+         return (vk_result){.i = i};
    }
 
-   return false;
+   return (vk_result){.i = invalid_index};
 }
 
 static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
@@ -446,7 +443,7 @@ static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_
    f32 priorities[queue_count] = {1.0f};
    VkDeviceQueueCreateInfo queue_info[queue_count] = {vk_info(DEVICE_QUEUE)};
 
-   queue_info[0].queueFamilyIndex = devices->queue_family_index;
+   queue_info[0].queueFamilyIndex = (u32)devices->queue_family_index;
    queue_info[0].queueCount = queue_count;
    queue_info[0].pQueuePriorities = priorities;
 
@@ -473,7 +470,7 @@ static VkQueue vk_graphics_queue_create(vk_device* devices)
    u32 queue_index = 0;
 
    // TODO: Get the queue index
-   vkGetDeviceQueue(devices->logical, devices->queue_family_index, queue_index, &graphics_queue);
+   vkGetDeviceQueue(devices->logical, (u32)devices->queue_family_index, queue_index, &graphics_queue);
 
    return graphics_queue;
 }
@@ -543,7 +540,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32
    swapchain_info.handle = vk_swapchain_create(context->devices.logical,
                                                context->surface,
                                                &swapchain_info,
-                                               context->devices.queue_family_index);
+                                               (u32)context->devices.queue_family_index);
 
    return swapchain_info;
 }
@@ -572,7 +569,7 @@ static VkCommandPool vk_command_pool_create(vk_device* devices)
    VkCommandPool pool = 0;
 
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
-   pool_info.queueFamilyIndex = devices->queue_family_index;
+   pool_info.queueFamilyIndex = (u32)devices->queue_family_index;
 
    vk_assert(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool));
 
@@ -1713,10 +1710,9 @@ bool vk_initialize(hw* hw)
       printf("Could not create the window surface\n");
       return false;
    }
-   // TODO: use vk_result below
-   if(!vk_logical_device_select_family_index(s, devices, *surface))
+   if((context->devices.queue_family_index = vk_logical_device_select_family_index(s, devices, *surface).i) == invalid_index)
    {
-      printf("Could not select queue family for surface\n");
+      printf("Could not select queue family index for surface\n");
       return false;
    }
    if(!(context->devices.logical = vk_logical_device_create(s, devices, features).h))

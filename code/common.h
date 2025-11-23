@@ -20,6 +20,8 @@ typedef unsigned char   byte;
 typedef size_t          usize;
 typedef usize           size;
 
+static const size invalid_index = (size)-1;
+
 #define s8(s) (s8){(u8 *)s, strlen(s)}
 #define s8_data(s) (const char*)(s).data
 
@@ -90,7 +92,7 @@ static size s8_is_substr_count(s8 str, s8 sub)
       if (!strncmp(s8_data(str) + i, s8_data(sub), sub.len))
          return i;
 
-   return (size)-1;
+   return invalid_index;
 }
 
 static s8 s8_slice(s8 str, size beg, size end)
