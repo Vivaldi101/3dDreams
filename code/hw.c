@@ -4,7 +4,7 @@
 #include "math.h"
 #include "vulkan_ng.h"
 
-static bool window_surface_create(void* instance, void* window_handle, void* surface)
+static vk_result window_surface_create(void* instance, void* window_handle)
 {
 #ifdef WIN32
    PFN_vkCreateWin32SurfaceKHR vk_surface_function = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR");
@@ -14,11 +14,12 @@ static bool window_surface_create(void* instance, void* window_handle, void* sur
    surface_info.hinstance = GetModuleHandleA(0);
    surface_info.hwnd = window_handle;
 
-   if(!vk_valid(vk_surface_function(instance, &surface_info, 0, surface)))
-      return false;
+   VkSurfaceKHR surface = 0;
+   if(!vk_valid(vk_surface_function(instance, &surface_info, 0, &surface)))
+      return (vk_result){0};
 #endif
 
-   return true;
+   return (vk_result){surface};
 }
 
 bool hw_window_open(hw* hw, const char *title, int x, int y, int w, int h)

@@ -17,7 +17,8 @@
 #include "arena.h"
 #include "common.h"
 
-// TODO: Move this to general renderer.h
+#include "vulkan_ng.h"
+
 enum
 {
    VULKAN_RENDERER_INDEX,
@@ -41,7 +42,7 @@ align_struct hw_renderer
    void(*frame_present)(struct hw* hw, void* context);
    void(*frame_resize)(struct hw* hw, u32 width, u32 height);
    void(*gpu_log)(hw* hw);
-   bool (*window_surface_create)(void* instance, void* window_handle, void* surface);
+   vk_result (*window_surface_create)(void* instance, void* window_handle);
    hw_window window;
 
    // should be inside app.c

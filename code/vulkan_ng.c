@@ -182,7 +182,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
    return false;
 }
 
-static vk_result vk_create_debugutils_messenger_ext(hw* hw, VkInstance instance)
+static vk_result vk_create_debugutils_messenger_ext(hw* hw, vk_device* devices)
 {
    VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
    messenger_info.messageSeverity =
@@ -196,12 +196,12 @@ static vk_result vk_create_debugutils_messenger_ext(hw* hw, VkInstance instance)
 
    messenger_info.pUserData = hw;
 
-   PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+   PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(devices->instance, "vkCreateDebugUtilsMessengerEXT");
    if(!func)
       return (vk_result){0};
 
    VkDebugUtilsMessengerEXT debug_messenger = 0;
-   if(!vk_valid(func(instance, &messenger_info, 0, &debug_messenger)))
+   if(!vk_valid(func(devices->instance, &messenger_info, 0, &debug_messenger)))
       return (vk_result){0};
 
    return (vk_result){debug_messenger};
@@ -1699,13 +1699,10 @@ bool vk_initialize(hw* hw)
    }
 
    #ifdef _DEBUG
+   if(!(context->messenger = vk_create_debugutils_messenger_ext(hw, devices).h))
    {
-
-      if(!(context->messenger = vk_create_debugutils_messenger_ext(hw, devices->instance).h))
-      {
-         printf("Could not create debug messenger\n");
-         return false;
-      }
+      printf("Could not create debug messenger\n");
+      return false;
    }
    #endif
 
@@ -1713,11 +1710,13 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   if(!hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle, surface))
+   if(!(context->surface = hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle).h))
    {
       printf("Could not create the window surface\n");
       return false;
    }
+
+   // TODO: use vk_result below
    if(!vk_logical_device_select_family_index(s, devices, *surface))
    {
       printf("Could not select queue family for surface\n");
