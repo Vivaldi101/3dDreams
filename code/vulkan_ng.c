@@ -1684,6 +1684,10 @@ bool vk_initialize(hw* hw)
    arena* a = context->storage;
    arena s = context->scratch;
 
+   // TODO: allocator
+   VkAllocationCallbacks allocator = {0};
+   context->allocator = allocator;
+
    if(!(context->devices.instance = vk_instance_create(s).h))
    {
       printf("Could not create instance\n");
@@ -1697,7 +1701,6 @@ bool vk_initialize(hw* hw)
       printf("Could not select physical device\n");
       return false;
    }
-
    #ifdef _DEBUG
    if(!(context->messenger = vk_create_debugutils_messenger_ext(hw, devices).h))
    {
@@ -1705,17 +1708,11 @@ bool vk_initialize(hw* hw)
       return false;
    }
    #endif
-
-   // TODO: allocator
-   VkAllocationCallbacks allocator = {0};
-   context->allocator = allocator;
-
    if(!(context->surface = hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle).h))
    {
       printf("Could not create the window surface\n");
       return false;
    }
-
    // TODO: use vk_result below
    if(!vk_logical_device_select_family_index(s, devices, *surface))
    {
@@ -1727,7 +1724,6 @@ bool vk_initialize(hw* hw)
       printf("Could not create logical device\n");
       return false;
    }
-
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
    context->image_ready_semaphore = vk_semaphore_create(context);
