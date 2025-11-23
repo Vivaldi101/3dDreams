@@ -355,7 +355,7 @@ static bool vk_logical_device_select_family_index(arena scratch, vk_device* devi
    return false;
 }
 
-static VkDevice vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
+static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
 {
    array(s8) extensions = {&scratch};
 
@@ -446,7 +446,7 @@ static VkDevice vk_logical_device_create(arena scratch, vk_device* devices, vk_f
    f32 priorities[queue_count] = {1.0f};
    VkDeviceQueueCreateInfo queue_info[queue_count] = {vk_info(DEVICE_QUEUE)};
 
-   queue_info[0].queueFamilyIndex = devices->queue_family_index; // TODO: query the right queue family
+   queue_info[0].queueFamilyIndex = devices->queue_family_index;
    queue_info[0].queueCount = queue_count;
    queue_info[0].pQueuePriorities = priorities;
 
@@ -459,9 +459,10 @@ static VkDevice vk_logical_device_create(arena scratch, vk_device* devices, vk_f
    ldev_info.pNext = &features2;
 
    VkDevice logical_device;
-   vk_assert(vkCreateDevice(devices->physical, &ldev_info, 0, &logical_device));
+   if(!vk_valid(vkCreateDevice(devices->physical, &ldev_info, 0, &logical_device)))
+      return (vk_result){0};
 
-   return logical_device;
+   return (vk_result){logical_device};
 }
 
 static VkQueue vk_graphics_queue_create(vk_device* devices)
@@ -1667,6 +1668,7 @@ bool vk_initialize(hw* hw)
    vk_context* context = push(hw->storage, vk_context);
    vk_device* devices = &context->devices;
    vk_features* features = &context->features;
+   VkSurfaceKHR* surface = &context->surface;
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1711,19 +1713,24 @@ bool vk_initialize(hw* hw)
    VkAllocationCallbacks allocator = {0};
    context->allocator = allocator;
 
-   if(!hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle, &context->surface))
+   if(!hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle, surface))
    {
       printf("Could not create the window surface\n");
       return false;
    }
-   if(!vk_logical_device_select_family_index(s, devices, context->surface))
+   if(!vk_logical_device_select_family_index(s, devices, *surface))
    {
       printf("Could not select queue family for surface\n");
       return false;
    }
+   if(!(context->devices.logical = vk_logical_device_create(s, devices, features).h))
+   {
+      printf("Could not create logical device\n");
+      return false;
+   }
+
    // TODO: wide contracts for all these below since vk_initialize is wide
    // TODO: fine tune params instead of just passing context
-   context->devices.logical = vk_logical_device_create(s, devices, features);
    context->image_ready_semaphore = vk_semaphore_create(context);
    context->image_done_semaphore = vk_semaphore_create(context);
    context->graphics_queue = vk_graphics_queue_create(devices);
