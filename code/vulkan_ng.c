@@ -161,19 +161,6 @@ static bool vk_assets_read(vk_context* context, s8 asset_file)
    return success;
 }
 
-static bool vk_create_debugutils_messenger_ext(VkDebugUtilsMessengerEXT* debug_messenger, VkInstance instance,
-                                                   VkDebugUtilsMessengerCreateInfoEXT* create_info)
-{
-   PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-   if(!func)
-      return false;
-
-   if(!vk_valid(func(instance, create_info, 0, debug_messenger)))
-      return false;
-
-   return true;
-}
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity_flags,
     VkDebugUtilsMessageTypeFlagsEXT type,
@@ -193,6 +180,31 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 #endif
 
    return false;
+}
+
+static vk_result vk_create_debugutils_messenger_ext(hw* hw, VkInstance instance)
+{
+   VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
+   messenger_info.messageSeverity =
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+   messenger_info.messageType =
+      VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+   messenger_info.pfnUserCallback = vk_debug_callback;
+
+   messenger_info.pUserData = hw;
+
+   PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+   if(!func)
+      return (vk_result){0};
+
+   VkDebugUtilsMessengerEXT debug_messenger = 0;
+   if(!vk_valid(func(instance, &messenger_info, 0, &debug_messenger)))
+      return (vk_result){0};
+
+   return (vk_result){debug_messenger};
 }
 
 static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
@@ -1472,15 +1484,13 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
 
 vk_result vk_instance_create(arena scratch)
 {
-   vk_result result = {0};
-
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
-      return result;
+      return (vk_result){0};
 
    VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count);
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
-      return result;
+      return (vk_result){0};
 
    const char** ext_names = push(&scratch, const char*, ext_count);
 
@@ -1505,9 +1515,9 @@ vk_result vk_instance_create(arena scratch)
 #endif
    VkInstance instance = 0;
    if(!vk_valid(vkCreateInstance(&instance_info, 0, &instance)))
-      return result;
+      return (vk_result){0};
 
-   return (vk_result){.h = instance};
+   return (vk_result){instance};
 }
 
 static bool vk_buffers_create(vk_context* context)
@@ -1682,26 +1692,12 @@ bool vk_initialize(hw* hw)
 
    #ifdef _DEBUG
    {
-      VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
-      messenger_info.messageSeverity =
-         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-      messenger_info.messageType =
-         VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-      messenger_info.pfnUserCallback = vk_debug_callback;
 
-      messenger_info.pUserData = hw;
-
-      VkDebugUtilsMessengerEXT messenger = 0;
-      if(!vk_create_debugutils_messenger_ext(&messenger, devices->instance, &messenger_info))
+      if(!(context->messenger = vk_create_debugutils_messenger_ext(hw, devices->instance).h))
       {
          printf("Could not create debug messenger");
          return false;
       }
-
-      context->messenger = messenger;
    }
    #endif
 
