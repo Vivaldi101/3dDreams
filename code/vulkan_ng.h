@@ -46,8 +46,9 @@
 typedef union vk_result
 {
    void* h;
-   bool b;
    size i;
+   u8 b;
+   static_assert(sizeof(void*) != sizeof(u8));
 } vk_result;
 
 align_struct vk_swapchain_surface
