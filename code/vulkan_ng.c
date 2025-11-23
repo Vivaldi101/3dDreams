@@ -1683,19 +1683,25 @@ bool vk_initialize(hw* hw)
    arena s = context->scratch;
 
    if(!(context->devices.instance = vk_instance_create(s).h))
+   {
+      printf("Could not create instance\n");
       return false;
+   }
 
    volkLoadInstance(devices->instance);
 
    if(!(context->devices.physical = vk_physical_device_select(s, devices, features).h))
+   {
+      printf("Could not select physical device\n");
       return false;
+   }
 
    #ifdef _DEBUG
    {
 
       if(!(context->messenger = vk_create_debugutils_messenger_ext(hw, devices->instance).h))
       {
-         printf("Could not create debug messenger");
+         printf("Could not create debug messenger\n");
          return false;
       }
    }
