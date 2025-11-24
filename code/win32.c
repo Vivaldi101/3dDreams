@@ -72,7 +72,7 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          {
             win32_hw->renderer.window.width = width;
             win32_hw->renderer.window.height = height;
-            win32_hw->renderer.frame_resize(win32_hw, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
+            win32_hw->renderer.frame_resize(&win32_hw->renderer, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
          }
 
          return 0;
@@ -99,7 +99,7 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          {
             win32_hw->renderer.window.width = LOWORD(lparam);
             win32_hw->renderer.window.height = HIWORD(lparam);
-            win32_hw->renderer.frame_resize(win32_hw, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
+            win32_hw->renderer.frame_resize(&win32_hw->renderer, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
          }
          return 0;
       }
@@ -114,7 +114,7 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          int width = rect.right - rect.left;
          int height = rect.bottom - rect.top;
          if(win32_hw)
-            win32_hw->renderer.frame_resize(win32_hw, width, height);
+            win32_hw->renderer.frame_resize(&win32_hw->renderer, width, height);
 
          return 0;
       }

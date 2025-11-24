@@ -707,7 +707,7 @@ static void gpu_log(hw* hw)
                        hw->state.frame_delta_in_seconds * ms, gpu_delta / us);
 }
 
-static void vk_resize(hw* hw, u32 width, u32 height)
+static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
 {
    if(width == 0 || height == 0)
       return;
@@ -720,12 +720,12 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    mvp.ar = ar;
 
    mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
-   hw->renderer.mvp = mvp;
+   renderer->mvp = mvp;
 
-   u32 renderer_index = hw->renderer.renderer_index;
+   u32 renderer_index = renderer->renderer_index;
    assert(renderer_index < RENDERER_COUNT);
 
-   vk_context* context = hw->renderer.backends[renderer_index];
+   vk_context* context = renderer->backends[renderer_index];
    vk_device* devices = &context->devices;
 
    vkDeviceWaitIdle(devices->logical);
@@ -879,7 +879,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain.image_width, context->swapchain.image_height);
+      vk_resize(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
 
    if(present_result != VK_SUCCESS)
       return;
@@ -898,7 +898,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    context->image_index = image_index;
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain.image_width, context->swapchain.image_height);
+      vk_resize(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
 
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
@@ -1740,7 +1740,7 @@ bool vk_initialize(hw* hw)
       array_add(context->images.depths, (vk_image) { 0 });
    }
 
-   hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
+   hw->renderer.frame_resize(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
 
    const size buffer_table_size = 1 << 8;
    context->buffer_table = buffer_hash_create(buffer_table_size, a);
