@@ -234,15 +234,12 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    return formats.data[0].format;
 }
 
-static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, VkPhysicalDevice physical_device, u32 width, u32 height, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface)
 {
-   assert(vk_valid_handle(physical_device));
-   assert(vk_valid_handle(surface));
-
    vk_swapchain_surface result = {0};
 
    VkSurfaceCapabilitiesKHR surface_caps;
-   if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_caps)))
+   if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(devices->physical, surface, &surface_caps)))
       return (vk_swapchain_surface){0};
 
    // triple buffering
@@ -254,10 +251,33 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, Vk
 
    u32 image_count = surface_caps.minImageCount + 1;
 
-   result.image_width = width;
-   result.image_height = height;
+   VkSwapchainKHR swapchain = 0;
+
+   VkSwapchainCreateInfoKHR swapchain_info = {vk_info_khr(SWAPCHAIN)};
+   swapchain_info.surface = surface;
+   swapchain_info.minImageCount = image_count;
+   swapchain_info.imageFormat = vk_swapchain_format(scratch, devices->physical, surface);
+   swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+   swapchain_info.imageExtent.width = surface_caps.currentExtent.width;
+   swapchain_info.imageExtent.height = surface_caps.currentExtent.height;
+   swapchain_info.imageArrayLayers = 1;
+   swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+   swapchain_info.queueFamilyIndexCount = 1;
+   swapchain_info.pQueueFamilyIndices = &(u32)devices->queue_family_index;
+   swapchain_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+   swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+   swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+   swapchain_info.clipped = true;
+   swapchain_info.oldSwapchain = 0;
+
+   if(!vk_valid(vkCreateSwapchainKHR(devices->logical, &swapchain_info, 0, &swapchain)))
+      return (vk_swapchain_surface){0};
+
+   result.format = swapchain_info.imageFormat;
+   result.handle = swapchain;
    result.image_count = image_count;
-   result.format = vk_swapchain_format(scratch, physical_device, surface);
+   result.image_width = surface_caps.currentExtent.width;
+   result.image_height = surface_caps.currentExtent.height;
 
    return result;
 }
@@ -483,63 +503,9 @@ static vk_result vk_semaphore_create(vk_device* devices)
    return (vk_result){sema};
 }
 
-static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR surface, vk_swapchain_surface* surface_info, u32 queue_family_index)
+static vk_swapchain_surface vk_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface)
 {
-   assert(vk_valid_handle(logical_device));
-   assert(vk_valid_format(surface_info->format));
-
-   VkSwapchainKHR swapchain = 0;
-
-   VkSwapchainCreateInfoKHR swapchain_info = {vk_info_khr(SWAPCHAIN)};
-   swapchain_info.surface = surface;
-   swapchain_info.minImageCount = surface_info->image_count;
-   swapchain_info.imageFormat = surface_info->format;
-   swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-   swapchain_info.imageExtent.width = surface_info->image_width;
-   swapchain_info.imageExtent.height = surface_info->image_height;
-   swapchain_info.imageArrayLayers = 1;
-   swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-   swapchain_info.queueFamilyIndexCount = 1;
-   swapchain_info.pQueueFamilyIndices = &queue_family_index;
-   swapchain_info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-   swapchain_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-   swapchain_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-   swapchain_info.clipped = true;
-   swapchain_info.oldSwapchain = surface_info->handle;
-
-   vk_assert(vkCreateSwapchainKHR(logical_device, &swapchain_info, 0, &swapchain));
-
-   return swapchain;
-}
-
-// TODO: Break this apart
-static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height)
-{
-   VkSurfaceCapabilitiesKHR surface_caps;
-   if(!vk_valid(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(context->devices.physical, context->surface, &surface_caps)))
-      return (vk_swapchain_surface) {0};
-
-   VkExtent2D swapchain_extent = {swapchain_width, swapchain_height};
-
-   if(surface_caps.currentExtent.width != UINT32_MAX)
-      swapchain_extent = surface_caps.currentExtent;
-   else
-   {
-      // surface allows to choose the size
-      VkExtent2D min_extent = surface_caps.minImageExtent;
-      VkExtent2D max_extent = surface_caps.maxImageExtent;
-      swapchain_extent.width = clamp(swapchain_extent.width, min_extent.width, max_extent.width);
-      swapchain_extent.height = clamp(swapchain_extent.height, min_extent.height, max_extent.height);
-   }
-
-   vk_swapchain_surface swapchain_info = vk_window_swapchain_surface_create(context->scratch, context->devices.physical, swapchain_extent.width, swapchain_extent.height, context->surface);
-
-   swapchain_info.handle = vk_swapchain_create(context->devices.logical,
-                                               context->surface,
-                                               &swapchain_info,
-                                               (u32)context->devices.queue_family_index);
-
-   return swapchain_info;
+   return vk_window_swapchain_surface_create(scratch, devices, surface);
 }
 
 static vk_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
@@ -666,8 +632,6 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
 
 static void vk_swapchain_destroy(vk_context* context)
 {
-   vkDeviceWaitIdle(context->devices.logical);
-
    for(u32 i = 0; i < context->framebuffers.count; ++i)
       vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
 
@@ -680,6 +644,7 @@ static void vk_swapchain_destroy(vk_context* context)
 
    for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
       vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
+
 
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
 }
@@ -755,6 +720,8 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    assert(renderer_index < RENDERER_COUNT);
 
    vk_context* context = hw->renderer.backends[renderer_index];
+   vk_device* devices = &context->devices;
+   VkSurfaceKHR surface = context->surface;
 
    mvp_transform mvp = {0};
    const f32 ar = (f32)width / height;
@@ -766,10 +733,13 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    hw->renderer.mvp = mvp;
 
-   vkDeviceWaitIdle(context->devices.logical);
+   vkDeviceWaitIdle(devices->logical);
 
    vk_swapchain_destroy(context);
-   context->swapchain_surface = vk_swapchain_surface_create(context, width, height);
+
+   arena s = context->scratch;
+   context->swapchain_surface = vk_swapchain_surface_create(s, devices, surface);
+
    vk_swapchain_update(context);
 
    printf("Viewport resized: [%u %u]\n", width, height);
@@ -1656,7 +1626,7 @@ bool vk_initialize(hw* hw)
    vk_cmd* cmd = &context->cmd;
    vk_features* features = &context->features;
    VkSurfaceKHR* surface = &context->surface;
-   vk_swapchain_surface* swapchain_surface = &context->swapchain_surface;
+   vk_swapchain_surface* swapchain = &context->swapchain_surface;
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1740,10 +1710,9 @@ bool vk_initialize(hw* hw)
       printf("Could not create command buffer\n");
       return false;
    }
-   // TODO: Break this apart
-   context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
+   context->swapchain_surface = vk_swapchain_surface_create(s, devices, *surface);
 
-   if(!(context->renderpass = vk_renderpass_create(devices, swapchain_surface).h))
+   if(!(context->renderpass = vk_renderpass_create(devices, swapchain).h))
    {
       printf("Could not create renderpass\n");
       return false;
@@ -1907,6 +1876,7 @@ void vk_uninitialize(hw* hw)
    for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
       vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
 
+   //TODO: call vk_swapchain_destroy(context);
    vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
    vkDestroySurfaceKHR(devices->instance, context->surface, 0);
 
