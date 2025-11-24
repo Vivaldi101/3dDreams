@@ -512,6 +512,7 @@ static VkSwapchainKHR vk_swapchain_create(VkDevice logical_device, VkSurfaceKHR 
    return swapchain;
 }
 
+// TODO: Break this apart
 static vk_swapchain_surface vk_swapchain_surface_create(vk_context* context, u32 swapchain_width, u32 swapchain_height)
 {
    VkSurfaceCapabilitiesKHR surface_caps;
@@ -569,11 +570,8 @@ static vk_result vk_command_pool_create(vk_device* devices)
 }
 
 
-static VkRenderPass vk_renderpass_create(vk_context* context)
+static vk_result vk_renderpass_create(vk_context* context)
 {
-   assert(vk_valid_handle(context->devices.logical));
-   assert(vk_valid_format(context->swapchain_surface.format));
-
    VkRenderPass renderpass = 0;
 
    const u32 color_attachment_index = 0;
@@ -616,9 +614,10 @@ static VkRenderPass vk_renderpass_create(vk_context* context)
    renderpass_info.attachmentCount = array_count(attachments);
    renderpass_info.pAttachments = attachments;
 
-   vk_assert(vkCreateRenderPass(context->devices.logical, &renderpass_info, 0, &renderpass));
+   if(!vk_valid(vkCreateRenderPass(context->devices.logical, &renderpass_info, 0, &renderpass)))
+      return (vk_result){0};
 
-   return renderpass;
+   return (vk_result){renderpass};
 }
 
 static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, vk_swapchain_surface* surface_info, VkImageView* attachments, u32 attachment_count)
@@ -1740,12 +1739,14 @@ bool vk_initialize(hw* hw)
       printf("Could not create command buffer\n");
       return false;
    }
+   // TODO: Break this apart
    context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
 
-   // TODO: wide contracts for all these below since vk_initialize is wide
-   // TODO: fine tune params instead of just passing context
-   context->renderpass = vk_renderpass_create(context);
-
+   if(!(context->renderpass = vk_renderpass_create(context).h))
+   {
+      printf("Could not create renderpass\n");
+      return false;
+   }
    context->graphics_queue = vk_graphics_queue_get(devices);
 
    // framebuffers
