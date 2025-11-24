@@ -179,9 +179,10 @@ align_struct vk_features
    f32 time_period;
 } vk_features;
 
+typedef array(VkFramebuffer) framebuffers_array;
 align_struct vk_context
 {
-   array(VkFramebuffer) framebuffers;
+   framebuffers_array framebuffers;
    array(vk_texture) textures;
 
    array(meshlet) meshlets;
@@ -228,8 +229,8 @@ align_struct vk_context
 
    vk_buffer_hash_table buffer_table;
 
-   vk_swapchain_surface swapchain_surface;
-   vk_swapchain_images swapchain_images;
+   vk_swapchain_surface swapchain;
+   vk_swapchain_images images;
 
    arena* storage;
    arena scratch;

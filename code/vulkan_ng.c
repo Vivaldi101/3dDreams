@@ -630,50 +630,46 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
    return result;
 }
 
-static void vk_swapchain_destroy(vk_context* context)
+static void vk_swapchain_destroy(vk_device* devices, vk_swapchain_images* images, framebuffers_array* framebuffers, vk_swapchain_surface* swapchain)
 {
-   for(u32 i = 0; i < context->framebuffers.count; ++i)
-      vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
+   for(u32 i = 0; i < framebuffers->count; ++i)
+      vkDestroyFramebuffer(devices->logical, framebuffers->data[i], 0);
 
-   for (u32 i = 0; i < context->swapchain_images.depths.count; ++i)
+   for (u32 i = 0; i < images->depths.count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
-      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i].handle, 0);
-      vkFreeMemory(context->devices.logical, context->swapchain_images.depths.data[i].memory, 0);
+      vkDestroyImageView(devices->logical, images->depths.data[i].view, 0);
+      vkDestroyImage(devices->logical, images->depths.data[i].handle, 0);
+      vkFreeMemory(devices->logical, images->depths.data[i].memory, 0);
    }
 
-   for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
+   for (u32 i = 0; i < images->images.count; ++i)
+      vkDestroyImageView(devices->logical, images->images.data[i].view, 0);
 
-
-   vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
+   vkDestroySwapchainKHR(devices->logical, swapchain->handle, 0);
 }
 
-// TODO: break into separate routines
 // TODO: wide contract
-static void vk_swapchain_update(vk_context* context)
+static void vk_swapchain_update(arena scratch, vk_device* devices, vk_swapchain_images* images, vk_swapchain_surface* swapchain, framebuffers_array* framebuffers, VkRenderPass renderpass)
 {
-   arena scratch = context->scratch;
+   VkImage* raw_images = push(&scratch, VkImage, swapchain->image_count);
 
-   VkImage* swapchain_images = push(&scratch, VkImage, context->swapchain_surface.image_count);
+   vk_assert(vkGetSwapchainImagesKHR(devices->logical, swapchain->handle, &swapchain->image_count, raw_images));
 
-   vk_assert(vkGetSwapchainImagesKHR(context->devices.logical, context->swapchain_surface.handle, &context->swapchain_surface.image_count, swapchain_images));
+   VkExtent3D depth_extent = {swapchain->image_width, swapchain->image_height, 1};
 
-   VkExtent3D depth_extent = {context->swapchain_surface.image_width, context->swapchain_surface.image_height, 1};
-
-   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
+   for(u32 i = 0; i < swapchain->image_count; ++i)
    {
-      context->swapchain_images.images.data[i].handle = swapchain_images[i];
+      images->images.data[i].handle = raw_images[i];
 
-      vk_depth_image_create(&context->swapchain_images.depths.data[i], context, VK_FORMAT_D32_SFLOAT, depth_extent); // TDOO: Return false here if fail
+      vk_depth_image_create(&images->depths.data[i], devices, VK_FORMAT_D32_SFLOAT, depth_extent); // TODO: Return false here if fail
 
-      context->swapchain_images.images.data[i].view = vk_image_view_create(context, context->swapchain_surface.format, context->swapchain_images.images.data[i].handle, VK_IMAGE_ASPECT_COLOR_BIT);
-      context->swapchain_images.depths.data[i].view = vk_image_view_create(context, VK_FORMAT_D32_SFLOAT, context->swapchain_images.depths.data[i].handle, VK_IMAGE_ASPECT_DEPTH_BIT);
+      images->images.data[i].view = vk_image_view_create(devices, swapchain->format, images->images.data[i].handle, VK_IMAGE_ASPECT_COLOR_BIT);
+      images->depths.data[i].view = vk_image_view_create(devices, VK_FORMAT_D32_SFLOAT, images->depths.data[i].handle, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-      VkImageView attachments[2] = {context->swapchain_images.images.data[i].view, context->swapchain_images.depths.data[i].view};
+      VkImageView attachments[2] = {images->images.data[i].view, images->depths.data[i].view};
 
-      VkFramebuffer fb = vk_framebuffer_create(context->devices.logical, context->renderpass, &context->swapchain_surface, attachments, array_count(attachments));
-      context->framebuffers.data[i] = fb;
+      VkFramebuffer fb = vk_framebuffer_create(devices->logical, renderpass, swapchain, attachments, array_count(attachments));
+      framebuffers->data[i] = fb;
    }
 }
 
@@ -716,13 +712,6 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    if(width == 0 || height == 0)
       return;
 
-   u32 renderer_index = hw->renderer.renderer_index;
-   assert(renderer_index < RENDERER_COUNT);
-
-   vk_context* context = hw->renderer.backends[renderer_index];
-   vk_device* devices = &context->devices;
-   VkSurfaceKHR surface = context->surface;
-
    mvp_transform mvp = {0};
    const f32 ar = (f32)width / height;
 
@@ -733,14 +722,27 @@ static void vk_resize(hw* hw, u32 width, u32 height)
    mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    hw->renderer.mvp = mvp;
 
+   u32 renderer_index = hw->renderer.renderer_index;
+   assert(renderer_index < RENDERER_COUNT);
+
+   vk_context* context = hw->renderer.backends[renderer_index];
+   vk_device* devices = &context->devices;
+
    vkDeviceWaitIdle(devices->logical);
 
-   vk_swapchain_destroy(context);
+   vk_swapchain_images* images = &context->images;
+   framebuffers_array* framebuffers = &context->framebuffers;
+   vk_swapchain_surface* swapchain = &context->swapchain;
+
+   vk_swapchain_destroy(&context->devices, images, framebuffers, swapchain);
 
    arena s = context->scratch;
-   context->swapchain_surface = vk_swapchain_surface_create(s, devices, surface);
+   VkSurfaceKHR surface = context->surface;
 
-   vk_swapchain_update(context);
+   VkRenderPass renderpass = context->renderpass;
+
+   context->swapchain = vk_swapchain_surface_create(s, devices, surface);
+   vk_swapchain_update(s, devices, images, swapchain, framebuffers, renderpass);
 
    printf("Viewport resized: [%u %u]\n", width, height);
 }
@@ -869,7 +871,7 @@ static void vk_present(hw* hw, vk_context* context)
 {
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
-   present_info.pSwapchains = &context->swapchain_surface.handle;
+   present_info.pSwapchains = &context->swapchain.handle;
    present_info.pImageIndices = &context->image_index;
    present_info.waitSemaphoreCount = 1;
    present_info.pWaitSemaphores = &context->image_done_semaphore;
@@ -877,7 +879,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
+      vk_resize(hw, context->swapchain.image_width, context->swapchain.image_height);
 
    if(present_result != VK_SUCCESS)
       return;
@@ -891,12 +893,12 @@ static void vk_present(hw* hw, vk_context* context)
 static void vk_render(hw* hw, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
-   VkResult next_image_result = vkAcquireNextImageKHR(context->devices.logical, context->swapchain_surface.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
+   VkResult next_image_result = vkAcquireNextImageKHR(context->devices.logical, context->swapchain.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
 
    context->image_index = image_index;
 
    if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(hw, context->swapchain_surface.image_width, context->swapchain_surface.image_height);
+      vk_resize(hw, context->swapchain.image_width, context->swapchain.image_height);
 
    if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
       return;
@@ -910,7 +912,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    renderpass_info.renderPass = context->renderpass;
    renderpass_info.framebuffer = context->framebuffers.data[image_index];
    renderpass_info.renderArea.extent = (VkExtent2D)
-   {context->swapchain_surface.image_width, context->swapchain_surface.image_height};
+   {context->swapchain.image_width, context->swapchain.image_height};
 
    VkCommandBuffer command_buffer = context->cmd.buffer;
 
@@ -941,12 +943,12 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    renderpass_info.clearValueCount = 2;
    renderpass_info.pClearValues = clear;
 
-   VkImage color_image = context->swapchain_images.images.data[image_index].handle;
+   VkImage color_image = context->images.images.data[image_index].handle;
    VkImageMemoryBarrier color_image_begin_barrier = vk_pipeline_barrier(color_image, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
       VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &color_image_begin_barrier);
 
-   VkImage depth_image = context->swapchain_images.depths.data[image_index].handle;
+   VkImage depth_image = context->images.depths.data[image_index].handle;
    VkImageMemoryBarrier depth_image_begin_barrier = vk_pipeline_barrier(depth_image, VK_IMAGE_ASPECT_DEPTH_BIT, 0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
       VK_DEPENDENCY_BY_REGION_BIT, 0, 0, 0, 0, 1, &depth_image_begin_barrier);
@@ -958,9 +960,9 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    // y-is-up
    viewport.x = 0.0f;
-   viewport.y = (f32)context->swapchain_surface.image_height;
-   viewport.width = (f32)context->swapchain_surface.image_width;
-   viewport.height = -(f32)context->swapchain_surface.image_height;
+   viewport.y = (f32)context->swapchain.image_height;
+   viewport.width = (f32)context->swapchain.image_width;
+   viewport.height = -(f32)context->swapchain.image_height;
 
    viewport.minDepth = 0.0f;
    viewport.maxDepth = 1.0f;
@@ -968,8 +970,8 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    VkRect2D scissor = {0};
    scissor.offset.x = 0;
    scissor.offset.y = 0;
-   scissor.extent.width = (u32)context->swapchain_surface.image_width;
-   scissor.extent.height = (u32)context->swapchain_surface.image_height;
+   scissor.extent.width = (u32)context->swapchain.image_width;
+   scissor.extent.height = (u32)context->swapchain.image_height;
 
    vkCmdSetViewport(command_buffer, 0, 1, &viewport);
    vkCmdSetScissor(command_buffer, 0, 1, &scissor);
@@ -1626,7 +1628,7 @@ bool vk_initialize(hw* hw)
    vk_cmd* cmd = &context->cmd;
    vk_features* features = &context->features;
    VkSurfaceKHR* surface = &context->surface;
-   vk_swapchain_surface* swapchain = &context->swapchain_surface;
+   vk_swapchain_surface* swapchain = &context->swapchain;
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1710,7 +1712,7 @@ bool vk_initialize(hw* hw)
       printf("Could not create command buffer\n");
       return false;
    }
-   context->swapchain_surface = vk_swapchain_surface_create(s, devices, *surface);
+   context->swapchain = vk_swapchain_surface_create(s, devices, *surface);
 
    if(!(context->renderpass = vk_renderpass_create(devices, swapchain).h))
    {
@@ -1721,21 +1723,21 @@ bool vk_initialize(hw* hw)
 
    // framebuffers
    context->framebuffers.arena = a;
-   array_resize(context->framebuffers, context->swapchain_surface.image_count);
+   array_resize(context->framebuffers, context->swapchain.image_count);
 
    // images
-   context->swapchain_images.images.arena = a;
-   array_resize(context->swapchain_images.images, context->swapchain_surface.image_count);
+   context->images.images.arena = a;
+   array_resize(context->images.images, context->swapchain.image_count);
 
    // depths
-   context->swapchain_images.depths.arena = a;
-   array_resize(context->swapchain_images.depths, context->swapchain_surface.image_count);
+   context->images.depths.arena = a;
+   array_resize(context->images.depths, context->swapchain.image_count);
 
-   for(u32 i = 0; i < context->swapchain_surface.image_count; ++i)
+   for(u32 i = 0; i < context->swapchain.image_count; ++i)
    {
       array_add(context->framebuffers, VK_NULL_HANDLE);
-      array_add(context->swapchain_images.images, (vk_image) { 0 });
-      array_add(context->swapchain_images.depths, (vk_image) { 0 });
+      array_add(context->images.images, (vk_image) { 0 });
+      array_add(context->images.depths, (vk_image) { 0 });
    }
 
    hw->renderer.frame_resize(hw, hw->renderer.window.width, hw->renderer.window.height);
@@ -1866,18 +1868,18 @@ void vk_uninitialize(hw* hw)
       vkFreeMemory(context->devices.logical, context->textures.data[i].image.memory, 0);
    }
 
-   for (u32 i = 0; i < context->swapchain_images.depths.count; ++i)
+   for (u32 i = 0; i < context->images.depths.count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.depths.data[i].view, 0);
-      vkDestroyImage(context->devices.logical, context->swapchain_images.depths.data[i].handle, 0);
-      vkFreeMemory(context->devices.logical, context->swapchain_images.depths.data[i].memory, 0);
+      vkDestroyImageView(context->devices.logical, context->images.depths.data[i].view, 0);
+      vkDestroyImage(context->devices.logical, context->images.depths.data[i].handle, 0);
+      vkFreeMemory(context->devices.logical, context->images.depths.data[i].memory, 0);
    }
 
-   for (u32 i = 0; i < context->swapchain_images.images.count; ++i)
-      vkDestroyImageView(context->devices.logical, context->swapchain_images.images.data[i].view, 0);
+   for (u32 i = 0; i < context->images.images.count; ++i)
+      vkDestroyImageView(context->devices.logical, context->images.images.data[i].view, 0);
 
    //TODO: call vk_swapchain_destroy(context);
-   vkDestroySwapchainKHR(context->devices.logical, context->swapchain_surface.handle, 0);
+   vkDestroySwapchainKHR(context->devices.logical, context->swapchain.handle, 0);
    vkDestroySurfaceKHR(devices->instance, context->surface, 0);
 
    vkDestroyDevice(context->devices.logical, 0);
