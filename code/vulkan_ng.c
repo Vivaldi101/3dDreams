@@ -570,7 +570,7 @@ static vk_result vk_command_pool_create(vk_device* devices)
 }
 
 
-static vk_result vk_renderpass_create(vk_context* context)
+static vk_result vk_renderpass_create(vk_device* devices, vk_swapchain_surface* swapchain)
 {
    VkRenderPass renderpass = 0;
 
@@ -589,7 +589,7 @@ static vk_result vk_renderpass_create(vk_context* context)
 
    VkAttachmentDescription attachments[2] = {0};
 
-   attachments[color_attachment_index].format = context->swapchain_surface.format;
+   attachments[color_attachment_index].format = swapchain->format;
    attachments[color_attachment_index].samples = VK_SAMPLE_COUNT_1_BIT;
    attachments[color_attachment_index].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
    attachments[color_attachment_index].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -614,7 +614,7 @@ static vk_result vk_renderpass_create(vk_context* context)
    renderpass_info.attachmentCount = array_count(attachments);
    renderpass_info.pAttachments = attachments;
 
-   if(!vk_valid(vkCreateRenderPass(context->devices.logical, &renderpass_info, 0, &renderpass)))
+   if(!vk_valid(vkCreateRenderPass(devices->logical, &renderpass_info, 0, &renderpass)))
       return (vk_result){0};
 
    return (vk_result){renderpass};
@@ -1656,6 +1656,7 @@ bool vk_initialize(hw* hw)
    vk_cmd* cmd = &context->cmd;
    vk_features* features = &context->features;
    VkSurfaceKHR* surface = &context->surface;
+   vk_swapchain_surface* swapchain_surface = &context->swapchain_surface;
 
    // app callbacks
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
@@ -1742,7 +1743,7 @@ bool vk_initialize(hw* hw)
    // TODO: Break this apart
    context->swapchain_surface = vk_swapchain_surface_create(context, hw->renderer.window.width, hw->renderer.window.height);
 
-   if(!(context->renderpass = vk_renderpass_create(context).h))
+   if(!(context->renderpass = vk_renderpass_create(devices, swapchain_surface).h))
    {
       printf("Could not create renderpass\n");
       return false;
