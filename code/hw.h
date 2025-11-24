@@ -35,6 +35,14 @@ align_struct hw_window
    void* handle;
 } hw_window;
 
+typedef union hw_result
+{
+   void* h;
+   size i;
+   u8 b;
+   static_assert(sizeof(void*) != sizeof(u8));
+} hw_result;
+
 align_struct hw_renderer
 {
    void* backends[RENDERER_COUNT];
@@ -43,7 +51,7 @@ align_struct hw_renderer
    void(*frame_resize)(struct hw_renderer* renderer, u32 width, u32 height);
    void(*gpu_log)(hw* hw);
 
-   vk_result (*window_surface_create)(void* instance, void* window_handle);
+   hw_result (*window_surface_create)(void* instance, void* window_handle);
    hw_window window;
 
    // should be inside app.c

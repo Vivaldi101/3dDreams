@@ -182,7 +182,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
    return false;
 }
 
-static vk_result vk_create_debugutils_messenger_ext(hw* hw, vk_device* devices)
+static hw_result vk_create_debugutils_messenger_ext(hw* hw, vk_device* devices)
 {
    VkDebugUtilsMessengerCreateInfoEXT messenger_info = {vk_info_ext(DEBUG_UTILS_MESSENGER)};
    messenger_info.messageSeverity =
@@ -198,13 +198,13 @@ static vk_result vk_create_debugutils_messenger_ext(hw* hw, vk_device* devices)
 
    PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(devices->instance, "vkCreateDebugUtilsMessengerEXT");
    if(!func)
-      return (vk_result){0};
+      return (hw_result){0};
 
    VkDebugUtilsMessengerEXT debug_messenger = 0;
    if(!vk_valid(func(devices->instance, &messenger_info, 0, &debug_messenger)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){debug_messenger};
+   return (hw_result){debug_messenger};
 }
 
 static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
@@ -283,9 +283,9 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, co
 }
 
 // TODO: wrap into vk_device select
-static vk_result vk_physical_device_select(arena s, vk_device* device, vk_features* features)
+static hw_result vk_physical_device_select(arena s, vk_device* device, vk_features* features)
 {
-   vk_result result = {0};
+   hw_result result = {0};
 
    u32 dev_count = 0;
    if(!vk_valid(vkEnumeratePhysicalDevices(device->instance, &dev_count, 0)))
@@ -343,15 +343,15 @@ static vk_result vk_physical_device_select(arena s, vk_device* device, vk_featur
             printf("Ray tracing supported\n");
             printf("Mesh shading supported\n");
 
-            return (vk_result){.h = devs[i]};
+            return (hw_result){.h = devs[i]};
          }
       }
    }
 
-   return (vk_result){.h = devs[fallback_gpu]};
+   return (hw_result){.h = devs[fallback_gpu]};
 }
 
-static vk_result vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
+static hw_result vk_logical_device_select_family_index(arena scratch, vk_device* devices, VkSurfaceKHR surface)
 {
    u32 queue_family_count = 0;
    vkGetPhysicalDeviceQueueFamilyProperties(devices->physical, &queue_family_count, 0);
@@ -366,13 +366,13 @@ static vk_result vk_logical_device_select_family_index(arena scratch, vk_device*
 
       // graphics and presentation within same queue for simplicity
       if((queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) && present_support)
-         return (vk_result){.i = i};
+         return (hw_result){.i = i};
    }
 
-   return (vk_result){.i = invalid_index};
+   return (hw_result){.i = invalid_index};
 }
 
-static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
+static hw_result vk_logical_device_create(arena scratch, vk_device* devices, vk_features* features)
 {
    array(s8) extensions = {&scratch};
 
@@ -477,9 +477,9 @@ static vk_result vk_logical_device_create(arena scratch, vk_device* devices, vk_
 
    VkDevice logical_device;
    if(!vk_valid(vkCreateDevice(devices->physical, &ldev_info, 0, &logical_device)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){logical_device};
+   return (hw_result){logical_device};
 }
 
 static VkQueue vk_graphics_queue_get(vk_device* devices)
@@ -492,15 +492,15 @@ static VkQueue vk_graphics_queue_get(vk_device* devices)
    return graphics_queue;
 }
 
-static vk_result vk_semaphore_create(vk_device* devices)
+static hw_result vk_semaphore_create(vk_device* devices)
 {
    VkSemaphore sema = 0;
 
    VkSemaphoreCreateInfo sema_info = {vk_info(SEMAPHORE)};
    if(!vk_valid(vkCreateSemaphore(devices->logical, &sema_info, 0, &sema)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){sema};
+   return (hw_result){sema};
 }
 
 static vk_swapchain_surface vk_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface)
@@ -508,7 +508,7 @@ static vk_swapchain_surface vk_swapchain_surface_create(arena scratch, const vk_
    return vk_window_swapchain_surface_create(scratch, devices, surface);
 }
 
-static vk_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
+static hw_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
 {
    VkCommandBufferAllocateInfo buffer_allocate_info = {vk_info_allocate(COMMAND_BUFFER)};
 
@@ -518,25 +518,25 @@ static vk_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
 
    VkCommandBuffer buffer = 0;
    if(!vk_valid(vkAllocateCommandBuffers(devices->logical, &buffer_allocate_info, &buffer)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){buffer};
+   return (hw_result){buffer};
 }
 
-static vk_result vk_command_pool_create(vk_device* devices)
+static hw_result vk_command_pool_create(vk_device* devices)
 {
    VkCommandPoolCreateInfo pool_info = {vk_info(COMMAND_POOL)};
    pool_info.queueFamilyIndex = (u32)devices->queue_family_index;
 
    VkCommandPool pool = 0;
    if(!vk_valid(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){pool};
+   return (hw_result){pool};
 }
 
 
-static vk_result vk_renderpass_create(vk_device* devices, vk_swapchain_surface* swapchain)
+static hw_result vk_renderpass_create(vk_device* devices, vk_swapchain_surface* swapchain)
 {
    VkRenderPass renderpass = 0;
 
@@ -581,9 +581,9 @@ static vk_result vk_renderpass_create(vk_device* devices, vk_swapchain_surface* 
    renderpass_info.pAttachments = attachments;
 
    if(!vk_valid(vkCreateRenderPass(devices->logical, &renderpass_info, 0, &renderpass)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){renderpass};
+   return (hw_result){renderpass};
 }
 
 static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass renderpass, vk_swapchain_surface* surface_info, VkImageView* attachments, u32 attachment_count)
@@ -747,7 +747,7 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
    printf("Viewport resized: [%u %u]\n", width, height);
 }
 
-static vk_result vk_query_pool_create(vk_device* devices, size query_pool_size)
+static hw_result vk_query_pool_create(vk_device* devices, size query_pool_size)
 {
    VkQueryPoolCreateInfo info = {vk_info(QUERY_POOL)};
    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
@@ -755,9 +755,9 @@ static vk_result vk_query_pool_create(vk_device* devices, size query_pool_size)
 
    VkQueryPool pool = 0;
    if(!vk_valid(vkCreateQueryPool(devices->logical, &info, 0, &pool)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){pool};
+   return (hw_result){pool};
 }
 
 // TODO: these into cmd.c
@@ -1441,15 +1441,15 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    return true;
 }
 
-vk_result vk_instance_create(arena scratch)
+hw_result vk_instance_create(arena scratch)
 {
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
-      return (vk_result){0};
+      return (hw_result){0};
 
    VkExtensionProperties* extensions = push(&scratch, VkExtensionProperties, ext_count);
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, extensions)))
-      return (vk_result){0};
+      return (hw_result){0};
 
    const char** ext_names = push(&scratch, const char*, ext_count);
 
@@ -1474,9 +1474,9 @@ vk_result vk_instance_create(arena scratch)
 #endif
    VkInstance instance = 0;
    if(!vk_valid(vkCreateInstance(&instance_info, 0, &instance)))
-      return (vk_result){0};
+      return (hw_result){0};
 
-   return (vk_result){instance};
+   return (hw_result){instance};
 }
 
 static bool vk_buffers_create(vk_context* context)

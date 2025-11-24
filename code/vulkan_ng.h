@@ -43,14 +43,6 @@
 #define vk_assert(v) (v)
 #endif
 
-typedef union vk_result
-{
-   void* h;
-   size i;
-   u8 b;
-   static_assert(sizeof(void*) != sizeof(u8));
-} vk_result;
-
 align_struct vk_swapchain_surface
 {
    u32 image_width;
