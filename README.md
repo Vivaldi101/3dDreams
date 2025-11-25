@@ -8,6 +8,8 @@ Orbit camera usage: left-click to orbit eye, right-click to pan, wheel to zoom i
 
 <img width="1920" height="1030" alt="{FAB0CEDE-C01B-4EBE-9374-22AA33A48A32}" src="https://github.com/user-attachments/assets/2e56047d-2156-4499-8adf-99b99670aef4" />
 
+<img width="1920" height="1034" alt="{705D6244-9119-4BFB-8BC9-E618A5A0BF66}" src="https://github.com/user-attachments/assets/24b02378-aede-44cb-9cc2-c11bdef8dd64" />
+
 <img width="1920" height="1031" alt="{877D303F-569C-4ECF-9B6A-6330D98CCDF9}" src="https://github.com/user-attachments/assets/a98b7fbc-c724-4878-bb9d-702cab72a615" />
 
 For command line build, follow these steps:
