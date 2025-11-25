@@ -32,6 +32,9 @@ layout(set = 0, binding = 2) readonly buffer mesh_draw_block
 
 void main()
 {
+#if DEBUG
+   out_color = in_color;
+#else
     mesh_draw draw = draws[in_draw_ID];
     vec3 light_color = vec3(1.f);
     float ambient = 0.f;
@@ -83,4 +86,5 @@ void main()
    if(albedo.a < 0.5) discard;
    
    out_color = vec4(color, albedo.a);
+#endif
 }
