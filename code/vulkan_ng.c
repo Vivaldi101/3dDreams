@@ -684,11 +684,11 @@ static void gpu_log(hw* hw)
 
    if(hw->state.is_mesh_shading)
       hw->window_title(hw,
-                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX ON"),
+                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: %u; Hold 'a' to show world axis; Press 'r' to reset camera; Press 'm' to toggle RTX; RTX ON"),
                        hw->state.frame_delta_in_seconds * ms, gpu_delta / us, context->meshlets.count);
    else
       hw->window_title(hw,
-                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'm' to toggle RTX; RTX OFF"),
+                       s8("cpu: %.2f ms; gpu: %.2f ms; #Meshlets: 0; Hold 'a' to show world axis; Press 'r' to reset camera; Press 'm' to toggle RTX; RTX OFF"),
                        hw->state.frame_delta_in_seconds * ms, gpu_delta / us);
 }
 

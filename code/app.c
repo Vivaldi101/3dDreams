@@ -140,11 +140,6 @@ static void app_input_handle(app_state* state)
    app_camera_update(state);
    state->draw_axis = false;
 
-   if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
-   {
-      state->input.key_state = 0;
-      state->is_raytracing = !state->is_raytracing;
-   }
    if(state->input.key == 'A' && (state->input.key_state == KEY_STATE_REPEATING || state->input.key_state == KEY_STATE_DOWN))
       state->draw_axis = true;
    if(state->input.key == 'M' && state->input.key_state == KEY_STATE_UP)
@@ -158,7 +153,7 @@ static void app_input_handle(app_state* state)
       state->input.key_state = 0;
       state->is_fullscreen = !state->is_fullscreen;
    }
-   if(state->input.key == 'S' && state->input.key_state == KEY_STATE_UP)
+   if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
       f32 altitude = PI / 10.f;
