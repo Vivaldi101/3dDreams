@@ -26,57 +26,42 @@ static bool vk_gltf_read(vk_context* context, s8 filename)
    return gltf_load(context, gltf_path);
 }
 
-static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name)
+static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, const char* shader_name_raw)
 {
    vk_shader_module result = {0};
 
    s8 exe_dir = vk_exe_directory(&scratch);
 
-   size shader_len = strlen(shader_name);
-   assert(shader_len != 0u);
-
    VkShaderStageFlagBits shader_stage = 0;
 
-   for(size i = 0; i < shader_len; ++i)
-   {
-      usize mesh_len = strlen("mesh.spv");
-      if(strncmp(shader_name+i, "mesh.spv", mesh_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-         break;
-      }
+   const s8 shader_name = s8(shader_name_raw);
+   const s8 mesh_spv_name = s8("mesh.spv");
+   const s8 vert_spv_name = s8("vert.spv");
+   const s8 frag_spv_name = s8("frag.spv");
 
-      usize vert_len = strlen("vert.spv");
-      if(strncmp(shader_name+i, "vert.spv", vert_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
-         break;
-      }
+   if(s8_is_substr_count(shader_name, mesh_spv_name) != invalid_index)
+      shader_stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+   else if(s8_is_substr_count(shader_name, vert_spv_name) != invalid_index)
+      shader_stage = VK_SHADER_STAGE_VERTEX_BIT;
+   else if(s8_is_substr_count(shader_name, frag_spv_name) != invalid_index)
+      shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-      usize frag_len = strlen("frag.spv");
-      if(strncmp(shader_name+i, "frag.spv", frag_len) == 0)
-      {
-         shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-         break;
-      }
-   }
-
-   VkShaderModule module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, s8(shader_name));
+   VkShaderModule module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, shader_name);
 
    switch(shader_stage)
    {
       case VK_SHADER_STAGE_MESH_BIT_EXT:
-         result.handle = module;
-         result.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
-         break;
+      result.handle = module;
+      result.stage = VK_SHADER_STAGE_MESH_BIT_EXT;
+      break;
       case VK_SHADER_STAGE_VERTEX_BIT:
-         result.handle = module;
-         result.stage = VK_SHADER_STAGE_VERTEX_BIT;
-         break;
+      result.handle = module;
+      result.stage = VK_SHADER_STAGE_VERTEX_BIT;
+      break;
       case VK_SHADER_STAGE_FRAGMENT_BIT:
-         result.handle = module;
-         result.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-         break;
+      result.handle = module;
+      result.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+      break;
       default: break;
    }
 
