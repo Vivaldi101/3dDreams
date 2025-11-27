@@ -1,4 +1,4 @@
-Vulkan renderer with mesh shading and ray tracing written in C23 with minimal library dependencies (cgltf, volk, stb image) written from scratch.
+Vulkan renderer with mesh shading and ray tracing written in C23 with minimal library dependencies (cgltf, volk, stb image) written from scratch for Win32.
 
 Orbit camera usage: left-click to orbit eye, right-click to pan, wheel to zoom in and out.
 
@@ -26,3 +26,5 @@ For command line build, follow these steps:
 For msvc build, open the project under win32-solution.
 
 Tested on NVIDIA and AMD vendors.
+
+TODO: Support for other platforms (linux, macos, ios)
