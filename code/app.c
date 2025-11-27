@@ -147,12 +147,6 @@ static void app_input_handle(app_state* state)
       state->input.key_state = 0;
       state->is_mesh_shading = !state->is_mesh_shading;
    }
-   if(state->input.key == 'F' && state->input.key_state == KEY_STATE_UP)
-   {
-      // TODO: Raymond chen like fullscreen toggle
-      state->input.key_state = 0;
-      state->is_fullscreen = !state->is_fullscreen;
-   }
    if(state->input.key == 'R' && state->input.key_state == KEY_STATE_UP)
    {
       state->input.key_state = 0;
