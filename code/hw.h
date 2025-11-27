@@ -76,10 +76,8 @@ align_struct hw
    arena scratch;
    hw_timer timer;
    app_state state;
-   void (*window_title)(struct hw* hw, s8 message, ...);
-   void (*log)(s8 message, ...);
+   void (*window_title_set)(struct hw* hw, s8 message, ...);
    bool(*platform_loop)();
-   bool finished;
 } hw;
 
 bool hw_window_open(hw* hw, const char *title, int x, int y, int width, int height);

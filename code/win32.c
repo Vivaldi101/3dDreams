@@ -440,7 +440,7 @@ int main(int argc, char** argv)
 
    hw.platform_loop = win32_platform_loop;
 
-   hw.window_title = win32_window_title;
+   hw.window_title_set = win32_window_title;
 
    if(argc < 2)
    {
