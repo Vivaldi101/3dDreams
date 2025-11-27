@@ -57,6 +57,8 @@ static bool win32_platform_loop()
    return true;
 }
 
+static WINDOWPLACEMENT global_window_placement = {sizeof(global_window_placement)};
+
 static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam) {
    hw* win32_hw = (hw*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
@@ -183,6 +185,34 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
          win32_hw->state.input.key = vkcode;
          win32_hw->state.input.key_state = KEY_STATE_UP;
+
+         if(win32_hw->state.input.key == 'F')
+         {
+            DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
+            if(dwStyle & WS_OVERLAPPEDWINDOW)
+            {
+               MONITORINFO mi = {sizeof(mi)};
+
+               if(GetWindowPlacement(hwnd, &global_window_placement)
+                  && GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
+               {
+                  SetWindowLong(hwnd, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+                  SetWindowPos(hwnd, HWND_TOP,
+                               mi.rcMonitor.left, mi.rcMonitor.top,
+                               mi.rcMonitor.right - mi.rcMonitor.left,
+                               mi.rcMonitor.bottom - mi.rcMonitor.top,
+                               SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+               }
+            }
+            else
+            {
+               SetWindowLong(hwnd, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+               SetWindowPlacement(hwnd, &global_window_placement);
+               SetWindowPos(hwnd, NULL, 0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                            SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            }
+         }
 
          return 0;
       }
