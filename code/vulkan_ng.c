@@ -44,7 +44,7 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    if(!result)
       return 0;
 
-   memcpy(result, original, size);
+   memmove(result, original, size);
 
    return result;
 }
