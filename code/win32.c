@@ -434,29 +434,38 @@ int main(int argc, char** argv)
 
    hw_virtual_memory_init();
 
-   size arena_max_commit_size = 1ull << 46;
+   const size arena_max_commit_size = 1ull << 46;
+   const size arena_part_size = arena_max_commit_size/4;
 
    // max virtual limit
    void* base = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
    assert(base);
 
-   arena base_arena = {0};
-   base_arena.end = base;
-   base_arena.kind = arena_persistent_kind;
+   arena app_arena = {0};
+   app_arena.end = base;
+   app_arena.kind = arena_persistent_kind;
+
+   arena vulkan_arena = {0};
+   vulkan_arena.end = (byte*)app_arena.end + arena_part_size;
+   vulkan_arena.kind = arena_persistent_kind;
 
    arena scratch_arena = {0};
-   scratch_arena.end = (byte*)base + (arena_max_commit_size/2);
+   scratch_arena.end = (byte*)vulkan_arena.end + arena_part_size;
    scratch_arena.kind = arena_scratch_kind;
 
    const size initial_arena_size = PAGE_SIZE;
 
-   arena* base_storage = arena_new(&base_arena, initial_arena_size);
-   assert(arena_left(base_storage) == initial_arena_size);
+   arena* app_storage = arena_new(&app_arena, initial_arena_size);
+   assert(arena_left(app_storage) == initial_arena_size);
+
+   arena* vulkan_storage = arena_new(&vulkan_arena, initial_arena_size);
+   assert(arena_left(vulkan_storage) == initial_arena_size);
 
    arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size);
    assert(arena_left(scratch_storage) == initial_arena_size);
 
-   hw.storage = base_storage;
+   hw.app_storage = app_storage;
+   hw.vulkan_storage = vulkan_storage;
    hw.scratch = *scratch_storage;
 
    hw.renderer.window.open = win32_window_open;

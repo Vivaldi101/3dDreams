@@ -97,11 +97,11 @@ static vk_buffer_objects obj_load(vk_context* context, arena scratch, tinyobj_at
 {
    vk_buffer_objects result = {0};
 
-   context->geometry.mesh_draws.arena = context->storage;
+   context->geometry.mesh_draws.arena = context->app_storage;
    // single .obj mesh
    array_resize(context->geometry.mesh_draws, 1);
 
-   context->geometry.mesh_instances.arena = context->storage;
+   context->geometry.mesh_instances.arena = context->app_storage;
    // single .obj mesh
    array_resize(context->geometry.mesh_instances, 1);
 
@@ -291,7 +291,7 @@ static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_co
    };
 
    VkDescriptorPool descriptor_pool = 0;
-   if(!vk_valid(vkCreateDescriptorPool(context->devices.logical, &pool_info, 0, &descriptor_pool)))
+   if(!vk_valid(vkCreateDescriptorPool(context->devices.logical, &pool_info, &global_allocator.handle, &descriptor_pool)))
       return false;
 
    VkSamplerCreateInfo sampler_info =
@@ -315,7 +315,7 @@ static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_co
    };
 
    VkSampler immutable_sampler;
-   if(!vk_valid(vkCreateSampler(context->devices.logical, &sampler_info, 0, &immutable_sampler)))
+   if(!vk_valid(vkCreateSampler(context->devices.logical, &sampler_info, &global_allocator.handle, &immutable_sampler)))
       return false;
 
    // variable and partially bound descriptor arrays
@@ -348,7 +348,7 @@ static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_co
    };
 
    VkDescriptorSetLayout descriptor_set_layout = 0;
-   if (!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, 0, &descriptor_set_layout)))
+   if (!vk_valid(vkCreateDescriptorSetLayout(context->devices.logical, &layout_info, &global_allocator.handle, &descriptor_set_layout)))
       return false;
 
 	if(context->textures.count > 0)
@@ -399,7 +399,7 @@ static bool texture_descriptor_create(vk_context* context, u32 max_descriptor_co
 		context->texture_descriptor.descriptor_pool = descriptor_pool;
 
       vkUpdateDescriptorSets(context->devices.logical, 1, &write, 0, 0);
-      vkDestroySampler(context->devices.logical, immutable_sampler, 0);
+      vkDestroySampler(context->devices.logical, immutable_sampler, &global_allocator.handle);
 	}
 
    return true;
@@ -432,7 +432,7 @@ static bool gltf_load_data(cgltf_data** data, s8 gltf_path)
 
 static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_path)
 {
-   arena* a = context->storage;
+   arena* a = context->app_storage;
    arena s = context->scratch;
 
    // preallocate vertices

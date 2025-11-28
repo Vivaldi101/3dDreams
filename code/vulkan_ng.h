@@ -37,7 +37,7 @@
 #define vk_assert(v) \
         do { \
           VkResult _r = (v); \
-          assert(vk_valid(_r)); \
+          assert(vk_valid((_r))); \
         } while(0)
 #else
 #define vk_assert(v) (v)
@@ -171,6 +171,13 @@ align_struct vk_features
    f32 time_period;
 } vk_features;
 
+// TODO: change to hw_gpu_allocator and add to hw.h
+align_struct vk_allocator
+{
+   VkAllocationCallbacks handle;
+   arena* arena;
+} vk_allocator;
+
 typedef array(VkFramebuffer) framebuffers_array;
 align_struct vk_context
 {
@@ -224,14 +231,13 @@ align_struct vk_context
    vk_swapchain_surface swapchain;
    vk_swapchain_images images;
 
-   arena* storage;
+   arena* app_storage;
+   arena* vulkan_storage;
    arena scratch;
 
 #ifdef _DEBUG
    VkDebugUtilsMessengerEXT messenger;
 #endif
-
-   VkAllocationCallbacks allocator;
 
    vk_features features;
 } vk_context;

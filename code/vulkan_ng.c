@@ -3,6 +3,8 @@
 
 #include "win32_file_io.c"
 
+static vk_allocator global_allocator;
+
 #include "vulkan_spirv_loader.c"
 #include "hash.c"
 #include "texture.c"
@@ -10,11 +12,76 @@
 #include "gltf.c"
 #include "rt.c"
 
+static void* VKAPI_PTR vk_allocation(void* user_data,
+                                     size_t size,
+                                     size_t alignment,
+                                     VkSystemAllocationScope allocation_scope)
+{
+   (void)allocation_scope;
+
+   if(size == 0)
+      return 0;
+
+   vk_allocator* allocator = user_data;
+
+   return alloc(allocator->arena, 1, alignment, size, 0);
+}
+
+static void* VKAPI_PTR vk_reallocation(void* user_data,
+                                       void* original,
+                                       size_t size,
+                                       size_t alignment,
+                                       VkSystemAllocationScope allocation_scope)
+{
+   (void)allocation_scope;
+
+   if(size == 0)
+      return 0;
+   if(!original)
+      return vk_allocation(user_data, size, alignment, allocation_scope);
+
+   void* result = vk_allocation(user_data, size, alignment, allocation_scope);
+   if(!result)
+      return 0;
+
+   memcpy(result, original, size);
+
+   return result;
+}
+
+static void VKAPI_PTR vk_free(void* user_data, void* memory)
+{
+   (void)user_data;
+   (void)memory;
+}
+
+static void VKAPI_PTR vk_internal_allocation(void* user_data,
+                                             size_t size,
+                                             VkInternalAllocationType allocation_type,
+                                             VkSystemAllocationScope allocation_scope)
+{
+   (void)user_data;
+   (void)size;
+   (void)allocation_type;
+   (void)allocation_scope;
+}
+
+static void VKAPI_PTR vk_internal_free(void* user_data,
+                                      size_t size,
+                                      VkInternalAllocationType allocation_type,
+                                      VkSystemAllocationScope allocation_scope)
+{
+   (void)user_data;
+   (void)size;
+   (void)allocation_type;
+   (void)allocation_scope;
+}
+
 static bool vk_gltf_read(vk_context* context, s8 filename)
 {
-   array(char) file_path = {context->storage};
+   array(char) file_path = {context->app_storage};
    s8 prefix = s8("%s\\assets\\gltf\\%s");
-   s8 exe_dir = vk_exe_directory(context->storage);
+   s8 exe_dir = vk_exe_directory(context->app_storage);
 
    file_path.count = exe_dir.len + prefix.len + filename.len - s8("%s%s").len;
    array_resize(file_path, file_path.count);
@@ -70,7 +137,7 @@ static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, c
 
 static bool spirv_initialize(vk_context* context)
 {
-   const s8_array shaders = vk_shader_names_read(context->storage, s8("bin\\assets\\shaders"));
+   const s8_array shaders = vk_shader_names_read(context->app_storage, s8("bin\\assets\\shaders"));
 
    if(shaders.count == 0)
    {
@@ -83,8 +150,8 @@ static bool spirv_initialize(vk_context* context)
    table->max_count = shaders.count;
 
    // TODO: make function for hash tables
-   table->keys = push(context->storage, const char*, table->max_count);
-   table->values = push(context->storage, vk_shader_module, table->max_count);
+   table->keys = push(context->app_storage, const char*, table->max_count);
+   table->values = push(context->app_storage, vk_shader_module, table->max_count);
 
    memset(table->values, 0, table->max_count * sizeof(vk_shader_module));
 
@@ -186,7 +253,7 @@ static hw_result vk_create_debugutils_messenger_ext(hw* hw, vk_device* devices)
       return (hw_result){0};
 
    VkDebugUtilsMessengerEXT debug_messenger = 0;
-   if(!vk_valid(func(devices->instance, &messenger_info, 0, &debug_messenger)))
+   if(!vk_valid(func(devices->instance, &messenger_info, &global_allocator.handle, &debug_messenger)))
       return (hw_result){0};
 
    return (hw_result){debug_messenger};
@@ -255,7 +322,8 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, co
    swapchain_info.clipped = true;
    swapchain_info.oldSwapchain = 0;
 
-   if(!vk_valid(vkCreateSwapchainKHR(devices->logical, &swapchain_info, 0, &swapchain)))
+   // TODO: break this apart so that handle creation is separate from this outer routine
+   if(!vk_valid(vkCreateSwapchainKHR(devices->logical, &swapchain_info, &global_allocator.handle, &swapchain)))
       return (vk_swapchain_surface){0};
 
    result.format = swapchain_info.imageFormat;
@@ -461,7 +529,7 @@ static hw_result vk_logical_device_create(arena scratch, vk_device* devices, vk_
    ldev_info.pNext = &features2;
 
    VkDevice logical_device;
-   if(!vk_valid(vkCreateDevice(devices->physical, &ldev_info, 0, &logical_device)))
+   if(!vk_valid(vkCreateDevice(devices->physical, &ldev_info, &global_allocator.handle, &logical_device)))
       return (hw_result){0};
 
    return (hw_result){logical_device};
@@ -482,7 +550,7 @@ static hw_result vk_semaphore_create(vk_device* devices)
    VkSemaphore sema = 0;
 
    VkSemaphoreCreateInfo sema_info = {vk_info(SEMAPHORE)};
-   if(!vk_valid(vkCreateSemaphore(devices->logical, &sema_info, 0, &sema)))
+   if(!vk_valid(vkCreateSemaphore(devices->logical, &sema_info, &global_allocator.handle, &sema)))
       return (hw_result){0};
 
    return (hw_result){sema};
@@ -514,7 +582,7 @@ static hw_result vk_command_pool_create(vk_device* devices)
    pool_info.queueFamilyIndex = (u32)devices->queue_family_index;
 
    VkCommandPool pool = 0;
-   if(!vk_valid(vkCreateCommandPool(devices->logical, &pool_info, 0, &pool)))
+   if(!vk_valid(vkCreateCommandPool(devices->logical, &pool_info, &global_allocator.handle, &pool)))
       return (hw_result){0};
 
    return (hw_result){pool};
@@ -565,7 +633,7 @@ static hw_result vk_renderpass_create(vk_device* devices, vk_swapchain_surface* 
    renderpass_info.attachmentCount = array_count(attachments);
    renderpass_info.pAttachments = attachments;
 
-   if(!vk_valid(vkCreateRenderPass(devices->logical, &renderpass_info, 0, &renderpass)))
+   if(!vk_valid(vkCreateRenderPass(devices->logical, &renderpass_info, &global_allocator.handle, &renderpass)))
       return (hw_result){0};
 
    return (hw_result){renderpass};
@@ -586,7 +654,7 @@ static VkFramebuffer vk_framebuffer_create(VkDevice logical_device, VkRenderPass
    framebuffer_info.height = surface_info->image_height;
    framebuffer_info.layers = 1;
 
-   vk_assert(vkCreateFramebuffer(logical_device, &framebuffer_info, 0, &framebuffer));
+   vk_assert(vkCreateFramebuffer(logical_device, &framebuffer_info, &global_allocator.handle, &framebuffer));
 
    return framebuffer;
 }
@@ -618,19 +686,19 @@ VkImageMemoryBarrier vk_pipeline_barrier(VkImage image, VkImageAspectFlags aspec
 static void vk_swapchain_destroy(vk_device* devices, vk_swapchain_images* images, framebuffers_array* framebuffers, vk_swapchain_surface* swapchain)
 {
    for(u32 i = 0; i < framebuffers->count; ++i)
-      vkDestroyFramebuffer(devices->logical, framebuffers->data[i], 0);
+      vkDestroyFramebuffer(devices->logical, framebuffers->data[i], &global_allocator.handle);
 
    for (u32 i = 0; i < images->depths.count; ++i)
    {
-      vkDestroyImageView(devices->logical, images->depths.data[i].view, 0);
-      vkDestroyImage(devices->logical, images->depths.data[i].handle, 0);
-      vkFreeMemory(devices->logical, images->depths.data[i].memory, 0);
+      vkDestroyImageView(devices->logical, images->depths.data[i].view, &global_allocator.handle);
+      vkDestroyImage(devices->logical, images->depths.data[i].handle, &global_allocator.handle);
+      vkFreeMemory(devices->logical, images->depths.data[i].memory, &global_allocator.handle);
    }
 
    for (u32 i = 0; i < images->images.count; ++i)
-      vkDestroyImageView(devices->logical, images->images.data[i].view, 0);
+      vkDestroyImageView(devices->logical, images->images.data[i].view, &global_allocator.handle);
 
-   vkDestroySwapchainKHR(devices->logical, swapchain->handle, 0);
+   vkDestroySwapchainKHR(devices->logical, swapchain->handle, &global_allocator.handle);
 }
 
 // TODO: wide contract
@@ -739,7 +807,7 @@ static hw_result vk_query_pool_create(vk_device* devices, size query_pool_size)
    info.queryCount = (u32)query_pool_size;
 
    VkQueryPool pool = 0;
-   if(!vk_valid(vkCreateQueryPool(devices->logical, &info, 0, &pool)))
+   if(!vk_valid(vkCreateQueryPool(devices->logical, &info, &global_allocator.handle, &pool)))
       return (hw_result){0};
 
    return (hw_result){pool};
@@ -1123,7 +1191,7 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, 0, set_layout)))
+      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, &global_allocator.handle, set_layout)))
          return false;
    }
    else
@@ -1145,7 +1213,7 @@ static bool vk_pipeline_set_layout_create(VkDescriptorSetLayout* set_layout, VkD
       info.bindingCount = array_count(bindings);
       info.pBindings = bindings;
 
-      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, 0, set_layout)))
+      if(!vk_valid(vkCreateDescriptorSetLayout(device, &info, &global_allocator.handle, set_layout)))
          return false;
    }
 
@@ -1171,7 +1239,7 @@ static bool vk_pipeline_layout_create(VkPipelineLayout* layout, VkDevice logical
    info.setLayoutCount = (u32)set_layout_count;
    info.pSetLayouts = set_layouts;
 
-   if(!vk_valid(vkCreatePipelineLayout(logical_device, &info, 0, layout)))
+   if(!vk_valid(vkCreatePipelineLayout(logical_device, &info, &global_allocator.handle, layout)))
       return false;
 
    return true;
@@ -1270,7 +1338,7 @@ static bool vk_mesh_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->rtx_pipeline_layout;
 
-   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, &global_allocator.handle, pipeline)))
       return false;
 
    return true;
@@ -1353,7 +1421,7 @@ static bool vk_graphics_pipeline_create(VkPipeline* pipeline, vk_context* contex
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, &global_allocator.handle, pipeline)))
       return false;
 
    return true;
@@ -1420,13 +1488,13 @@ static bool vk_axis_pipeline_create(VkPipeline* pipeline, vk_context* context, V
    pipeline_info.renderPass = context->renderpass;
    pipeline_info.layout = context->non_rtx_pipeline_layout;
 
-   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, 0, pipeline)))
+   if(!vk_valid(vkCreateGraphicsPipelines(context->devices.logical, cache, 1, &pipeline_info, &global_allocator.handle, pipeline)))
       return false;
 
    return true;
 }
 
-hw_result vk_instance_create(arena scratch)
+static hw_result vk_instance_create(arena scratch)
 {
    u32 ext_count = 0;
    if(!vk_valid(vkEnumerateInstanceExtensionProperties(0, &ext_count, 0)))
@@ -1458,7 +1526,7 @@ hw_result vk_instance_create(arena scratch)
    }
 #endif
    VkInstance instance = 0;
-   if(!vk_valid(vkCreateInstance(&instance_info, 0, &instance)))
+   if(!vk_valid(vkCreateInstance(&instance_info, &global_allocator.handle, &instance)))
       return (hw_result){0};
 
    return (hw_result){instance};
@@ -1608,7 +1676,7 @@ bool vk_initialize(hw* hw)
    if(!vk_valid(volkInitialize()))
       return false;
 
-   vk_context* context = push(hw->storage, vk_context);
+   vk_context* context = push(hw->app_storage, vk_context);
    vk_device* devices = &context->devices;
    vk_cmd* cmd = &context->cmd;
    vk_features* features = &context->features;
@@ -1623,15 +1691,20 @@ bool vk_initialize(hw* hw)
    hw->renderer.gpu_log = gpu_log;
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
-   context->storage = hw->storage;
+   context->app_storage = hw->app_storage;
+   context->vulkan_storage = hw->vulkan_storage;
    context->scratch = hw->scratch;
 
-   arena* a = context->storage;
+   arena* a = context->app_storage;
    arena s = context->scratch;
 
-   // TODO: allocator
-   VkAllocationCallbacks allocator = {0};
-   context->allocator = allocator;
+   global_allocator.arena = context->vulkan_storage;
+   global_allocator.handle.pUserData = &global_allocator;
+   global_allocator.handle.pfnAllocation = vk_allocation;
+   global_allocator.handle.pfnReallocation = vk_reallocation;
+   global_allocator.handle.pfnFree = vk_free;
+   global_allocator.handle.pfnInternalFree = vk_internal_free;
+   global_allocator.handle.pfnInternalAllocation = vk_internal_allocation;
 
    if(!(context->devices.instance = vk_instance_create(s).h))
    {
@@ -1653,7 +1726,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
    #endif
-   if(!(context->surface = hw->renderer.window_surface_create(context->devices.instance, hw->renderer.window.handle).h))
+   if(!(context->surface = hw->renderer.window_surface_create(&global_allocator, context->devices.instance, hw->renderer.window.handle).h))
    {
       printf("Could not create the window surface\n");
       return false;
@@ -1697,6 +1770,7 @@ bool vk_initialize(hw* hw)
       printf("Could not create command buffer\n");
       return false;
    }
+   // TODO: break this apart so that handle creation is separate
    context->swapchain = vk_swapchain_surface_create(s, devices, *surface);
 
    if(!(context->renderpass = vk_renderpass_create(devices, swapchain).h))
@@ -1805,22 +1879,22 @@ void vk_uninitialize(hw* hw)
 
    vkDeviceWaitIdle(context->devices.logical);
 
-   vkDestroyDescriptorSetLayout(context->devices.logical, context->non_rtx_set_layout, 0);
-   vkDestroyDescriptorSetLayout(context->devices.logical, context->rtx_set_layout, 0);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->non_rtx_set_layout, &global_allocator.handle);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->rtx_set_layout, &global_allocator.handle);
 
-   vkDestroyDescriptorSetLayout(context->devices.logical, context->texture_descriptor.layout, 0);
-   vkDestroyDescriptorPool(context->devices.logical, context->texture_descriptor.descriptor_pool, 0);
+   vkDestroyDescriptorSetLayout(context->devices.logical, context->texture_descriptor.layout, &global_allocator.handle);
+   vkDestroyDescriptorPool(context->devices.logical, context->texture_descriptor.descriptor_pool, &global_allocator.handle);
 
-   vkDestroyPipeline(context->devices.logical, context->axis_pipeline, 0);
-   vkDestroyPipeline(context->devices.logical, context->frustum_pipeline, 0);
-   vkDestroyPipeline(context->devices.logical, context->non_rtx_pipeline, 0);
-   vkDestroyPipeline(context->devices.logical, context->rtx_pipeline, 0);
+   vkDestroyPipeline(context->devices.logical, context->axis_pipeline, &global_allocator.handle);
+   vkDestroyPipeline(context->devices.logical, context->frustum_pipeline, &global_allocator.handle);
+   vkDestroyPipeline(context->devices.logical, context->non_rtx_pipeline, &global_allocator.handle);
+   vkDestroyPipeline(context->devices.logical, context->rtx_pipeline, &global_allocator.handle);
 
-   vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, 0);
-   vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, 0);
+   vkDestroyPipelineLayout(context->devices.logical, context->non_rtx_pipeline_layout, &global_allocator.handle);
+   vkDestroyPipelineLayout(context->devices.logical, context->rtx_pipeline_layout, &global_allocator.handle);
 
-   vkDestroyCommandPool(context->devices.logical, context->cmd.pool, 0);
-   vkDestroyQueryPool(context->devices.logical, context->query_pool, 0);
+   vkDestroyCommandPool(context->devices.logical, context->cmd.pool, &global_allocator.handle);
+   vkDestroyQueryPool(context->devices.logical, context->query_pool, &global_allocator.handle);
 
    vk_buffer_destroy(&context->devices, &ib);
    vk_buffer_destroy(&context->devices, &vb);
@@ -1835,42 +1909,42 @@ void vk_uninitialize(hw* hw)
    vk_buffer_destroy(&context->devices, &rt);
 
    for(size i = 0; i < context->rt_as.blas_count; i++)
-      vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.blases[i], 0);
+      vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.blases[i], &global_allocator.handle);
 
-   vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.tlas, 0);
+   vkDestroyAccelerationStructureKHR(context->devices.logical, context->rt_as.tlas, &global_allocator.handle);
 
-   vkDestroyRenderPass(context->devices.logical, context->renderpass, 0);
-   vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, 0);
-   vkDestroySemaphore(context->devices.logical, context->image_ready_semaphore, 0);
+   vkDestroyRenderPass(context->devices.logical, context->renderpass, &global_allocator.handle);
+   vkDestroySemaphore(context->devices.logical, context->image_done_semaphore, &global_allocator.handle);
+   vkDestroySemaphore(context->devices.logical, context->image_ready_semaphore, &global_allocator.handle);
 
    for(u32 i = 0; i < context->framebuffers.count; ++i)
-      vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], 0);
+      vkDestroyFramebuffer(context->devices.logical, context->framebuffers.data[i], &global_allocator.handle);
 
    for(u32 i = 0; i < context->textures.count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->textures.data[i].image.view, 0);
-      vkDestroyImage(context->devices.logical, context->textures.data[i].image.handle, 0);
-      vkFreeMemory(context->devices.logical, context->textures.data[i].image.memory, 0);
+      vkDestroyImageView(context->devices.logical, context->textures.data[i].image.view, &global_allocator.handle);
+      vkDestroyImage(context->devices.logical, context->textures.data[i].image.handle, &global_allocator.handle);
+      vkFreeMemory(context->devices.logical, context->textures.data[i].image.memory, &global_allocator.handle);
    }
 
    for (u32 i = 0; i < context->images.depths.count; ++i)
    {
-      vkDestroyImageView(context->devices.logical, context->images.depths.data[i].view, 0);
-      vkDestroyImage(context->devices.logical, context->images.depths.data[i].handle, 0);
-      vkFreeMemory(context->devices.logical, context->images.depths.data[i].memory, 0);
+      vkDestroyImageView(context->devices.logical, context->images.depths.data[i].view, &global_allocator.handle);
+      vkDestroyImage(context->devices.logical, context->images.depths.data[i].handle, &global_allocator.handle);
+      vkFreeMemory(context->devices.logical, context->images.depths.data[i].memory, &global_allocator.handle);
    }
 
    for (u32 i = 0; i < context->images.images.count; ++i)
-      vkDestroyImageView(context->devices.logical, context->images.images.data[i].view, 0);
+      vkDestroyImageView(context->devices.logical, context->images.images.data[i].view, &global_allocator.handle);
 
    //TODO: call vk_swapchain_destroy(context);
-   vkDestroySwapchainKHR(context->devices.logical, context->swapchain.handle, 0);
-   vkDestroySurfaceKHR(devices->instance, context->surface, 0);
+   vkDestroySwapchainKHR(context->devices.logical, context->swapchain.handle, &global_allocator.handle);
+   vkDestroySurfaceKHR(devices->instance, context->surface, &global_allocator.handle);
 
-   vkDestroyDevice(context->devices.logical, 0);
+   vkDestroyDevice(context->devices.logical, &global_allocator.handle);
 #if _DEBUG
-   vkDestroyDebugUtilsMessengerEXT(devices->instance, context->messenger, 0);
+   vkDestroyDebugUtilsMessengerEXT(devices->instance, context->messenger, &global_allocator.handle);
 #endif
 
-   vkDestroyInstance(devices->instance, 0);
+   vkDestroyInstance(devices->instance, &global_allocator.handle);
 }

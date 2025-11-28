@@ -5,11 +5,11 @@
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
 // TODO: Change name to vk_spv_compile
-static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* storage, s8 shader_dir, s8 shader_name)
+static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* app_storage, s8 shader_dir, s8 shader_name)
 {
    VkShaderModule result = 0;
 
-   array(char) shader_path = {storage};
+   array(char) shader_path = {app_storage};
    s8 prefix = s8("%s\\bin\\assets\\shaders\\%s");
 
    shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
@@ -17,7 +17,7 @@ static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* 
 
    wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name.data);
 
-   arena shader_file = win32_file_read(storage, shader_path.data);
+   arena shader_file = win32_file_read(app_storage, shader_path.data);
 
    VkShaderModuleCreateInfo module_info = {0};
    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

@@ -24,7 +24,7 @@ static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDev
    create_info.size = buffer->size;
    create_info.usage = usage;
 
-   if (!vk_valid(vkCreateBuffer(device, &create_info, 0, &buffer->handle)))
+   if (!vk_valid(vkCreateBuffer(device, &create_info, &global_allocator.handle, &buffer->handle)))
       return false;
 
    VkMemoryRequirements memory_reqs;
@@ -60,7 +60,7 @@ static bool vk_buffer_allocate(vk_buffer* buffer, VkDevice device, VkPhysicalDev
    allocate_info.memoryTypeIndex = memory_index;
    allocate_info.pNext = &allocate_flags_info;
 
-   vkAllocateMemory(device, &allocate_info, 0, &buffer->memory);
+   vkAllocateMemory(device, &allocate_info, &global_allocator.handle, &buffer->memory);
 
    return true;
 }
@@ -82,8 +82,8 @@ static bool vk_buffer_create_and_bind(vk_buffer* buffer, vk_device* device, VkBu
 
 static void vk_buffer_destroy(vk_device* device, vk_buffer* buffer)
 {
-   vkFreeMemory(device->logical, buffer->memory, 0);
-   vkDestroyBuffer(device->logical, buffer->handle, 0);
+   vkFreeMemory(device->logical, buffer->memory, &global_allocator.handle);
+   vkDestroyBuffer(device->logical, buffer->handle, &global_allocator.handle);
 }
 
 static void vk_buffer_to_image_upload(vk_context* context, vk_buffer scratch, VkImage image, VkExtent3D image_extent, const void* data, VkDeviceSize dev_size)

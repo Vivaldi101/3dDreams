@@ -18,7 +18,7 @@ static VkImageView vk_image_view_create(vk_device* devices, VkFormat format, VkI
    view_info.subresourceRange.layerCount = 1;
    view_info.subresourceRange.levelCount = 1;
 
-   if(!vk_valid(vkCreateImageView(devices->logical, &view_info, 0, &image_view)))
+   if(!vk_valid(vkCreateImageView(devices->logical, &view_info, &global_allocator.handle, &image_view)))
       return VK_NULL_HANDLE;
 
    return image_view;
@@ -41,7 +41,7 @@ static bool vk_image_create(vk_image* image, vk_device* devices, VkFormat format
    image_info.queueFamilyIndexCount = 0;
    image_info.pQueueFamilyIndices = 0;
 
-   if(vkCreateImage(devices->logical, &image_info, 0, &image->handle) != VK_SUCCESS)
+   if(vkCreateImage(devices->logical, &image_info, &global_allocator.handle, &image->handle) != VK_SUCCESS)
       return false;
 
    VkMemoryRequirements memory_requirements;
@@ -69,7 +69,7 @@ static bool vk_image_create(vk_image* image, vk_device* devices, VkFormat format
    alloc_info.memoryTypeIndex = memory_type_index;
 
    VkDeviceMemory memory;
-   if(vkAllocateMemory(devices->logical, &alloc_info, 0, &memory) != VK_SUCCESS)
+   if(vkAllocateMemory(devices->logical, &alloc_info, &global_allocator.handle, &memory) != VK_SUCCESS)
       return false;
 
    image->memory = memory;

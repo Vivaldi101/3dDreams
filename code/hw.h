@@ -51,7 +51,7 @@ align_struct hw_renderer
    void(*frame_resize)(struct hw_renderer* renderer, u32 width, u32 height);
    void(*gpu_log)(hw* hw);
 
-   hw_result (*window_surface_create)(void* instance, void* window_handle);
+   hw_result (*window_surface_create)(struct vk_allocator* allocator, void* instance, void* window_handle);
    hw_window window;
 
    // should be inside app.c
@@ -72,7 +72,8 @@ align_struct hw_timer
 align_struct hw
 {
    hw_renderer renderer;
-   arena* storage;
+   arena* app_storage;
+   arena* vulkan_storage;
    arena scratch;
    hw_timer timer;
    app_state state;

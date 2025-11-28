@@ -114,7 +114,7 @@ static bool rt_blas_geometry_build(arena s, vk_context* context, VkAccelerationS
       assert(blas_buffer.size >= info->size + info->offset);
       assert((info->offset & 0xff) == 0);
 
-      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, 0, context->rt_as.blases + i)))
+      if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, info, &global_allocator.handle, context->rt_as.blases + i)))
          return false;
 
       context->rt_as.blas_count++;
@@ -249,7 +249,7 @@ static bool rt_tlas_geometry_build(arena s, vk_context* context, VkAccelerationS
    info.size = tlas_buffer.size;
    info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 
-   if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, &info, 0, tlas)))
+   if(!vk_valid(vkCreateAccelerationStructureKHR(devices->logical, &info, &global_allocator.handle, tlas)))
       return false;
 
    build_info.dstAccelerationStructure = *tlas;
@@ -297,7 +297,7 @@ static bool rt_acceleration_structures_create(vk_context* context)
 {
    vk_device* devices = &context->devices;
 
-   arena* a = context->storage;
+   arena* a = context->app_storage;
 
    if(!vk_valid(vkResetCommandPool(devices->logical, context->cmd.pool, 0)))
       return false;
