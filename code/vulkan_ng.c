@@ -41,9 +41,7 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
       return vk_allocation(user_data, size, alignment, allocation_scope);
 
    void* result = vk_allocation(user_data, size, alignment, allocation_scope);
-   if(!result)
-      return 0;
-
+   assert(original < result);
    memmove(result, original, size);
 
    return result;
