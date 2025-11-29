@@ -23,6 +23,7 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
       return 0;
 
    vk_allocator* allocator = user_data;
+   allocator->old_size = size;
 
    return alloc(allocator->arena, 1, alignment, size, 0);
 }
@@ -37,12 +38,15 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
 
    if(size == 0)
       return 0;
+
+   vk_allocator* allocator = user_data;
+
    if(!original)
       return vk_allocation(user_data, size, alignment, allocation_scope);
 
    void* result = vk_allocation(user_data, size, alignment, allocation_scope);
    assert(original < result);
-   memmove(result, original, size);
+   memmove(result, original, allocator->old_size);
 
    return result;
 }
