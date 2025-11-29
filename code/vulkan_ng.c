@@ -22,8 +22,11 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    if(size == 0)
       return 0;
 
+   static usize i = 0;
    vk_allocator* allocator = user_data;
    allocator->old_size = size;
+
+   printf("Vulkan %zu alloc: %zu bytes\n", i++, size);
 
    return alloc(allocator->arena, 1, alignment, size, 0);
 }
@@ -36,6 +39,7 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
 {
    (void)allocation_scope;
 
+
    if(size == 0)
       return 0;
 
@@ -44,17 +48,23 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    if(!original)
       return vk_allocation(user_data, size, alignment, allocation_scope);
 
+   static usize i = 0;
    void* result = vk_allocation(user_data, size, alignment, allocation_scope);
    assert(original < result);
    memmove(result, original, allocator->old_size);
 
+   printf("Vulkan %zu re-alloc: %zu bytes\n", i++, size);
+
    return result;
 }
 
+// TODO: Figure out how to do the frees with arenas since vulkan allocates per frame
 static void VKAPI_PTR vk_free(void* user_data, void* memory)
 {
    (void)user_data;
    (void)memory;
+
+   printf("Vulkan free\n");
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
