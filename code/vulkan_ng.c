@@ -58,7 +58,6 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    return result;
 }
 
-// TODO: Figure out how to do the frees with arenas since vulkan allocates per frame
 static void VKAPI_PTR vk_free(void* user_data, void* memory)
 {
    (void)user_data;

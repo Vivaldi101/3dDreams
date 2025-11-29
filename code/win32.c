@@ -322,8 +322,11 @@ static void hw_virtual_memory_release(void* address)
 static void hw_virtual_memory_decommit(void* address, usize size)
 {
 	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
+	assert(hw_is_virtual_memory_commited((byte*)address));
 
-	global_allocate(address, size, MEM_DECOMMIT, PAGE_READWRITE);
+   u32 error = GetLastError();
+   global_free(address, size, MEM_DECOMMIT);
+   error = GetLastError();
 }
 
 static void hw_virtual_memory_init()
@@ -396,7 +399,6 @@ static void arena_test_compute2(arena* a, arena_foo** result, size sz)
    }
 }
 
-#if 1
 static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 {
    *result = push(a, arena_foo, sz);
@@ -406,9 +408,24 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 
    return true;
 }
-#endif
 
-static arena_foo** arena_test_result(arena* a, size sz)
+typedef array(arena_foo) array_foo;
+
+static void array_test_free(array_foo* foos)
+{
+   hw_virtual_memory_decommit(foos->data, foos->count * sizeof(typeof(*(foos->data))));
+   foos->arena->beg = foos->arena->end;
+   foos->count = 0;
+   foos->data = 0;
+}
+
+static void array_test_result(array_foo* foos, size sz)
+{
+   for(size i = 0; i < sz; ++i)
+      arrayp_push(foos) = (arena_foo){.k = i};
+}
+
+static void arena_test_result(arena* a, size sz)
 {
    arena_foo** result = 0;
 
@@ -423,8 +440,6 @@ static arena_foo** arena_test_result(arena* a, size sz)
 
    for(size i = 0; i < sz; ++i)
       printf("arena_test_compute2: %lld\n", result[i]->k);
-
-   return result;
 }
 
 int main(int argc, char** argv)
@@ -489,9 +504,21 @@ int main(int argc, char** argv)
 
    //app_start(&hw, s8(argv[1]));
 
+   // arena tests
    #if 1
-   size sz = 100;
-   arena_test_result(app_storage, sz);
+   size sz = 10;
+
+   array_foo foos = {app_storage};
+   array_test_result(&foos, sz);
+
+   array_foo bars = {app_storage};
+   array_test_result(&bars, sz);
+
+   array_test_free(&bars);
+
+   array_test_result(&bars, sz);
+   array_test_free(&bars);
+
    #endif
 
    global_free(base, 0, MEM_RELEASE);
