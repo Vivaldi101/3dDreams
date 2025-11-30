@@ -413,16 +413,31 @@ typedef array(arena_foo) array_foo;
 
 static void array_test_free(array_foo* foos)
 {
-   hw_virtual_memory_decommit(foos->data, foos->count * sizeof(typeof(*(foos->data))));
-   foos->arena->beg = foos->arena->end;
+   //hw_virtual_memory_decommit(foos->data, foos->count * sizeof(typeof(*(foos->data))));
+   memset(foos->data, 0, foos->count * sizeof(typeof(*(foos->data))));
    foos->count = 0;
    foos->data = 0;
 }
 
-static void array_test_result(array_foo* foos, size sz)
+static void array_test_result(array_foo* foos, size array_size)
 {
-   for(size i = 0; i < sz; ++i)
+   //if(foos->arena->beg <= foos->old_arena.end)
+   if(foos->old_arena.beg < foos->arena->beg)
+   {
+      const size s = foos->count * sizeof(typeof(*foos->data));
+
+      assert(hw_is_virtual_memory_commited((byte*)foos->arena->beg + s - 1));
+      assert(hw_is_virtual_memory_commited((byte*)foos->arena->beg));
+      memmove(foos->arena->beg, foos->data, s);
+      foos->data = foos->arena->beg;
+
+      foos->arena->beg = (byte*)foos->arena->beg + s;
+   }
+
+   for(size i = 0; i < array_size; ++i)
       arrayp_push(foos) = (arena_foo){.k = i};
+
+   foos->old_arena = *foos->arena;
 }
 
 static void arena_test_result(arena* a, size sz)
@@ -452,30 +467,27 @@ int main(int argc, char** argv)
    const size arena_part_size = arena_max_commit_size/4;
 
    // max virtual limit
-   void* base = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
-   assert(base);
+   void* program_memory = global_allocate(0, arena_max_commit_size, MEM_RESERVE, PAGE_READWRITE);
+   assert(program_memory);
 
    arena app_arena = {0};
-   app_arena.end = base;
-   app_arena.kind = arena_persistent_kind;
+   app_arena.end = program_memory;
 
    arena vulkan_arena = {0};
    vulkan_arena.end = (byte*)app_arena.end + arena_part_size;
-   vulkan_arena.kind = arena_persistent_kind;
 
    arena scratch_arena = {0};
    scratch_arena.end = (byte*)vulkan_arena.end + arena_part_size;
-   scratch_arena.kind = arena_scratch_kind;
 
    const size initial_arena_size = PAGE_SIZE;
 
-   arena* app_storage = arena_new(&app_arena, initial_arena_size);
+   arena* app_storage = arena_new(&app_arena, initial_arena_size, arena_persistent_kind);
    assert(arena_left(app_storage) == initial_arena_size);
 
-   arena* vulkan_storage = arena_new(&vulkan_arena, initial_arena_size);
+   arena* vulkan_storage = arena_new(&vulkan_arena, initial_arena_size, arena_persistent_kind);
    assert(arena_left(vulkan_storage) == initial_arena_size);
 
-   arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size);
+   arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size, arena_scratch_kind);
    assert(arena_left(scratch_storage) == initial_arena_size);
 
    hw.app_storage = app_storage;
@@ -502,26 +514,39 @@ int main(int argc, char** argv)
       return 0;
    }
 
-   //app_start(&hw, s8(argv[1]));
-
    // arena tests
    #if 1
    size sz = 10;
 
-   array_foo foos = {app_storage};
-   array_test_result(&foos, sz);
+   array_foo first = {app_storage};
+   array_test_result(&first, sz);
 
-   array_foo bars = {app_storage};
-   array_test_result(&bars, sz);
+   array_foo second = {app_storage};
+   array_test_result(&second, sz);
 
-   array_test_free(&bars);
+   array_test_result(&first, 5);
 
-   array_test_result(&bars, sz);
-   array_test_free(&bars);
+   for(size i = 0; i < first.count; ++i)
+      printf("First: %d\n", (int)first.data[i].k);
 
+   array_test_free(&first);
+
+   for(size i = 0; i < first.count; ++i)
+      printf("First: %d\n", (int)first.data[i].k);
+
+   array_test_result(&second, 5);
+
+   for(size i = 0; i < second.count; ++i)
+      printf("Second: %d\n", (int)second.data[i].k);
+
+   for(size i = 0; i < first.count; ++i)
+      printf("First: %d\n", (int)first.data[i].k);
+
+   #else
+   app_start(&hw, s8(argv[1]));
    #endif
 
-   global_free(base, 0, MEM_RELEASE);
+   global_free(program_memory, 0, MEM_RELEASE);
 
    return 0;
 }
