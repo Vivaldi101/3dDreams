@@ -421,7 +421,7 @@ static void array_test_free(array_foo* foos)
 
 static void array_test_result(array_foo* foos, size array_size)
 {
-   //if(foos->arena->beg <= foos->old_arena.end)
+   // realloc
    if(foos->old_arena.beg < foos->arena->beg)
    {
       const size s = foos->count * sizeof(typeof(*foos->data));

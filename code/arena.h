@@ -6,11 +6,13 @@
 // TODO: make areanas platform agnostic
 #include <Windows.h>
 
-typedef enum arena_flags
+typedef enum alloc_flags
 {
    arena_persistent_kind = 0,
-   arena_scratch_kind
-} arena_flags;
+   arena_scratch_kind,
+   array_persistent_kind,
+   array_scratch_kind,
+} alloc_flags;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -25,6 +27,9 @@ typedef enum arena_flags
 // Pushes to non preallocated app_storage
 #define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 #define arrayp_push(a)      (a)->count++, *(typeof(a->data))array_alloc((array*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, 0)
+
+#define arrayf_push(a)          (a).count++, *(typeof(a.data))array_fixed_alloc((array_fixed*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, array_scratch_kind)
+#define arrayfp_push(a)      (a)->count++, *(typeof(a->data))array_fixed_alloc((array_fixed*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, array_scratch_kind)
 
 // Adds to preallocated app_storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
@@ -41,21 +46,25 @@ align_struct arena
 {
    void* beg;
    void* end;         // one past the end
-   arena_flags kind;
 } arena;
 
-// TODO: This cannot be passed to functions as is - use typeof() to cast the struct array to struct array(T)?
-#define array(T) struct { arena* arena; size count; T* data; }
-
-#define array_clear(a, s) memset((a).data, 0, (s)*sizeof(typeof(*(a).data)))
-#define array_fixed(t, T, s, a) array(T) (t) = {&(a)}; {array_resize((t), (s)); array_clear((t), (s));}
+// This cannot be passed to functions as is - must be used as a typedef
+#define array(T) struct { arena* arena; size count; T* data; arena old_arena; }
 
 align_struct array
 {
    arena* arena;
    size count;
-   void* data;
+   void* data;  // base
+   arena old_arena;
 } array;
+
+align_struct array_fixed
+{
+   arena arena;
+   size count;
+   void* data;   // base
+} array_fixed;
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -66,17 +75,14 @@ static bool hw_is_virtual_memory_commited(void* address)
    return mbi.State == MEM_COMMIT;
 }
 
-// TODO: use GetSystemInfo
-// TODO: just expand base in place instead of return
-static arena* arena_new(arena* base, size cap)
+static arena* arena_new(arena* base, size cap, alloc_flags flag)
 {
    assert(base->end && cap > 0);
    assert(cap >= PAGE_SIZE);
-   //assert((byte*)base->end + cap <= (byte*)base->commit_end);   TODO: re-enable
 
    arena* a = base;
 
-   if(base->kind == arena_scratch_kind && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
+   if((flag == arena_scratch_kind || flag == array_scratch_kind) && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       a->beg = base->end;
       a->end = (byte*)base->end + cap;
@@ -96,19 +102,17 @@ static arena* arena_new(arena* base, size cap)
    p->beg = p + sizeof(arena);
    p->end = (byte*)p->beg + cap;
 
-   p->kind = base->kind;
-
    assert((byte*)p->beg + cap == p->end);
 
    return p;
 }
 
-static void arena_expand(arena* a, size new_cap)
+static void arena_expand(arena* a, size new_cap, alloc_flags flag)
 {
    assert(new_cap > 0);
    assert((uptr)a->end <= ((1ull << 48)-1) - PAGE_SIZE);
 
-   arena* new_arena = arena_new(a, new_cap);
+   arena* new_arena = arena_new(a, new_cap, flag);
    assert(new_arena->end >= a->end);
 
    a->end = (byte*)new_arena->end;
@@ -116,7 +120,7 @@ static void arena_expand(arena* a, size new_cap)
    assert(a->end == (byte*)new_arena->beg + new_cap);
 }
 
-static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
+static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flags flag)
 {
    (void)flag;
    assert(a);
@@ -130,7 +134,7 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
       // page align allocs
-      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE, flag);
       p = a->beg;
    }
 
@@ -144,6 +148,15 @@ static void* alloc(arena* a, size alloc_size, size align, size count, u32 flag)
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
    void* result = alloc(a->arena, alloc_size, align, count, flag);
+
+   a->data = a->data ? a->data : result;
+
+   return result;
+}
+
+static void* array_fixed_alloc(array_fixed* a, size alloc_size, size align, size count, u32 flag)
+{
+   void* result = alloc(&a->arena, alloc_size, align, count, flag);
 
    a->data = a->data ? a->data : result;
 
