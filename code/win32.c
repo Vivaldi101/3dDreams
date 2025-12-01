@@ -307,9 +307,6 @@ static void* hw_virtual_memory_reserve(usize size)
 
 static void hw_virtual_memory_commit(void* address, usize size)
 {
-	assert(hw_is_virtual_memory_reserved((byte*)address+size-1));
-	assert(!hw_is_virtual_memory_commited((byte*)address+size-1));
-
 	// commit the reserved address range
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
 }
@@ -411,33 +408,52 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 
 typedef array(arena_foo) array_foo;
 
-static void array_test_free(array_foo* foos)
+static void* array_test_free(array_foo* foos)
 {
    //hw_virtual_memory_decommit(foos->data, foos->count * sizeof(typeof(*(foos->data))));
    memset(foos->data, 0, foos->count * sizeof(typeof(*(foos->data))));
-   foos->count = 0;
-   foos->data = 0;
+
+   return foos->data;
 }
 
 static void array_test_result(array_foo* foos, size array_size)
 {
-   // realloc
-   if(foos->old_arena.beg < foos->arena->beg)
-   {
-      const size s = foos->count * sizeof(typeof(*foos->data));
+   const size old_size = foos->count * sizeof(typeof(*foos->data));
 
-      assert(hw_is_virtual_memory_commited((byte*)foos->arena->beg + s - 1));
-      assert(hw_is_virtual_memory_commited((byte*)foos->arena->beg));
-      memmove(foos->arena->beg, foos->data, s);
+   // realloc old size
+   if(foos->old_arena.beg < foos->arena->beg && old_size > 0)
+   {
+      // align to next page for the next array
+      foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+
+      hw_virtual_memory_commit((byte*)foos->arena->beg, old_size);
+
+      memmove(foos->arena->beg, foos->data, old_size);
       foos->data = foos->arena->beg;
 
-      foos->arena->beg = (byte*)foos->arena->beg + s;
+      foos->arena->beg = (byte*)foos->arena->beg + old_size;
+      foos->arena->end = (byte*)foos->arena->end + old_size;
+      foos->arena->end = (void*)(((uptr)foos->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+   }
+   else if(foos->old_arena.beg > foos->arena->beg && old_size > 0)
+   {
+      foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+
+      hw_virtual_memory_commit(foos->arena->beg, old_size);
+
+      memmove(foos->arena->beg, foos->data, old_size);
+      foos->data = foos->arena->beg;
+
+      foos->arena->beg = (byte*)foos->arena->beg + old_size;
+      foos->arena->end = (byte*)foos->arena->end + old_size;
+      foos->arena->end = (void*)(((uptr)foos->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    }
 
    for(size i = 0; i < array_size; ++i)
       arrayp_push(foos) = (arena_foo){.k = i};
 
-   foos->old_arena = *foos->arena;
+   foos->old_arena.beg = foos->arena->beg;
+   foos->old_arena.end = foos->arena->end;
 }
 
 static void arena_test_result(arena* a, size sz)
@@ -516,25 +532,28 @@ int main(int argc, char** argv)
 
    // arena tests
    #if 1
-   size sz = 10;
-
-   array_foo first = {app_storage};
-   array_test_result(&first, sz);
 
    array_foo second = {app_storage};
-   array_test_result(&second, sz);
+   array_test_result(&second, 10);
 
-   array_test_result(&first, 5);
+   array_foo first = {app_storage};
+   array_test_result(&first, 10);
 
-   for(size i = 0; i < first.count; ++i)
-      printf("First: %d\n", (int)first.data[i].k);
-
-   array_test_free(&first);
-
-   for(size i = 0; i < first.count; ++i)
-      printf("First: %d\n", (int)first.data[i].k);
+   array_test_result(&second, 8);
+   array_test_result(&second, 8);
+   array_test_result(&second, 8);
+   array_test_result(&second, 8);
+   array_test_result(&second, 8);
+   array_test_result(&second, 2);
 
    array_test_result(&second, 5);
+   array_test_result(&first, 5);
+
+   hw_virtual_memory_decommit(second.data, second.count * sizeof(typeof(*second.data)));
+   second.count = 0;
+   app_storage->beg = second.data;
+
+   array_test_result(&first, 5);
 
    for(size i = 0; i < second.count; ++i)
       printf("Second: %d\n", (int)second.data[i].k);
@@ -545,6 +564,8 @@ int main(int argc, char** argv)
    #else
    app_start(&hw, s8(argv[1]));
    #endif
+
+   assert(app_storage->end >= app_storage->beg);
 
    global_free(program_memory, 0, MEM_RELEASE);
 

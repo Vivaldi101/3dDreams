@@ -75,6 +75,7 @@ static bool hw_is_virtual_memory_commited(void* address)
    return mbi.State == MEM_COMMIT;
 }
 
+// TODO: Use hw_virtual_memory_commit(void* address, usize size) on commits
 static arena* arena_new(arena* base, size cap, alloc_flags flag)
 {
    assert(base->end && cap > 0);
