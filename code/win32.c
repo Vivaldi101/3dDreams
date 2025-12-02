@@ -408,9 +408,9 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 
 typedef array(arena_foo) array_foo;
 
-static void array_test_decommit(array* a, size s)
+static void array_decommit(array* a, size array_size)
 {
-   hw_virtual_memory_decommit(a->data, s);
+   hw_virtual_memory_decommit(a->data, array_size);
    a->count = 0;
    a->arena->beg = a->data;
    a->old_beg = 0;
@@ -418,7 +418,7 @@ static void array_test_decommit(array* a, size s)
 
 static void array_test_result(array_foo* a, size array_size)
 {
-   if(!a->old_beg)
+   if(!a->old_beg || array_size <= 0)
       return;
 
    const size old_size = a->count * sizeof(typeof(*a->data));
@@ -538,8 +538,8 @@ int main(int argc, char** argv)
    array_test_result(&second, 5);
    array_test_result(&first, 5);
 
-   //array_test_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
-   //array_test_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
+   array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
 
    array_test_result(&first, 5);
 
