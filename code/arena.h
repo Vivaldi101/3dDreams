@@ -48,9 +48,6 @@ align_struct arena
    void* end;         // one past the end
 } arena;
 
-// This cannot be passed to functions as is - must be used as a typedef
-#define array(T) __declspec(align(custom_alignment)) struct { arena* arena; size count; T* data; void* old_beg; }
-
 align_struct array
 {
    arena* arena;
@@ -66,6 +63,9 @@ align_struct array_fixed
    void* data;   // base
    void* old_beg;
 } array_fixed;
+
+// This cannot be passed to functions as is - must be used as a typedef
+#define array(T) __declspec(align(custom_alignment)) struct { arena* arena; size count; T* data; void* old_beg; }
 
 static bool hw_is_virtual_memory_commited(void* address)
 {

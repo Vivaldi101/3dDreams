@@ -424,22 +424,9 @@ static void array_test_result(array_foo* foos, size array_size)
    const size old_size = foos->count * sizeof(typeof(*foos->data));
 
    // realloc old size
-   if(foos->old_beg < foos->arena->beg && old_size > 0)
+   if((foos->old_beg != foos->arena->beg) && old_size > 0)
    {
       // align to next page for the next array
-      foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-
-      hw_virtual_memory_commit((byte*)foos->arena->beg, old_size);
-
-      memmove(foos->arena->beg, foos->data, old_size);
-      foos->data = foos->arena->beg;
-
-      foos->arena->beg = (byte*)foos->arena->beg + old_size;
-      foos->arena->end = (byte*)foos->arena->end + old_size;
-      foos->arena->end = (void*)(((uptr)foos->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-   }
-   else if(foos->old_beg > foos->arena->beg && old_size > 0)
-   {
       foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
 
       hw_virtual_memory_commit(foos->arena->beg, old_size);
@@ -552,7 +539,7 @@ int main(int argc, char** argv)
    array_test_result(&first, 5);
 
    array_test_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
-   //array_test_decommit(&second);
+   array_test_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
 
    array_test_result(&first, 5);
 
@@ -568,7 +555,9 @@ int main(int argc, char** argv)
 
    #endif
 
-   assert(app_storage->end >= app_storage->beg);
+   assert(arena_left(app_storage) >= 0);
+   assert(arena_left(vulkan_storage) >= 0);
+   assert(arena_left(scratch_storage) >= 0);
 
    global_free(program_memory, 0, MEM_RELEASE);
 
