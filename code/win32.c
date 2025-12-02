@@ -408,41 +408,41 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 
 typedef array(arena_foo) array_foo;
 
-static void array_test_decommit(array* foos, size s)
+static void array_test_decommit(array* a, size s)
 {
-   hw_virtual_memory_decommit(foos->data, s);
-   foos->count = 0;
-   foos->arena->beg = foos->data;
-   foos->old_beg = 0;
+   hw_virtual_memory_decommit(a->data, s);
+   a->count = 0;
+   a->arena->beg = a->data;
+   a->old_beg = 0;
 }
 
-static void array_test_result(array_foo* foos, size array_size)
+static void array_test_result(array_foo* a, size array_size)
 {
-   if(!foos->old_beg)
+   if(!a->old_beg)
       return;
 
-   const size old_size = foos->count * sizeof(typeof(*foos->data));
+   const size old_size = a->count * sizeof(typeof(*a->data));
 
    // realloc old size
-   if((foos->old_beg != foos->arena->beg) && old_size > 0)
+   if((a->old_beg != a->arena->beg) && old_size > 0)
    {
       // align to next page for the next array
-      foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
 
-      hw_virtual_memory_commit(foos->arena->beg, old_size);
+      hw_virtual_memory_commit(a->arena->beg, old_size);
 
-      memmove(foos->arena->beg, foos->data, old_size);
-      foos->data = foos->arena->beg;
+      memmove(a->arena->beg, a->data, old_size);
+      a->data = a->arena->beg;
 
-      foos->arena->beg = (byte*)foos->arena->beg + old_size;
-      foos->arena->end = (byte*)foos->arena->end + old_size;
-      foos->arena->end = (void*)(((uptr)foos->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      a->arena->beg = (byte*)a->arena->beg + old_size;
+      a->arena->end = (byte*)a->arena->end + old_size;
+      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    }
 
    for(size i = 0; i < array_size; ++i)
-      arrayp_push(foos) = (arena_foo){.k = i};
+      arrayp_push(a) = (arena_foo){.k = i};
 
-   foos->old_beg = foos->arena->beg;
+   a->old_beg = a->arena->beg;
 }
 
 static void arena_test_result(arena* a, size sz)
@@ -538,8 +538,8 @@ int main(int argc, char** argv)
    array_test_result(&second, 5);
    array_test_result(&first, 5);
 
-   array_test_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
-   array_test_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   //array_test_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
+   //array_test_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
 
    array_test_result(&first, 5);
 
