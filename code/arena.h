@@ -49,7 +49,7 @@ align_struct arena
 } arena;
 
 // This cannot be passed to functions as is - must be used as a typedef
-#define array(T) struct { arena* arena; size count; T* data; void* old_beg; }
+#define array(T) __declspec(align(custom_alignment)) struct { arena* arena; size count; T* data; void* old_beg; }
 
 align_struct array
 {
