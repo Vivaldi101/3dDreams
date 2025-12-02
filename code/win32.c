@@ -280,7 +280,7 @@ typedef BOOL(*VirtualFreePtr)(LPVOID, SIZE_T, DWORD);
 static VirtualAllocPtr global_allocate = 0;
 static VirtualFreePtr global_free = 0;
 
-static void hw_global_reserve_available()
+void hw_global_reserve_available()
 {
    MEMORYSTATUSEX memory_status;
    memory_status.dwLength = sizeof(memory_status);
@@ -290,7 +290,7 @@ static void hw_global_reserve_available()
    global_allocate(0, memory_status.ullAvailPhys, MEM_RESERVE, PAGE_READWRITE);
 }
 
-static bool hw_is_virtual_memory_reserved(void* address)
+bool hw_is_virtual_memory_reserved(void* address)
 {
    MEMORY_BASIC_INFORMATION mbi;
    if(VirtualQuery(address, &mbi, sizeof(mbi)) == 0)
@@ -299,24 +299,24 @@ static bool hw_is_virtual_memory_reserved(void* address)
    return mbi.State == MEM_RESERVE;
 }
 
-static void* hw_virtual_memory_reserve(usize size)
+void* hw_virtual_memory_reserve(usize size)
 {
 	// let the os decide into what address to place the reserve
    return global_allocate(0, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
-static void hw_virtual_memory_commit(void* address, usize size)
+void hw_virtual_memory_commit(void* address, usize size)
 {
 	// commit the reserved address range
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
-static void hw_virtual_memory_release(void* address)
+void hw_virtual_memory_release(void* address)
 {
 	global_free(address, 0, MEM_RELEASE);
 }
 
-static void hw_virtual_memory_decommit(void* address, usize size)
+void hw_virtual_memory_decommit(void* address, usize size)
 {
 	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
 	assert(hw_is_virtual_memory_commited((byte*)address));
@@ -326,7 +326,7 @@ static void hw_virtual_memory_decommit(void* address, usize size)
    error = GetLastError();
 }
 
-static void hw_virtual_memory_init()
+void hw_virtual_memory_init()
 {
    typedef LPVOID(*VirtualAllocPtr)(LPVOID, usize, DWORD, DWORD);
 
@@ -339,11 +339,6 @@ static void hw_virtual_memory_init()
 
    assert(global_allocate);
    assert(global_free);
-}
-
-static void arena_free(arena* a)
-{
-   hw_virtual_memory_release(a->beg);
 }
 
 align_struct scratch_foo
@@ -407,43 +402,6 @@ static bool arena_test_bool(arena* a, arena_foo** result, size sz)
 }
 
 typedef array(arena_foo) array_foo;
-
-static void array_decommit(array* a, size array_size)
-{
-   hw_virtual_memory_decommit(a->data, array_size);
-   a->count = 0;
-   a->arena->beg = a->data;
-   a->old_beg = 0;
-}
-
-static void array_realloc(array_foo* a, size array_size)
-{
-   if(!a->old_beg || array_size <= 0)
-      return;
-
-   const size old_size = a->count * sizeof(typeof(*a->data));
-
-   // realloc old size
-   if((a->old_beg != a->arena->beg) && old_size > 0)
-   {
-      // align to next page for the next array
-      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-
-      hw_virtual_memory_commit(a->arena->beg, old_size);
-
-      memmove(a->arena->beg, a->data, old_size);
-      a->data = a->arena->beg;
-
-      a->arena->beg = (byte*)a->arena->beg + old_size;
-      a->arena->end = (byte*)a->arena->end + old_size;
-      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-   }
-
-   for(size i = 0; i < array_size; ++i)
-      arrayp_push(a) = (arena_foo){.k = i};
-
-   a->old_beg = a->arena->beg;
-}
 
 static void arena_test_result(arena* a, size sz)
 {
@@ -523,25 +481,29 @@ int main(int argc, char** argv)
    #if 1
 
    array_foo second = {app_storage, .old_beg = app_storage->beg};
-   array_realloc(&second, 10);
+   array_push(second) = (arena_foo){1};
 
    array_foo first = {app_storage, .old_beg = app_storage->beg};
-   array_realloc(&first, 10);
+   array_push(first) = (arena_foo){999};
+   array_push(first) = (arena_foo){-12};
 
-   array_realloc(&second, 8);
-   array_realloc(&second, 8);
-   array_realloc(&second, 8);
-   array_realloc(&second, 8);
-   array_realloc(&second, 8);
-   array_realloc(&second, 2);
+   array_push(second) = (arena_foo){2};
+   array_push(second) = (arena_foo){3};
+   array_push(second) = (arena_foo){11};
+   array_push(second) = (arena_foo){0};
+   //array_push(&second, 8);
+   //array_push(&second, 8);
+   //array_push(&second, 8);
+   //array_push(&second, 8);
+   //array_push(&second, 2);
 
-   array_realloc(&second, 5);
-   array_realloc(&first, 5);
+   //array_push(&second, 5);
+   //array_push(&first, 5);
 
-   array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
+   //array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
    array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
 
-   array_realloc(&first, 5);
+   //array_push(&first, 5);
 
    for(size i = 0; i < second.count; ++i)
       printf("Second: %d\n", (int)second.data[i].k);

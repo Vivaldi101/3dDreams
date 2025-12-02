@@ -5,6 +5,8 @@
 
 // TODO: make areanas platform agnostic
 #include <Windows.h>
+void hw_virtual_memory_commit(void* address, usize size);
+void hw_virtual_memory_decommit(void* address, usize size);
 
 typedef enum alloc_flags
 {
@@ -27,9 +29,6 @@ typedef enum alloc_flags
 // Pushes to non preallocated app_storage
 #define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 #define arrayp_push(a)      (a)->count++, *(typeof(a->data))array_alloc((array*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, 0)
-
-#define arrayf_push(a)          (a).count++, *(typeof(a.data))array_fixed_alloc((array_fixed*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, array_scratch_kind)
-#define arrayfp_push(a)      (a)->count++, *(typeof(a->data))array_fixed_alloc((array_fixed*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, array_scratch_kind)
 
 // Adds to preallocated app_storage
 #define array_add(a, v)        *((a.data + a.count++)) = (v)
@@ -147,32 +146,46 @@ static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flag
    return p;
 }
 
+static void array_decommit(array* a, size array_size)
+{
+   hw_virtual_memory_decommit(a->data, array_size);
+   a->count = 0;
+   a->arena->beg = a->data;
+   a->old_beg = 0;
+}
+
+static void array_realloc(array* a, size old_size)
+{
+   assert(a->old_beg);
+
+   // realloc old size
+   if((a->old_beg != a->arena->beg) && old_size > 0)
+   {
+      // align to next page for the next array
+      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+
+      hw_virtual_memory_commit(a->arena->beg, old_size);
+
+      memmove(a->arena->beg, a->data, old_size);
+      a->data = a->arena->beg;
+
+      a->arena->beg = (byte*)a->arena->beg + old_size;
+      a->arena->end = (byte*)a->arena->end + old_size;
+      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+   }
+}
+
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
+   if(a->data)
+      array_realloc(a, (byte*)a->old_beg - (byte*)a->data);
+
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    a->data = a->data ? a->data : result;
+   a->old_beg = a->arena->beg;
 
    return result;
-}
-
-static void* array_fixed_alloc(array_fixed* a, size alloc_size, size align, size count, u32 flag)
-{
-   void* result = alloc(&a->arena, alloc_size, align, count, flag);
-
-   a->data = a->data ? a->data : result;
-
-   return result;
-}
-
-static bool arena_reset(arena* a)
-{
-   return VirtualAlloc(a->beg, (byte*)a->end - (byte*)a->beg, MEM_RESET, PAGE_READWRITE) != 0;
-}
-
-static bool arena_decommit(arena* a)
-{
-   return VirtualFree(a->beg, 0, MEM_DECOMMIT) != 0;
 }
 
 #endif
