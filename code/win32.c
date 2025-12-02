@@ -416,7 +416,7 @@ static void array_decommit(array* a, size array_size)
    a->old_beg = 0;
 }
 
-static void array_test_result(array_foo* a, size array_size)
+static void array_realloc(array_foo* a, size array_size)
 {
    if(!a->old_beg || array_size <= 0)
       return;
@@ -523,25 +523,25 @@ int main(int argc, char** argv)
    #if 1
 
    array_foo second = {app_storage, .old_beg = app_storage->beg};
-   array_test_result(&second, 10);
+   array_realloc(&second, 10);
 
    array_foo first = {app_storage, .old_beg = app_storage->beg};
-   array_test_result(&first, 10);
+   array_realloc(&first, 10);
 
-   array_test_result(&second, 8);
-   array_test_result(&second, 8);
-   array_test_result(&second, 8);
-   array_test_result(&second, 8);
-   array_test_result(&second, 8);
-   array_test_result(&second, 2);
+   array_realloc(&second, 8);
+   array_realloc(&second, 8);
+   array_realloc(&second, 8);
+   array_realloc(&second, 8);
+   array_realloc(&second, 8);
+   array_realloc(&second, 2);
 
-   array_test_result(&second, 5);
-   array_test_result(&first, 5);
+   array_realloc(&second, 5);
+   array_realloc(&first, 5);
 
    array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
    array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
 
-   array_test_result(&first, 5);
+   array_realloc(&first, 5);
 
    for(size i = 0; i < second.count; ++i)
       printf("Second: %d\n", (int)second.data[i].k);
