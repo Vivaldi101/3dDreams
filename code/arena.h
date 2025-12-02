@@ -5,8 +5,8 @@
 
 // TODO: make areanas platform agnostic
 #include <Windows.h>
-void hw_virtual_memory_commit(void* address, usize size);
-void hw_virtual_memory_decommit(void* address, usize size);
+bool hw_virtual_memory_commit(void* address, usize size);
+bool hw_virtual_memory_decommit(void* address, usize size);
 
 typedef enum alloc_flags
 {
@@ -146,20 +146,20 @@ static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flag
    return p;
 }
 
-static void array_decommit(array* a, size array_size)
+static bool array_decommit(array* a, size array_size)
 {
-   hw_virtual_memory_decommit(a->data, array_size);
    a->count = 0;
    a->arena->beg = a->data;
    a->old_beg = 0;
+   return hw_virtual_memory_decommit(a->data, array_size);
 }
 
-static void array_realloc(array* a, size old_size)
+static void array_realloc(array* a, size old_size, size new_size)
 {
-   assert(a->old_beg);
+   assert(iff(a->old_beg, old_size > 0));
 
    // realloc old size
-   if((a->old_beg != a->arena->beg) && old_size > 0)
+   if((a->old_beg != a->arena->beg) && (old_size + new_size > arena_left(a->arena)))
    {
       // align to next page for the next array
       a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
@@ -173,13 +173,27 @@ static void array_realloc(array* a, size old_size)
       a->arena->end = (byte*)a->arena->end + old_size;
       a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    }
+   else if(old_size == 0)
+   {
+      // align to next page for the next array
+      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      a->data = a->arena->beg;
+      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+   }
+   else
+   {
+      a->arena->beg = a->old_beg;
+      // TODO: a->arena->end = a->old_end;
+   }
 }
 
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
-   if(a->data)
-      array_realloc(a, (byte*)a->old_beg - (byte*)a->data);
+   size old_size = 0;
+   if(a->old_beg)
+      old_size = (byte*)a->old_beg - (byte*)a->data;
 
+   array_realloc(a, old_size, alloc_size * count);
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    a->data = a->data ? a->data : result;

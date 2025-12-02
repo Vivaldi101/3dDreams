@@ -305,10 +305,12 @@ void* hw_virtual_memory_reserve(usize size)
    return global_allocate(0, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
-void hw_virtual_memory_commit(void* address, usize size)
+bool hw_virtual_memory_commit(void* address, usize size)
 {
+	GetLastError();
 	// commit the reserved address range
    global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
+   return GetLastError() == 0;
 }
 
 void hw_virtual_memory_release(void* address)
@@ -316,14 +318,11 @@ void hw_virtual_memory_release(void* address)
 	global_free(address, 0, MEM_RELEASE);
 }
 
-void hw_virtual_memory_decommit(void* address, usize size)
+bool hw_virtual_memory_decommit(void* address, usize size)
 {
-	assert(hw_is_virtual_memory_commited((byte*)address+size-1));
-	assert(hw_is_virtual_memory_commited((byte*)address));
-
-   u32 error = GetLastError();
+	GetLastError();
    global_free(address, size, MEM_DECOMMIT);
-   error = GetLastError();
+   return GetLastError() == 0;
 }
 
 void hw_virtual_memory_init()
@@ -480,30 +479,25 @@ int main(int argc, char** argv)
    // arena tests
    #if 1
 
-   array_foo second = {app_storage, .old_beg = app_storage->beg};
+   array_foo first = {app_storage};
+   array_foo second = {app_storage};
+
    array_push(second) = (arena_foo){1};
-
-   array_foo first = {app_storage, .old_beg = app_storage->beg};
-   array_push(first) = (arena_foo){999};
-   array_push(first) = (arena_foo){-12};
-
+   array_push(first) = (arena_foo){5};
+   array_push(first) = (arena_foo){6};
    array_push(second) = (arena_foo){2};
+   array_push(first) = (arena_foo){7};
    array_push(second) = (arena_foo){3};
-   array_push(second) = (arena_foo){11};
-   array_push(second) = (arena_foo){0};
-   //array_push(&second, 8);
-   //array_push(&second, 8);
-   //array_push(&second, 8);
-   //array_push(&second, 8);
-   //array_push(&second, 2);
+   array_push(first) = (arena_foo){8};
+   array_push(second) = (arena_foo){4};
 
-   //array_push(&second, 5);
-   //array_push(&first, 5);
+   array_push(first) = (arena_foo){9};
+   array_push(first) = (arena_foo){10};
 
-   //array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
-   array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   bool decommit = array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   assert(decommit);
 
-   //array_push(&first, 5);
+   array_push(first) = (arena_foo){999};
 
    for(size i = 0; i < second.count; ++i)
       printf("Second: %d\n", (int)second.data[i].k);

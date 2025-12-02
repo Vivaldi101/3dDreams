@@ -27,8 +27,8 @@ static const size invalid_index = (size)-1;
 
 #define fault(p)  {hw_message_box(p); __debugbreak();}
 
-#define iff(p, q) (p) == (q)
 #define implies(p, q) (!(p) || (q))
+#define iff(p, q) implies((p), (q)) && implies((q), (p))
 
 #define custom_alignment 64
 static_assert(custom_alignment == 64, "");
