@@ -421,18 +421,18 @@ static void array_test_decommit(array_foo* foos)
    hw_virtual_memory_decommit(foos->data, foos->count * sizeof(typeof(*foos->data)));
    foos->count = 0;
    foos->arena->beg = foos->data;
-   foos->old_arena.beg = foos->old_arena.end = 0;
+   foos->old_beg = 0;
 }
 
 static void array_test_result(array_foo* foos, size array_size)
 {
-   if(!foos->old_arena.beg && !foos->old_arena.end)
+   if(!foos->old_beg)
       return;
 
    const size old_size = foos->count * sizeof(typeof(*foos->data));
 
    // realloc old size
-   if(foos->old_arena.beg < foos->arena->beg && old_size > 0)
+   if(foos->old_beg < foos->arena->beg && old_size > 0)
    {
       // align to next page for the next array
       foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
@@ -446,7 +446,7 @@ static void array_test_result(array_foo* foos, size array_size)
       foos->arena->end = (byte*)foos->arena->end + old_size;
       foos->arena->end = (void*)(((uptr)foos->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    }
-   else if(foos->old_arena.beg > foos->arena->beg && old_size > 0)
+   else if(foos->old_beg > foos->arena->beg && old_size > 0)
    {
       foos->arena->beg = (void*)(((uptr)foos->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
 
@@ -463,8 +463,7 @@ static void array_test_result(array_foo* foos, size array_size)
    for(size i = 0; i < array_size; ++i)
       arrayp_push(foos) = (arena_foo){.k = i};
 
-   foos->old_arena.beg = foos->arena->beg;
-   foos->old_arena.end = foos->arena->end;
+   foos->old_beg = foos->arena->beg;
 }
 
 static void arena_test_result(arena* a, size sz)
@@ -544,10 +543,10 @@ int main(int argc, char** argv)
    // arena tests
    #if 1
 
-   array_foo second = {app_storage, .old_arena = *app_storage};
+   array_foo second = {app_storage, .old_beg = app_storage->beg};
    array_test_result(&second, 10);
 
-   array_foo first = {app_storage, .old_arena = *app_storage};
+   array_foo first = {app_storage, .old_beg = app_storage->beg};
    array_test_result(&first, 10);
 
    array_test_result(&second, 8);
@@ -560,7 +559,8 @@ int main(int argc, char** argv)
    array_test_result(&second, 5);
    array_test_result(&first, 5);
 
-   array_test_decommit(&first);
+   //array_test_decommit(&first);
+   //array_test_decommit(&second);
 
    array_test_result(&first, 5);
 
