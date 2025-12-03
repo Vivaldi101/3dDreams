@@ -39,7 +39,6 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
 {
    (void)allocation_scope;
 
-
    if(size == 0)
       return 0;
 

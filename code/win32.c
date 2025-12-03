@@ -305,12 +305,13 @@ void* hw_virtual_memory_reserve(usize size)
    return global_allocate(0, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
-bool hw_virtual_memory_commit(void* address, usize size)
+void* hw_virtual_memory_commit(void* address, usize size)
 {
-	GetLastError();
-	// commit the reserved address range
-   global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
-   return GetLastError() == 0;
+   //assert(!hw_is_virtual_memory_commited(address));
+   //assert(!hw_is_virtual_memory_commited((byte*)address + size - 1));
+
+   // commit the reserved address range
+   return global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
 }
 
 void hw_virtual_memory_release(void* address)
@@ -318,11 +319,9 @@ void hw_virtual_memory_release(void* address)
 	global_free(address, 0, MEM_RELEASE);
 }
 
-bool hw_virtual_memory_decommit(void* address, usize size)
+void hw_virtual_memory_decommit(void* address, usize size)
 {
-	GetLastError();
    global_free(address, size, MEM_DECOMMIT);
-   return GetLastError() == 0;
 }
 
 void hw_virtual_memory_init()
@@ -443,18 +442,18 @@ int main(int argc, char** argv)
 
    const size initial_arena_size = PAGE_SIZE;
 
-   arena* app_storage = arena_new(&app_arena, initial_arena_size, arena_persistent_kind);
-   assert(arena_left(app_storage) == initial_arena_size);
+   arena app_storage = arena_new(&app_arena, initial_arena_size, arena_persistent_kind);
+   assert(arena_left(&app_storage) == initial_arena_size);
 
-   arena* vulkan_storage = arena_new(&vulkan_arena, initial_arena_size, arena_persistent_kind);
-   assert(arena_left(vulkan_storage) == initial_arena_size);
+   arena vulkan_storage = arena_new(&vulkan_arena, initial_arena_size, arena_persistent_kind);
+   assert(arena_left(&vulkan_storage) == initial_arena_size);
 
-   arena* scratch_storage = arena_new(&scratch_arena, initial_arena_size, arena_scratch_kind);
-   assert(arena_left(scratch_storage) == initial_arena_size);
+   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size, arena_scratch_kind);
+   assert(arena_left(&scratch_storage) == initial_arena_size);
 
-   hw.app_storage = app_storage;
-   hw.vulkan_storage = vulkan_storage;
-   hw.scratch = *scratch_storage;
+   hw.app_storage = &app_storage;
+   hw.vulkan_storage = &vulkan_storage;
+   hw.scratch = scratch_storage;
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
@@ -476,25 +475,23 @@ int main(int argc, char** argv)
       return 0;
    }
 
+   // TOOD: Remove
    // arena tests
    #if 1
 
-   array_foo first = {app_storage};
-   array_foo second = {app_storage};
+   array_foo first = {&app_storage};
+   array_foo second = {&app_storage};
 
-   array_push(second) = (arena_foo){64};
-
-   for(size i = 0; i < 64; i++)
+   for(size i = 0; i < 63; i++)
       array_push(first) = (arena_foo){i};
 
-   array_push(second) = (arena_foo){65};
-   array_push(second) = (arena_foo){66};
-   array_push(second) = (arena_foo){67};
+   array_free(first);
+   //array_push(first) = (arena_foo){63};
+   array_push(second) = (arena_foo){1};
 
-   //bool decommit = array_free(first);
-   //assert(decommit);
-   bool decommit = array_free(second);
-   assert(decommit);
+   //array_free(first);
+
+   array_push(second) = (arena_foo){63};
 
    for(size i = 0; i < first.count; ++i)
       printf("First: %d\n", (int)first.data[i].k);
@@ -508,9 +505,9 @@ int main(int argc, char** argv)
 
    #endif
 
-   assert(arena_left(app_storage) >= 0);
-   assert(arena_left(vulkan_storage) >= 0);
-   assert(arena_left(scratch_storage) >= 0);
+   assert(arena_left(&app_storage) >= 0);
+   assert(arena_left(&vulkan_storage) >= 0);
+   assert(arena_left(&scratch_storage) >= 0);
 
    global_free(program_memory, 0, MEM_RELEASE);
 
