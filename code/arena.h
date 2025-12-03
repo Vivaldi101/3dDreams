@@ -25,7 +25,6 @@ typedef enum alloc_flags
 #define new4(a, t, n, f)    (t*)alloc(a, sizeof(t), __alignof(t), n, f)
 
 // TODO: functions?
-// TODO: cleanup array_push() and array_add()
 // Pushes to non preallocated app_storage
 #define array_push(a)          (a).count++, *(typeof(a.data))array_alloc((array*)&a, sizeof(typeof(*a.data)), __alignof(typeof(*a.data)), 1, 0)
 #define arrayp_push(a)      (a)->count++, *(typeof(a->data))array_alloc((array*)a, sizeof(typeof(*a->data)), __alignof(typeof(*a->data)), 1, 0)
@@ -36,6 +35,8 @@ typedef enum alloc_flags
 
 #define array_set(arr, a)  (arr).arena = a
 #define array_set_size(arr, s, a)  {array_set((arr), (a)); array_resize((arr), (s)); array_clear((arr), (s));}
+
+#define array_free(a)       array_decommit((array*)&a, a.count * sizeof(typeof(*(a.data))));
 
 #define countof(a)      (sizeof(a) / sizeof(*(a)))
 #define lengthof(s)     (countof(s) - 1)

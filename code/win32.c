@@ -491,9 +491,9 @@ int main(int argc, char** argv)
    array_push(second) = (arena_foo){66};
    array_push(second) = (arena_foo){67};
 
-   bool decommit = array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
-   assert(decommit);
-   decommit = array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   //bool decommit = array_free(first);
+   //assert(decommit);
+   bool decommit = array_free(second);
    assert(decommit);
 
    for(size i = 0; i < first.count; ++i)
