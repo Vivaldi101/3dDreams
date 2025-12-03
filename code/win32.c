@@ -482,28 +482,25 @@ int main(int argc, char** argv)
    array_foo first = {app_storage};
    array_foo second = {app_storage};
 
-   array_push(second) = (arena_foo){1};
-   array_push(first) = (arena_foo){5};
-   array_push(first) = (arena_foo){6};
-   array_push(second) = (arena_foo){2};
-   array_push(first) = (arena_foo){7};
-   array_push(second) = (arena_foo){3};
-   array_push(first) = (arena_foo){8};
-   array_push(second) = (arena_foo){4};
+   array_push(second) = (arena_foo){64};
 
-   array_push(first) = (arena_foo){9};
-   array_push(first) = (arena_foo){10};
+   for(size i = 0; i < 64; i++)
+      array_push(first) = (arena_foo){i};
 
-   bool decommit = array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   array_push(second) = (arena_foo){65};
+   array_push(second) = (arena_foo){66};
+   array_push(second) = (arena_foo){67};
+
+   bool decommit = array_decommit((array*)&first, first.count * sizeof(typeof(*first.data)));
    assert(decommit);
-
-   array_push(first) = (arena_foo){999};
-
-   for(size i = 0; i < second.count; ++i)
-      printf("Second: %d\n", (int)second.data[i].k);
+   decommit = array_decommit((array*)&second, second.count * sizeof(typeof(*second.data)));
+   assert(decommit);
 
    for(size i = 0; i < first.count; ++i)
       printf("First: %d\n", (int)first.data[i].k);
+
+   for(size i = 0; i < second.count; ++i)
+      printf("Second: %d\n", (int)second.data[i].k);
 
    #else
 

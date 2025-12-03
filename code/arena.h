@@ -51,20 +51,14 @@ align_struct array
 {
    arena* arena;
    size count;
-   void* data;  // base
-   void* old_beg;
+   void* data;     // base
+   void* old_beg;  // TODO: compress into old_arena
+   void* old_end;
 } array;
 
-align_struct array_fixed
-{
-   arena arena;
-   size count;
-   void* data;   // base
-   void* old_beg;
-} array_fixed;
-
 // This cannot be passed to functions as is - must be used as a typedef
-#define array(T) __declspec(align(custom_alignment)) struct { arena* arena; size count; T* data; void* old_beg; }
+#define array(T) __declspec(align(custom_alignment)) \
+struct { arena* arena; size count; T* data; void* old_beg; void* old_end; }
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -157,10 +151,18 @@ static bool array_decommit(array* a, size array_size)
 static void array_realloc(array* a, size old_size, size new_size)
 {
    assert(iff(a->old_beg, old_size > 0));
+   assert(iff(a->old_end, old_size > 0));
 
-   // realloc old size
-   if((a->old_beg != a->arena->beg) && (old_size + new_size > arena_left(a->arena)))
+   if(old_size == 0)
    {
+      // align to next page for the next array
+      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      a->data = a->arena->beg;
+      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+   }
+   else if(old_size + new_size > arena_left(a->arena))
+   {
+      // realloc old size
       // align to next page for the next array
       a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
 
@@ -173,17 +175,10 @@ static void array_realloc(array* a, size old_size, size new_size)
       a->arena->end = (byte*)a->arena->end + old_size;
       a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    }
-   else if(old_size == 0)
-   {
-      // align to next page for the next array
-      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-      a->data = a->arena->beg;
-      a->arena->end = (void*)(((uptr)a->arena->end + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-   }
    else
    {
       a->arena->beg = a->old_beg;
-      // TODO: a->arena->end = a->old_end;
+      a->arena->end = a->old_end;
    }
 }
 
@@ -198,6 +193,7 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
 
    a->data = a->data ? a->data : result;
    a->old_beg = a->arena->beg;
+   a->old_end = a->arena->end;
 
    return result;
 }
