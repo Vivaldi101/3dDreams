@@ -71,22 +71,20 @@ static bool hw_is_virtual_memory_commited(void* address)
    return mbi.State == MEM_COMMIT;
 }
 
-static arena arena_new(arena* base, size cap, alloc_flags flag)
+static arena arena_new(arena* base, size cap)
 {
    assert(base->end && cap > 0);
    assert(cap >= PAGE_SIZE);
 
    arena a = *base;
 
-   if((flag == arena_scratch_kind || flag == array_scratch_kind) && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
+   if(hw_is_virtual_memory_commited((byte*)base->end) && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       a.beg = base->end;
       a.end = (byte*)base->end + cap;
 
-      assert((byte*)a.beg + cap == a.end);
-
-      assert(a.beg == base->beg);
-      assert(a.end == base->end);
+      assert(a.beg == base->end);
+      assert(a.end == (byte*)base->end + cap);
 
       return a;
    }
@@ -100,12 +98,12 @@ static arena arena_new(arena* base, size cap, alloc_flags flag)
    return a;
 }
 
-static void arena_expand(arena* a, size new_cap, alloc_flags flag)
+static void arena_expand(arena* a, size new_cap)
 {
    assert(new_cap > 0);
    assert((uptr)a->end <= ((1ull << 48)-1) - PAGE_SIZE);
 
-   arena new_arena = arena_new(a, new_cap, flag);
+   arena new_arena = arena_new(a, new_cap);
    assert(new_arena.beg >= a->beg);
    assert(new_arena.end > a->end);
 
@@ -128,7 +126,7 @@ static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flag
    if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
       // page align allocs
-      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE, flag);
+      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
       p = a->beg;
    }
 

@@ -442,13 +442,13 @@ int main(int argc, char** argv)
 
    const size initial_arena_size = PAGE_SIZE;
 
-   arena app_storage = arena_new(&app_arena, initial_arena_size, arena_persistent_kind);
+   arena app_storage = arena_new(&app_arena, initial_arena_size);
    assert(arena_left(&app_storage) == initial_arena_size);
 
-   arena vulkan_storage = arena_new(&vulkan_arena, initial_arena_size, arena_persistent_kind);
+   arena vulkan_storage = arena_new(&vulkan_arena, initial_arena_size);
    assert(arena_left(&vulkan_storage) == initial_arena_size);
 
-   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size, arena_scratch_kind);
+   arena scratch_storage = arena_new(&scratch_arena, initial_arena_size);
    assert(arena_left(&scratch_storage) == initial_arena_size);
 
    hw.app_storage = &app_storage;
@@ -477,7 +477,7 @@ int main(int argc, char** argv)
 
    // TOOD: Remove
    // arena tests
-   #if 1
+   #if 0
 
    array_foo first = {&app_storage};
    array_foo second = {&app_storage};
@@ -485,8 +485,6 @@ int main(int argc, char** argv)
    for(size i = 0; i < 63; i++)
       array_push(first) = (arena_foo){i};
 
-   array_free(first);
-   //array_push(first) = (arena_foo){63};
    array_push(second) = (arena_foo){1};
 
    //array_free(first);
