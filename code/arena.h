@@ -104,7 +104,7 @@ static void arena_expand(arena* a, size new_cap)
    assert((uptr)a->end <= ((1ull << 48)-1) - PAGE_SIZE);
 
    arena new_arena = arena_new(a, new_cap);
-   //assert(new_arena.beg >= a->beg);
+   assert(new_arena.beg >= a->beg);
    assert(new_arena.end > a->end);
 
    a->end = (byte*)new_arena.end;
@@ -153,7 +153,7 @@ static void array_decommit(array* a, size array_size)
    hw_virtual_memory_decommit(a->data, array_size);
 }
 
-static size array_realloc(array* a)
+static void array_realloc(array* a)
 {
    assert(a->arena->beg <= a->arena->end);
 
@@ -178,8 +178,6 @@ static size array_realloc(array* a)
       a->data = a->arena->beg;
       a->arena->beg = (void*)((uptr)a->arena->beg + old_array_size);
    }
-
-   return old_array_size;
 }
 
 static void arena_realloc(arena* a, size old_array_size, void* data)
@@ -210,9 +208,8 @@ static void arena_realloc(arena* a, size old_array_size, void* data)
 
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
-   size old_array_size = 0;
    if(a->data)
-      old_array_size = array_realloc(a);
+      array_realloc(a);
    else if((uptr)a->arena->beg & ALIGN_PAGE_SIZE)
       a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
    else
