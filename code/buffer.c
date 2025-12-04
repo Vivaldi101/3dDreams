@@ -422,8 +422,8 @@ static vk_buffer* buffer_hash_lookup(vk_buffer_hash_table* table, const char* ke
 
 static void buffer_hash_clear(vk_buffer_hash_table* table)
 {
-   memset(table->values, 0, table->max_count * sizeof(*table->values));
-   memset(table->keys, 0, table->max_count * sizeof(*table->keys));
+   pointer_clear(table->values, table->max_count * sizeof(*table->values));
+   pointer_clear(table->keys, table->max_count * sizeof(*table->keys));
 }
 
 static vk_buffer_hash_table buffer_hash_create(size max_count, arena* a)

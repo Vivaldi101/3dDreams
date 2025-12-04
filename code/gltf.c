@@ -659,7 +659,7 @@ static bool gltf_load_mesh(vk_context* context, const cgltf_data* data, s8 gltf_
    for(size i = 0; i < mesh_draws_count; ++i)
    {
       // 0xff means the vertex index is not in use yet
-      memset(meshlet_vertices, 0xff, max_vertex_count);
+      pointer_clear_to(meshlet_vertices, 0xff, max_vertex_count);
 
       size vertex_count = geometry->mesh_draws.data[i].vertex_count;
       size index_count = geometry->mesh_draws.data[i].index_count;

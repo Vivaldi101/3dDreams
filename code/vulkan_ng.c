@@ -163,10 +163,7 @@ static bool spirv_initialize(vk_context* context)
    table->keys = push(context->app_storage, const char*, table->max_count);
    table->values = push(context->app_storage, vk_shader_module, table->max_count);
 
-   memset(table->values, 0, table->max_count * sizeof(vk_shader_module));
-
-   for(size i = 0; i < table->max_count; ++i)
-      table->keys[i] = 0;
+   pointer_clear(table->values, table->max_count * sizeof(vk_shader_module));
 
    for(size i = 0; i < shaders.count; ++i)
    {
