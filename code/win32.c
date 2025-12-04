@@ -321,6 +321,9 @@ void hw_virtual_memory_release(void* address)
 
 void hw_virtual_memory_decommit(void* address, usize size)
 {
+   assert(hw_is_virtual_memory_commited(address));
+   assert(hw_is_virtual_memory_commited((byte*)address + size - 1));
+
    global_free(address, size, MEM_DECOMMIT);
 }
 
@@ -487,7 +490,7 @@ int main(int argc, char** argv)
 
    array_push(second) = (arena_foo){1};
 
-   //array_free(first);
+   array_free(first);
 
    array_push(second) = (arena_foo){63};
 

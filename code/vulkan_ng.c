@@ -13,56 +13,70 @@ static vk_allocator global_allocator;
 #include "rt.c"
 
 static void* VKAPI_PTR vk_allocation(void* user_data,
-                                     size_t size,
+                                     size_t new_size,
                                      size_t alignment,
                                      VkSystemAllocationScope allocation_scope)
 {
    (void)allocation_scope;
 
-   if(size == 0)
+   if(new_size == 0)
       return 0;
 
    static usize i = 0;
    vk_allocator* allocator = user_data;
-   allocator->old_size = size;
 
-   printf("Vulkan %zu alloc: %zu bytes\n", i++, size);
+   printf("Vulkan %zu alloc: %zu bytes\n", i++, new_size);
 
-   return alloc(allocator->arena, 1, alignment, size, 0);
+   void* p = array_alloc((array*)&allocator->memory, 1, PAGE_SIZE, new_size + sizeof(size), 0);
+
+   assert(!((uptr)p & (ALIGN_PAGE_SIZE)));
+
+   *(size*)(byte*)p = new_size;
+
+   return (byte*)p + sizeof(size);
 }
 
 static void* VKAPI_PTR vk_reallocation(void* user_data,
                                        void* original,
-                                       size_t size,
+                                       size_t new_size,
                                        size_t alignment,
                                        VkSystemAllocationScope allocation_scope)
 {
    (void)allocation_scope;
 
-   if(size == 0)
+   if(new_size == 0)
       return 0;
 
    vk_allocator* allocator = user_data;
 
    if(!original)
-      return vk_allocation(user_data, size, alignment, allocation_scope);
+      return vk_allocation(user_data, new_size, alignment, allocation_scope);
 
    static usize i = 0;
-   void* result = vk_allocation(user_data, size, alignment, allocation_scope);
-   assert(original < result);
-   memmove(result, original, allocator->old_size);
+   void* result = vk_allocation(user_data, new_size, alignment, allocation_scope);
+   size old_size = *((size*)original - 1);
 
-   printf("Vulkan %zu re-alloc: %zu bytes\n", i++, size);
+   memmove(result, original, old_size);
+
+   printf("Vulkan %zu re-alloc: %zu bytes\n", i++, new_size);
 
    return result;
 }
 
 static void VKAPI_PTR vk_free(void* user_data, void* memory)
 {
-   (void)user_data;
-   (void)memory;
+   if(!user_data || !memory)
+      return;
 
-   printf("Vulkan free\n");
+   vk_allocator* allocator = user_data;
+
+   size freed_size = *((size*)memory - 1);
+
+   assert(!(((uptr)((size*)memory - 1)) & ALIGN_PAGE_SIZE));
+
+   hw_virtual_memory_decommit(memory, freed_size);
+
+   printf("Vulkan free: %zu bytes\n", freed_size);
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
@@ -1706,6 +1720,7 @@ bool vk_initialize(hw* hw)
    arena s = context->scratch;
 
    global_allocator.arena = context->vulkan_storage;
+   global_allocator.memory.arena = global_allocator.arena;
    global_allocator.handle.pUserData = &global_allocator;
    global_allocator.handle.pfnAllocation = vk_allocation;
    global_allocator.handle.pfnReallocation = vk_reallocation;
