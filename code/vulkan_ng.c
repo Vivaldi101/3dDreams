@@ -26,13 +26,13 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
 
    vk_allocator* allocator = user_data;
 
-   printf("Vulkan alloc: %zu bytes\n", new_size);
-
    void* p = array_alloc((array*)&allocator->memory, 1, PAGE_SIZE, new_size + sizeof(size), 0);
 
    assert(!((uptr)p & (ALIGN_PAGE_SIZE)));
 
    *(size*)(byte*)p = new_size;
+
+   printf("Vulkan alloc: %p with %zu bytes\n", p, new_size);
 
    return (byte*)p + sizeof(size);
 }
@@ -56,7 +56,7 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
 
    memmove(result, original, old_size);
 
-   printf("Vulkan re-alloc: %zu bytes\n", new_size);
+   printf("Vulkan re-alloc: %p with %zu bytes\n", result, new_size);
 
    return result;
 }
@@ -72,7 +72,7 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
 
    hw_virtual_memory_decommit((size*)memory - 1, freed_size);
 
-   printf("Vulkan free: %zu bytes\n", freed_size);
+   printf("Vulkan free: %p with %zu bytes\n", (size*)memory - 1, freed_size);
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
