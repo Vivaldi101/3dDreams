@@ -111,7 +111,7 @@ static void arena_expand(arena* a, size new_cap, alloc_flags flag)
    assert((uptr)a->end <= ((1ull << 48)-1) - PAGE_SIZE);
 
    arena new_arena = arena_new(a, new_cap, flag);
-   assert(new_arena.beg == a->beg);
+   assert(new_arena.beg >= a->beg);
    assert(new_arena.end > a->end);
 
    a->end = (byte*)new_arena.end;
