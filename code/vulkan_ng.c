@@ -3,6 +3,7 @@
 
 #include "win32_file_io.c"
 
+// TODO: global for now
 static vk_allocator global_allocator;
 
 #include "vulkan_spirv_loader.c"
@@ -18,14 +19,14 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
                                      VkSystemAllocationScope allocation_scope)
 {
    (void)allocation_scope;
+   (void)alignment;
 
    if(new_size == 0)
       return 0;
 
-   static usize i = 0;
    vk_allocator* allocator = user_data;
 
-   printf("Vulkan %zu alloc: %zu bytes\n", i++, new_size);
+   printf("Vulkan alloc: %zu bytes\n", new_size);
 
    void* p = array_alloc((array*)&allocator->memory, 1, PAGE_SIZE, new_size + sizeof(size), 0);
 
@@ -47,18 +48,15 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    if(new_size == 0)
       return 0;
 
-   vk_allocator* allocator = user_data;
-
    if(!original)
       return vk_allocation(user_data, new_size, alignment, allocation_scope);
 
-   static usize i = 0;
    void* result = vk_allocation(user_data, new_size, alignment, allocation_scope);
    size old_size = *((size*)original - 1);
 
    memmove(result, original, old_size);
 
-   printf("Vulkan %zu re-alloc: %zu bytes\n", i++, new_size);
+   printf("Vulkan re-alloc: %zu bytes\n", new_size);
 
    return result;
 }
@@ -68,13 +66,11 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    if(!user_data || !memory)
       return;
 
-   vk_allocator* allocator = user_data;
-
    size freed_size = *((size*)memory - 1);
 
    assert(!(((uptr)((size*)memory - 1)) & ALIGN_PAGE_SIZE));
 
-   hw_virtual_memory_decommit(memory, freed_size);
+   hw_virtual_memory_decommit((size*)memory - 1, freed_size);
 
    printf("Vulkan free: %zu bytes\n", freed_size);
 }
@@ -91,9 +87,9 @@ static void VKAPI_PTR vk_internal_allocation(void* user_data,
 }
 
 static void VKAPI_PTR vk_internal_free(void* user_data,
-                                      size_t size,
-                                      VkInternalAllocationType allocation_type,
-                                      VkSystemAllocationScope allocation_scope)
+                                       size_t size,
+                                       VkInternalAllocationType allocation_type,
+                                       VkSystemAllocationScope allocation_scope)
 {
    (void)user_data;
    (void)size;

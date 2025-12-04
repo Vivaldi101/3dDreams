@@ -307,9 +307,6 @@ void* hw_virtual_memory_reserve(usize size)
 
 void* hw_virtual_memory_commit(void* address, usize size)
 {
-   //assert(!hw_is_virtual_memory_commited(address));
-   //assert(!hw_is_virtual_memory_commited((byte*)address + size - 1));
-
    // commit the reserved address range
    return global_allocate(address, size, MEM_COMMIT, PAGE_READWRITE);
 }
@@ -321,6 +318,7 @@ void hw_virtual_memory_release(void* address)
 
 void hw_virtual_memory_decommit(void* address, usize size)
 {
+   assert(!((uptr)address & ALIGN_PAGE_SIZE));
    assert(hw_is_virtual_memory_commited(address));
    assert(hw_is_virtual_memory_commited((byte*)address + size - 1));
 
@@ -490,7 +488,7 @@ int main(int argc, char** argv)
 
    array_push(second) = (arena_foo){1};
 
-   array_free(first);
+   //array_free(second);
 
    array_push(second) = (arena_foo){63};
 
