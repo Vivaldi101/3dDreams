@@ -112,30 +112,32 @@ static void arena_expand(arena* a, size new_cap)
    assert(a->end == (byte*)new_arena.beg + new_cap);
 }
 
-static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flags flag)
+static void* alloc(arena* a, size alloc_size, size align, size count, size header_size, alloc_flags flag)
 {
    (void)flag;
    assert(a->beg <= a->end);
-   assert(alloc_size > 0);
-   assert(align > 0);
-   assert(count > 0);
 
-   // align allocation to next aligned boundary
-   void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
+   void* p = (void*)(((uptr)a->beg + align - 1) & ~(align - 1));
 
-   assert(!((uptr)p & (align-1)));
-
-   if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
+   // empty or overflow
+   if((count <= 0) || (count > ((((byte*)a->end - (byte*)p) - header_size) / alloc_size)))
    {
-      // page align allocs
-      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      arena_expand(a, (header_size + (count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
       p = a->beg;
-      p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
    }
 
-   a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
+   assert(!((uptr)((byte*)p) & (align - 1)));
 
-   pointer_clear(p, count * alloc_size);
+   // advance arena
+   a->beg = (byte*)p + (count * alloc_size) + header_size;
+
+   pointer_clear(p, (count * alloc_size) + header_size);
+
+   // save the old size on first time for reallocs
+   *(size*)p = count * alloc_size;
+
+   p = (byte*)p + header_size;
+   p = (void*)(((uptr)p + align - 1) & ~(align - 1));
 
    assert(a->beg <= a->end);
 
@@ -208,21 +210,16 @@ static void arena_realloc(arena* a, size old_array_size, void* data)
 
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
-   if(a->data)
-      array_realloc(a);
-   else if((uptr)a->arena->beg & ALIGN_PAGE_SIZE)
-      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-   else
-      hw_virtual_memory_commit(a->arena->beg, PAGE_SIZE);
-
-   void* result = alloc(a->arena, alloc_size, align, count, flag);
+   size header_size = !a->data ? sizeof(size) : 0;
+   void* result = alloc(a->arena, alloc_size, align, count, header_size, flag);
 
    // set base data once
    a->data = a->data ? a->data : result;
 
    a->count++;
-   a->old_beg = a->arena->beg;
 
+   // must be aligned pointer
+   assert(!((uptr)((byte*)result) & (align - 1)));
    return result;
 }
 
