@@ -154,12 +154,49 @@ static void array_decommit(array* a, size array_size)
    hw_virtual_memory_decommit(a->data, array_size);
 }
 
+static void array_realloc(array* a)
+{
+   assert(a->arena->beg <= a->arena->end);
+
+   size old_array_size = *(size*)((byte*)a->data);
+   if(old_array_size == 0)
+      return;
+
+   // need to relocate
+   if((byte*)a->arena->beg > (byte*)a->data + old_array_size)
+   {
+      a->arena->beg = a->arena->end;
+      a->arena->beg = (void*)(((uptr)a->arena->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      a->arena->end = (void*)((uptr)a->arena->beg + old_array_size);
+      hw_virtual_memory_commit(a->arena->beg, old_array_size);
+      memmove(a->arena->beg, a->data, old_array_size);
+
+      a->data = a->arena->beg;
+      a->arena->beg = a->arena->end;
+   }
+   else if((byte*)a->arena->beg < (byte*)a->data)
+   {
+      hw_virtual_memory_commit(a->arena->beg, old_array_size);
+      memmove(a->arena->beg, a->data, old_array_size);
+      a->data = a->arena->beg;
+      a->arena->beg = (void*)((uptr)a->arena->beg + old_array_size);
+   }
+}
+
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
    void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    // set base data once
    a->data = a->data ? a->data : result;
+
+   #if 0
+   if(a->data)
+   {
+      array_realloc(a);
+      return a->data;
+   }
+   #endif
 
    a->count++;
 
