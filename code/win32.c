@@ -318,7 +318,6 @@ void hw_virtual_memory_release(void* address)
 
 void hw_virtual_memory_decommit(void* address, usize size)
 {
-   assert(!((uptr)address & ALIGN_PAGE_SIZE));
    assert(hw_is_virtual_memory_commited(address));
    assert(hw_is_virtual_memory_commited((byte*)address + size - 1));
 
@@ -434,12 +433,15 @@ int main(int argc, char** argv)
 
    arena app_arena = {0};
    app_arena.end = program_memory;
+   app_arena.kind = arena_persistent_kind;
 
    arena vulkan_arena = {0};
    vulkan_arena.end = (byte*)app_arena.end + arena_part_size;
+   vulkan_arena.kind = arena_persistent_kind;
 
    arena scratch_arena = {0};
    scratch_arena.end = (byte*)vulkan_arena.end + arena_part_size;
+   scratch_arena.kind = arena_scratch_kind;
 
    const size initial_arena_size = PAGE_SIZE;
 

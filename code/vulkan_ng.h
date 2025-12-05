@@ -175,7 +175,6 @@ align_struct vk_features
 align_struct vk_allocator
 {
    VkAllocationCallbacks handle;
-   arena* arena;
    array(byte) memory;
 } vk_allocator;
 

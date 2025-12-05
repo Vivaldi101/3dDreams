@@ -24,11 +24,15 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    if(new_size == 0)
       return 0;
 
+   // align to 4k pages for easier decommits on free
+   alignment = PAGE_SIZE;
+
    vk_allocator* allocator = user_data;
 
-   void* p = array_alloc((array*)&allocator->memory, 1, PAGE_SIZE, new_size + sizeof(size), 0);
+   // + sizeof(size) for header size for realloc
+   void* p = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
 
-   assert(!((uptr)p & (ALIGN_PAGE_SIZE)));
+   assert(!((uptr)p & (alignment-1)));
 
    *(size*)(byte*)p = new_size;
 
@@ -51,8 +55,9 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    if(!original)
       return vk_allocation(user_data, new_size, alignment, allocation_scope);
 
-   void* result = vk_allocation(user_data, new_size, alignment, allocation_scope);
    size old_size = *((size*)original - 1);
+   assert(old_size + new_size > new_size);
+   void* result = vk_allocation(user_data, old_size + new_size, alignment, allocation_scope);
 
    memmove(result, original, old_size);
 
@@ -66,13 +71,10 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    if(!user_data || !memory)
       return;
 
-   size freed_size = *((size*)memory - 1);
+   size array_size = *(size*)((byte*)memory - sizeof(size));
+   hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
 
-   assert(!(((uptr)((size*)memory - 1)) & ALIGN_PAGE_SIZE));
-
-   hw_virtual_memory_decommit((size*)memory - 1, freed_size);
-
-   printf("Vulkan free: %p with %zu bytes\n", (size*)memory - 1, freed_size);
+   printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
@@ -117,8 +119,6 @@ static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, c
 {
    vk_shader_module result = {0};
 
-   s8 exe_dir = vk_exe_directory(&scratch);
-
    VkShaderStageFlagBits shader_stage = 0;
 
    const s8 shader_name = s8(shader_name_raw);
@@ -133,7 +133,7 @@ static vk_shader_module vk_shader_load(VkDevice logical_device, arena scratch, c
    else if(s8_is_substr_count(shader_name, frag_spv_name) != invalid_index)
       shader_stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-   VkShaderModule module = vk_shader_spv_module_load(logical_device, &scratch, exe_dir, shader_name);
+   VkShaderModule module = vk_shader_spv_module_load(logical_device, scratch, shader_name);
 
    switch(shader_stage)
    {
@@ -1715,8 +1715,7 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   global_allocator.arena = context->vulkan_storage;
-   global_allocator.memory.arena = global_allocator.arena;
+   global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
    global_allocator.handle.pfnAllocation = vk_allocation;
    global_allocator.handle.pfnReallocation = vk_reallocation;

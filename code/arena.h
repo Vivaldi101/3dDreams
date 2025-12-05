@@ -9,13 +9,13 @@
 void* hw_virtual_memory_commit(void* address, usize size);
 void hw_virtual_memory_decommit(void* address, usize size);
 
-typedef enum alloc_flags
+typedef enum arena_flags
 {
    arena_persistent_kind = 0,
    arena_scratch_kind,
    array_persistent_kind,
    array_scratch_kind,
-} alloc_flags;
+} arena_flags;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -48,6 +48,7 @@ align_struct arena
 {
    void* beg;
    void* end;         // one past the end
+   arena_flags kind;
 } arena;
 
 align_struct array
@@ -55,12 +56,11 @@ align_struct array
    arena* arena;
    size count;
    void* data;     // base
-   void* old_beg;
 } array;
 
 // This cannot be passed to functions as is - must be used as a typedef
 #define array(T) __declspec(align(custom_alignment)) \
-struct { arena* arena; size count; T* data; arena old_beg; }
+struct { arena* arena; size count; T* data; }
 
 static bool hw_is_virtual_memory_commited(void* address)
 {
@@ -78,7 +78,9 @@ static arena arena_new(arena* base, size cap)
 
    arena a = *base;
 
-   if(hw_is_virtual_memory_commited((byte*)base->end) && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
+   if(a.kind == arena_scratch_kind &&
+      hw_is_virtual_memory_commited((byte*)base->end) &&
+      hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       a.beg = base->end;
       a.end = (byte*)base->end + cap;
@@ -112,32 +114,30 @@ static void arena_expand(arena* a, size new_cap)
    assert(a->end == (byte*)new_arena.beg + new_cap);
 }
 
-static void* alloc(arena* a, size alloc_size, size align, size count, size header_size, alloc_flags flag)
+static void* alloc(arena* a, size alloc_size, size align, size count, arena_flags flag)
 {
    (void)flag;
    assert(a->beg <= a->end);
+   assert(alloc_size > 0);
+   assert(align > 0);
+   assert(count > 0);
 
-   void* p = (void*)(((uptr)a->beg + align - 1) & ~(align - 1));
+   // align allocation to next aligned boundary
+   void* p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
 
-   // empty or overflow
-   if((count <= 0) || (count > ((((byte*)a->end - (byte*)p) - header_size) / alloc_size)))
+   assert(!((uptr)p & (align-1)));
+
+   if(count <= 0 || count > ((byte*)a->end - (byte*)p) / alloc_size) // empty or overflow
    {
-      arena_expand(a, (header_size + (count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
+      // page align allocs
+      arena_expand(a, ((count * alloc_size) + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
       p = a->beg;
+      p = (void*)(((uptr)a->beg + (align - 1)) & ~(uptr)(align - 1));
    }
 
-   assert(!((uptr)((byte*)p) & (align - 1)));
+   a->beg = (byte*)p + (count * alloc_size);                         // advance arena 
 
-   // advance arena
-   a->beg = (byte*)p + (count * alloc_size) + header_size;
-
-   pointer_clear(p, (count * alloc_size) + header_size);
-
-   // save the old size on first time for reallocs
-   *(size*)p = count * alloc_size;
-
-   p = (byte*)p + header_size;
-   p = (void*)(((uptr)p + align - 1) & ~(align - 1));
+   pointer_clear(p, count * alloc_size);
 
    assert(a->beg <= a->end);
 
@@ -147,7 +147,6 @@ static void* alloc(arena* a, size alloc_size, size align, size count, size heade
 static void array_decommit(array* a, size array_size)
 {
    a->count = 0;
-   a->old_beg = 0;
 
    a->arena->beg = a->data;
 
@@ -159,7 +158,9 @@ static void array_realloc(array* a)
 {
    assert(a->arena->beg <= a->arena->end);
 
-   size old_array_size = (byte*)a->old_beg - (byte*)a->data;
+   size old_array_size = *(size*)((byte*)a->data);
+   if(old_array_size == 0)
+      return;
 
    // need to relocate
    if((byte*)a->arena->beg > (byte*)a->data + old_array_size)
@@ -182,44 +183,23 @@ static void array_realloc(array* a)
    }
 }
 
-static void arena_realloc(arena* a, size old_array_size, void* data)
-{
-   assert(a->beg <= a->end);
-
-   // need to relocate
-   if((byte*)a->beg > (byte*)data + old_array_size)
-   {
-      a->beg = a->end;
-      a->beg = (void*)(((uptr)a->beg + ALIGN_PAGE_SIZE) & ~ALIGN_PAGE_SIZE);
-      a->end = (void*)((uptr)a->beg + old_array_size);
-      hw_virtual_memory_commit(a->beg, old_array_size);
-      memmove(a->beg, data, old_array_size);
-
-      data = a->beg;
-      a->beg = a->end;
-   }
-   else if((byte*)a->beg < (byte*)data)
-   {
-      hw_virtual_memory_commit(a->beg, old_array_size);
-      memmove(a->beg, data, old_array_size);
-      data = a->beg;
-      a->beg = (void*)((uptr)a->beg + old_array_size);
-   }
-
-}
-
 static void* array_alloc(array* a, size alloc_size, size align, size count, u32 flag)
 {
-   size header_size = !a->data ? sizeof(size) : 0;
-   void* result = alloc(a->arena, alloc_size, align, count, header_size, flag);
+   void* result = alloc(a->arena, alloc_size, align, count, flag);
 
    // set base data once
    a->data = a->data ? a->data : result;
 
+   #if 0
+   if(a->data)
+   {
+      array_realloc(a);
+      return a->data;
+   }
+   #endif
+
    a->count++;
 
-   // must be aligned pointer
-   assert(!((uptr)((byte*)result) & (align - 1)));
    return result;
 }
 
