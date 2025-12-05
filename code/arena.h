@@ -9,13 +9,13 @@
 void* hw_virtual_memory_commit(void* address, usize size);
 void hw_virtual_memory_decommit(void* address, usize size);
 
-typedef enum alloc_flags
+typedef enum arena_flags
 {
    arena_persistent_kind = 0,
    arena_scratch_kind,
    array_persistent_kind,
    array_scratch_kind,
-} alloc_flags;
+} arena_flags;
 
 #define arena_left(a) (size)((byte*)(a)->end - (byte*)(a)->beg)
 
@@ -48,6 +48,7 @@ align_struct arena
 {
    void* beg;
    void* end;         // one past the end
+   arena_flags kind;
 } arena;
 
 align_struct array
@@ -77,7 +78,9 @@ static arena arena_new(arena* base, size cap)
 
    arena a = *base;
 
-   if(hw_is_virtual_memory_commited((byte*)base->end) && hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
+   if(a.kind == arena_scratch_kind &&
+      hw_is_virtual_memory_commited((byte*)base->end) &&
+      hw_is_virtual_memory_commited((byte*)base->end + cap - 1))
    {
       a.beg = base->end;
       a.end = (byte*)base->end + cap;
@@ -111,7 +114,7 @@ static void arena_expand(arena* a, size new_cap)
    assert(a->end == (byte*)new_arena.beg + new_cap);
 }
 
-static void* alloc(arena* a, size alloc_size, size align, size count, alloc_flags flag)
+static void* alloc(arena* a, size alloc_size, size align, size count, arena_flags flag)
 {
    (void)flag;
    assert(a->beg <= a->end);

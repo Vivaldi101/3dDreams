@@ -4,32 +4,6 @@
 // This must match what is in the shader_build.bat file
 #define BUILTIN_SHADER_NAME "Builtin.ObjectShader"
 
-// TODO: Change name to vk_spv_compile
-static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena* app_storage, s8 shader_dir, s8 shader_name)
-{
-   VkShaderModule result = 0;
-
-   array(char) shader_path = {app_storage};
-   s8 prefix = s8("%s\\bin\\assets\\shaders\\%s");
-
-   shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
-   array_resize(shader_path, shader_path.count);
-
-   wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name.data);
-
-   arena shader_file = win32_file_read(app_storage, shader_path.data);
-
-   VkShaderModuleCreateInfo module_info = {0};
-   module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-   module_info.pCode = (u32*)shader_file.beg;
-   module_info.codeSize = arena_left(&shader_file);
-
-   if((vkCreateShaderModule(logical_device, &module_info, 0, &result)) != VK_SUCCESS)
-      return 0;
-
-   return result;
-}
-
 // TODO: Should be in win32.c
 static s8 win32_module_path(arena* a)
 {
@@ -69,6 +43,34 @@ static s8 vk_exe_directory(arena* a)
    module_path.data[module_path.len] = 0;
 
    return module_path;
+}
+
+// TODO: Change name to vk_spv_compile
+static VkShaderModule vk_shader_spv_module_load(VkDevice logical_device, arena scratch, s8 shader_name)
+{
+   VkShaderModule result = 0;
+
+   s8 shader_dir = vk_exe_directory(&scratch);
+
+   array(char) shader_path = {&scratch};
+   s8 prefix = s8("%s\\bin\\assets\\shaders\\%s");
+
+   shader_path.count = shader_dir.len + prefix.len + shader_name.len;  // TODO s8 for shader_name
+   array_resize(shader_path, shader_path.count);
+
+   wsprintf(shader_path.data, s8_data(prefix), shader_dir.data, shader_name.data);
+
+   arena shader_file = win32_file_read(&scratch, shader_path.data);
+
+   VkShaderModuleCreateInfo module_info = {0};
+   module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+   module_info.pCode = (u32*)shader_file.beg;
+   module_info.codeSize = arena_left(&shader_file);
+
+   if((vkCreateShaderModule(logical_device, &module_info, 0, &result)) != VK_SUCCESS)
+      return 0;
+
+   return result;
 }
 
 typedef array(s8) s8_array;
