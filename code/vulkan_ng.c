@@ -26,6 +26,7 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
 
    vk_allocator* allocator = user_data;
 
+   // + sizeof(size) for header size for realloc
    void* p = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
 
    assert(!((uptr)p & (alignment-1)));
