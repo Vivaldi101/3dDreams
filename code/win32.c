@@ -318,7 +318,7 @@ void hw_virtual_memory_release(void* address)
 
 void hw_virtual_memory_decommit(void* address, usize size)
 {
-   assert(!((uptr)address & ALIGN_PAGE_SIZE));
+   //assert(!((uptr)address & ALIGN_PAGE_SIZE));
    assert(hw_is_virtual_memory_commited(address));
    assert(hw_is_virtual_memory_commited((byte*)address + size - 1));
 
