@@ -24,6 +24,9 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    if(new_size == 0)
       return 0;
 
+   // align to 4k pages for easier decommits on free
+   alignment = PAGE_SIZE;
+
    vk_allocator* allocator = user_data;
 
    // + sizeof(size) for header size for realloc
@@ -68,12 +71,14 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    if(!user_data || !memory)
       return;
 
-   size freed_size = *(size*)((byte*)memory - sizeof(size));
+   size array_size = *(size*)((byte*)memory - sizeof(size));
    vk_allocator* allocator = user_data;
+   hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
+
    //allocator->arena->beg = memory;
    //allocator->arena->end = (byte*)allocator->arena->beg + freed_size;
 
-   printf("Vulkan free: %p with %zu bytes\n", memory, freed_size);
+   printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
