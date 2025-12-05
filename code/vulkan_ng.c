@@ -72,11 +72,7 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
       return;
 
    size array_size = *(size*)((byte*)memory - sizeof(size));
-   vk_allocator* allocator = user_data;
    hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
-
-   //allocator->arena->beg = memory;
-   //allocator->arena->end = (byte*)allocator->arena->beg + freed_size;
 
    printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
 }
@@ -1719,8 +1715,7 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   global_allocator.arena = context->vulkan_storage;
-   global_allocator.memory.arena = global_allocator.arena;
+   global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
    global_allocator.handle.pfnAllocation = vk_allocation;
    global_allocator.handle.pfnReallocation = vk_reallocation;
