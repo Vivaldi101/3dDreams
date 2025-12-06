@@ -190,14 +190,6 @@ static void* array_alloc(array* a, size alloc_size, size align, size count, u32 
    // set base data once
    a->data = a->data ? a->data : result;
 
-   #if 0
-   if(a->data)
-   {
-      array_realloc(a);
-      return a->data;
-   }
-   #endif
-
    a->count++;
 
    return result;
