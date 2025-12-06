@@ -7,6 +7,7 @@
 static vk_allocator global_allocator;
 
 #include "vulkan_spirv_loader.c"
+#include "free_list.c"
 #include "hash.c"
 #include "texture.c"
 #include "buffer.c"
@@ -72,6 +73,7 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
       return;
 
    size array_size = *(size*)((byte*)memory - sizeof(size));
+   // TODO: instead of decommiting use a free-list of available arenas first then do decommit if none found
    hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
 
    printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
