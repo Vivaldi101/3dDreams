@@ -1717,6 +1717,29 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
+   int foo1 = 1;
+   int foo2 = 2;
+   int foo3 = 3;
+
+   list_node(int) h = {};
+
+   typeof(h)* n = list_push(a, &h);
+   n->data = &foo1;
+
+   typeof(h)* m = list_push(a, &h);
+   m->data = &foo2;
+
+   typeof(h)* p = list_push(a, &h);
+   p->data = &foo3;
+
+   node_release(n);
+   node_release(m);
+   node_release(p);
+
+   typeof(h)* pn = list_push(a, &h);
+
+   assert(pn == p);
+
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
    global_allocator.handle.pfnAllocation = vk_allocation;

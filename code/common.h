@@ -26,6 +26,7 @@ static const size invalid_index = (size)-1;
 #define s8_data(s) (const char*)(s).data
 
 #define fault(p)  {hw_message_box(p); __debugbreak();}
+#define fault(p)  {hw_message_box(p); __debugbreak();}
 
 #define implies(p, q) (!(p) || (q))
 #define iff(p, q) implies((p), (q)) && implies((q), (p))
