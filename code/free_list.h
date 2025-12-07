@@ -7,22 +7,20 @@ align_struct list_node
 } list_node;
 
 #define list_node(T) __declspec(align(custom_alignment)) \
-struct { struct list_node* next; void* data; }
+struct { struct list_node* next; T data; }
 
 // sanity check for generic list_node
 static_assert(offsetof(list_node, data) == offsetof(list_node(int), data));
 
-align_struct free_list
-{
-   list_node* nodes;
-   size count;
-} free_list;
-
 align_struct list
 {
-   free_list available_nodes;
+   list_node* free_list;
    list_node* nodes;
-   list_node* head;
+   size node_count;
 } list;
 
-static free_list global_free_list; // TODO: Remove this and use list struct above
+//#define list(T) __declspec(align(custom_alignment)) \
+//struct { struct list_node* next; T data; }
+
+// sanity check for generic list
+//static_assert(offsetof(list, nodes_left) == offsetof(list(int), nodes_left));

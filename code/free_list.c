@@ -1,54 +1,62 @@
 #include "free_list.h"
 
-static const size free_list_count = PAGE_SIZE / sizeof(list_node);
-
-static void list_node_release(list_node* n)
+static void list_node_release(list* l, list_node* n)
 {
-   n->next = global_free_list.nodes;
-   global_free_list.nodes = n;
-   global_free_list.count++;
+   printf("Releasing node to free-list: %p\n", n);
+
+   n->next = l->free_list;
+   l->free_list = n;
 }
 
-static list_node* list_node_push(arena* a, list_node* h)
+static list_node* list_node_push(arena* a, list* l)
 {
    list_node* result = 0;
 
-   // take from free list
-   if(global_free_list.nodes && global_free_list.count != 0)
+   if(l->free_list)
    {
-      result = global_free_list.nodes;
-      result->next = h->next;
-      h->next = result;
-      global_free_list.nodes++;
-      global_free_list.count--;
+      // take first from free list
+      result = l->free_list;
+      l->free_list = l->free_list->next;
       return result;
    }
 
-   // make room in the free list
-   global_free_list.nodes = push(a, list_node, free_list_count, arena_persistent_kind);
+   // how much to allocate in burst - align to 4k page size usually
+   const size list_count = PAGE_SIZE / sizeof(list_node);
 
-   result = global_free_list.nodes;
-   result->next = h->next;
+   // first time alloc or ran out
+   if(!l->nodes || l->node_count == list_count)
+   {
+      l->node_count = 0;
+      l->nodes = push(a, list_node, list_count, arena_persistent_kind);
+   }
 
-   h->next = result;
+   // circular
+   result = l->nodes + l->node_count;
+   result->next = l->nodes->next;
 
-   global_free_list.count = free_list_count - 1;
-   global_free_list.nodes++;
+   l->nodes->next = result;
+   l->node_count++;
 
    return result;
 }
 
-static void list_release(list* list)
+static void list_release(list* l)
 {
-   list_node* t;
-   do
-   {
-      t = list->head->next;
-      list_node_release(list->head);
-      list->head = t;
-   }
-   while(t);
+   for(size i = 0; i < l->node_count; ++i)
+      list_node_release(l, l->nodes + i);
 }
 
-#define list_push(a, h) (typeof(h))list_node_push((a), (list_node*)(h))
-#define node_release(n) list_node_release((list_node*)(n))
+static void free_list_print(list* l)
+{
+   list_node* n = l->free_list;
+   
+   while(n)
+   {
+      printf("Free-list node: %p\n", n);
+      n = n->next;
+   }
+}
+
+#define list_push(a, l) list_node_push((a), (l))
+#define list_free(l) list_release((l))
+#define node_release(l, n) list_node_release((l), (n))

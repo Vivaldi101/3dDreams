@@ -1717,28 +1717,22 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   int foo1 = 1;
-   int foo2 = 2;
-   int foo3 = 3;
+   #if 0
+   list l = {};
 
-   list_node(int) h = {};
+   for(size i = 0; i < 64; ++i)
+   {
+      list_node(size)* n = list_push(a, &l);
 
-   typeof(h)* n = list_push(a, &h);
-   n->data = &foo1;
+      n->data = i;
+   }
 
-   typeof(h)* m = list_push(a, &h);
-   m->data = &foo2;
+   list_free(&l);
+   free_list_print(&l);
 
-   typeof(h)* p = list_push(a, &h);
-   p->data = &foo3;
+   return false;
 
-   node_release(n);
-   node_release(m);
-   node_release(p);
-
-   typeof(h)* pn = list_push(a, &h);
-
-   assert(pn == p);
+   #endif
 
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
