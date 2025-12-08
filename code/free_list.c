@@ -57,6 +57,10 @@ static void free_list_print(list* l)
    }
 }
 
-#define list_push(a, l) list_node_push((a), (l))
-#define list_free(l) list_release((l))
+#define list_push(a, l) (typeof(*(l.nodes)))list_node_push((a), (list*)(l))
+
+#define list_free(l, t) \
+   static_assert(offsetof(l, node_count) == offsetof(list, node_count)); \
+   list_release((list*)(l))
+
 #define node_release(l, n) list_node_release((l), (n))

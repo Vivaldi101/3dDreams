@@ -6,7 +6,8 @@ align_struct list_node
    void* data;
 } list_node;
 
-#define list_node(T) __declspec(align(custom_alignment)) \
+#define list_node(T) \
+__declspec(align(custom_alignment)) \
 struct { struct list_node* next; T data; }
 
 // sanity check for generic list_node
@@ -19,8 +20,6 @@ align_struct list
    size node_count;
 } list;
 
-//#define list(T) __declspec(align(custom_alignment)) \
-//struct { struct list_node* next; T data; }
-
-// sanity check for generic list
-//static_assert(offsetof(list, nodes_left) == offsetof(list(int), nodes_left));
+#define list(T) typedef list_node(T) node_##T; \
+__declspec(align(custom_alignment)) \
+struct list_##T { node_##T* free_list; node_##T* nodes; size node_count; } \

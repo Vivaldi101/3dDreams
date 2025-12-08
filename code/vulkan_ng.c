@@ -37,7 +37,9 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
 
    *(size*)(byte*)p = new_size;
 
+   #if _DEBUG
    printf("Vulkan alloc: %p with %zu bytes\n", p, new_size);
+   #endif
 
    return (byte*)p + sizeof(size);
 }
@@ -62,7 +64,9 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
 
    memmove(result, original, old_size);
 
+   #if _DEBUG
    printf("Vulkan re-alloc: %p with %zu bytes\n", result, new_size);
+   #endif
 
    return result;
 }
@@ -76,7 +80,9 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    // TODO: instead of decommiting use a free-list of available arenas first then do decommit if none found
    hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
 
+   #if _DEBUG
    printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
+   #endif
 }
 
 static void VKAPI_PTR vk_internal_allocation(void* user_data,
@@ -1717,18 +1723,18 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   #if 0
-   list l = {};
+   #if 1
+   list(size) l = {0};
 
    for(size i = 0; i < 64; ++i)
    {
-      list_node(size)* n = list_push(a, &l);
+      node_size* n = list_push(a, &l);
 
       n->data = i;
    }
 
-   list_free(&l);
-   free_list_print(&l);
+   //list_free(&l, size);
+   //free_list_print(&l);
 
    return false;
 
