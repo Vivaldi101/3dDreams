@@ -20,6 +20,6 @@ align_struct list
    size node_count;
 } list;
 
-#define list(T) typedef list_node(T) node_##T; \
+#define list(T) typedef list_node(T) node_##T##_t; \
 __declspec(align(custom_alignment)) \
-struct list_##T { node_##T* free_list; node_##T* nodes; size node_count; } \
+struct list_##T { node_##T##_t* free_list; node_##T##_t* nodes; size node_count; } \

@@ -1728,7 +1728,7 @@ bool vk_initialize(hw* hw)
 
    for(size i = 0; i < 64; ++i)
    {
-      node_size* n = list_push(a, &l);
+      node_size_t* n = list_push(a, &l);
 
       n->data = i;
    }
@@ -1736,7 +1736,8 @@ bool vk_initialize(hw* hw)
    //list_free(&l, size);
    //free_list_print(&l);
 
-   return false;
+   //return false;
+   int foo = 42;
 
    #endif
 
