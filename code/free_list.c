@@ -58,9 +58,28 @@ static void free_list_print(list* l)
 }
 
 #define list_push(a, l) (typeof(*(l.nodes)))list_node_push((a), (list*)(l))
+
+// TODO: cleanup sanity asserts
 #define list_free(l) \
    static_assert(offsetof(typeof(*l), node_count) == offsetof(list, node_count)); \
    static_assert(sizeof(typeof(*l)) == sizeof(list)); \
    list_release((list*)l)
 
-#define node_release(l, n) list_node_release((l), (n))
+#define node_release(l, n) list_node_release((list*)(l), (n))
+
+#if 0
+static void free_list_tests(arena* a)
+{
+   list(size) l = {0};
+
+   for(size i = 0; i < 64; ++i)
+   {
+      node_size_t* n = list_push(a, &l);
+
+      n->data = i;
+   }
+
+   list_free(&l);
+
+}
+#endif

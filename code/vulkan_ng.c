@@ -1723,24 +1723,6 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   #if 1
-   list(size) l = {0};
-
-   for(size i = 0; i < 64; ++i)
-   {
-      node_size_t* n = list_push(a, &l);
-
-      n->data = i;
-   }
-
-   //list_free(&l, size);
-   //free_list_print(&l);
-
-   //return false;
-   int foo = 42;
-
-   #endif
-
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
    global_allocator.handle.pfnAllocation = vk_allocation;
