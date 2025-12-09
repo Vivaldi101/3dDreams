@@ -2,21 +2,20 @@
 
 static void list_node_release(list* l, list_node* n)
 {
-   //printf("Releasing node to free-list: %p with size: %zu\n", n, n->data.slot_size);
-
-   n->next = l->free_list;
-   l->free_list = n;
+   n->next = l->free_list->next;
+   l->free_list->next = n;
 }
 
 static list_node* list_node_push(arena* a, list* l, size node_size)
 {
    list_node* result = 0;
 
-   if(l->free_list)
+   if(l->free_list && l->free_list->next)
    {
       // take first from free list
-      result = l->free_list;
-      l->free_list = l->free_list->next;
+      result = l->free_list->next;
+      l->free_list->next = l->free_list->next->next;
+      result->is_free_list = true;
       return result;
    }
 
@@ -29,6 +28,9 @@ static list_node* list_node_push(arena* a, list* l, size node_size)
       l->node_count = 0;
       l->nodes = push(a, list_node, list_count, arena_persistent_kind);
    }
+
+   if(!l->free_list)
+      l->free_list = push(a, list_node);
 
    result = l->nodes + l->node_count;
    result->next = l->head;
@@ -47,7 +49,7 @@ static void list_release(list* l)
 
 static void free_list_print(list* l)
 {
-   list_node* n = l->free_list;
+   list_node* n = l->free_list->next;
    
    while(n)
    {
