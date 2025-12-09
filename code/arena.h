@@ -63,7 +63,7 @@ align_struct array
 #define array(T) __declspec(align(custom_alignment)) \
 struct { arena* arena; size count; T* data; }
 
-// sanity check for generic array
+// sanity check
 static_assert(offsetof(array, data) == offsetof(array(int), data));
 
 static bool hw_is_virtual_memory_commited(void* address)

@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include "arena.h"
+#include "free_list.h"
 #include "vulkan_shader_module.h"
 
 #include "../assets/shaders/mesh.h"
@@ -175,6 +176,8 @@ align_struct vk_features
 align_struct vk_allocator
 {
    VkAllocationCallbacks handle;
+   list slots;
+   list_node* free_list_head;
    array(byte) memory;
 } vk_allocator;
 

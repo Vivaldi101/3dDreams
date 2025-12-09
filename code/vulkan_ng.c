@@ -8,8 +8,8 @@ static vk_allocator global_allocator;
 
 #include "vulkan_spirv_loader.c"
 #include "free_list.c"
-#include "hash.c"
 #include "texture.c"
+#include "hash.c"
 #include "buffer.c"
 #include "gltf.c"
 #include "rt.c"
@@ -25,23 +25,43 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    if(new_size == 0)
       return 0;
 
-   // align to 4k pages for easier decommits on free
+   // align to 4k pages for easier decommits on free 
+   // TODO: relax this once we have free-list for arena reuse
    alignment = PAGE_SIZE;
 
    vk_allocator* allocator = user_data;
 
-   // + sizeof(size) for header size for realloc
-   void* p = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
+   arena* a = allocator->memory.arena;
+   list* l = &allocator->slots;
+   list_node* n = list_push(a, l);
 
-   assert(!((uptr)p & (alignment-1)));
+   assert(implies(n->data.memory, !((uptr)((byte*)n->data.memory - sizeof(size)) & (alignment - 1))));
 
-   *(size*)(byte*)p = new_size;
+   void* result = 0;
+
+   // We could iterate the free list here instead too
+   if(n->data.slot_size == new_size)
+   {
+      printf("ACQUIRING node from free-list: %p with %zu bytes\n", n->data.memory, n->data.slot_size);
+      return n->data.memory;
+   }
+   else
+   {
+      allocator->free_list_head = n;
+
+      // + sizeof(size) for header size for realloc
+      result = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
+
+      assert(!((uptr)result & (alignment - 1)));
+
+      *(size*)(byte*)result = new_size;
+   }
 
    #if _DEBUG
-   printf("Vulkan alloc: %p with %zu bytes\n", p, new_size);
+   printf("Vulkan alloc: %p with %zu bytes\n", result, new_size);
    #endif
 
-   return (byte*)p + sizeof(size);
+   return (byte*)result + sizeof(size);
 }
 
 static void* VKAPI_PTR vk_reallocation(void* user_data,
@@ -76,12 +96,26 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    if(!user_data || !memory)
       return;
 
-   size array_size = *(size*)((byte*)memory - sizeof(size));
+   vk_allocator* allocator = user_data;
+   list* l = &allocator->slots;
+   size slot_size = *(size*)((byte*)memory - sizeof(size));
+
+   if(allocator->free_list_head)
+   {
+      allocator->free_list_head->data.memory = memory;
+      allocator->free_list_head->data.slot_size = slot_size;
+
+      printf("Vulkan release node to free-list: %p with %zu bytes\n", (byte*)memory - sizeof(size), slot_size);
+      node_release(l, allocator->free_list_head);
+
+      allocator->free_list_head = allocator->free_list_head->next;
+   }
+
    // TODO: instead of decommiting use a free-list of available arenas first then do decommit if none found
-   hw_virtual_memory_decommit((byte*)memory - sizeof(size), array_size);
+   //hw_virtual_memory_decommit((byte*)memory - sizeof(size), slot_size);
 
    #if _DEBUG
-   printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), array_size);
+   //printf("Vulkan free: %p with %zu bytes\n", (byte*)memory - sizeof(size), slot_size);
    #endif
 }
 
@@ -1722,6 +1756,26 @@ bool vk_initialize(hw* hw)
 
    arena* a = context->app_storage;
    arena s = context->scratch;
+
+   #if 0
+   // l->head is m, m->next is n, n->next is null
+   list l = {};
+
+   list_node* n = list_push(a, &l);
+   n->data.slot_size = 1;
+   list_node* m = list_push(a, &l);
+   m->data.slot_size = 2;
+
+   assert(m->next == n);
+   assert(!n->next);
+
+   node_release(&l, m);
+   node_release(&l, n);
+
+   free_list_print(&l);
+
+   return false;
+   #endif
 
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;

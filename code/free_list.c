@@ -2,13 +2,13 @@
 
 static void list_node_release(list* l, list_node* n)
 {
-   printf("Releasing node to free-list: %p\n", n);
+   //printf("Releasing node to free-list: %p with size: %zu\n", n, n->data.slot_size);
 
    n->next = l->free_list;
    l->free_list = n;
 }
 
-static list_node* list_node_push(arena* a, list* l)
+static list_node* list_node_push(arena* a, list* l, size node_size)
 {
    list_node* result = 0;
 
@@ -21,7 +21,7 @@ static list_node* list_node_push(arena* a, list* l)
    }
 
    // how much to allocate in burst - align to 4k page size usually
-   const size list_count = PAGE_SIZE / sizeof(list_node);
+   const size list_count = PAGE_SIZE / node_size;
 
    // first time alloc or ran out
    if(!l->nodes || l->node_count == list_count)
@@ -30,11 +30,10 @@ static list_node* list_node_push(arena* a, list* l)
       l->nodes = push(a, list_node, list_count, arena_persistent_kind);
    }
 
-   // circular
    result = l->nodes + l->node_count;
-   result->next = l->nodes->next;
+   result->next = l->head;
+   l->head = result;
 
-   l->nodes->next = result;
    l->node_count++;
 
    return result;
@@ -56,16 +55,6 @@ static void free_list_print(list* l)
       n = n->next;
    }
 }
-
-#define list_push(a, l) (typeof(*(l.nodes)))list_node_push((a), (list*)(l))
-
-// TODO: cleanup sanity asserts
-#define list_free(l) \
-   static_assert(offsetof(typeof(*l), node_count) == offsetof(list, node_count)); \
-   static_assert(sizeof(typeof(*l)) == sizeof(list)); \
-   list_release((list*)l)
-
-#define node_release(l, n) list_node_release((list*)(l), (n))
 
 #if 0
 static void free_list_tests(arena* a)
