@@ -30,7 +30,7 @@ align_struct list
    size node_count;
 } list;
 
-#define list_push(a, l) list_node_push((a), (l), sizeof(*(l)->nodes))
+#define list_push(a, l) list_node_push((a), (l))
 
 // TODO: cleanup sanity asserts
 #define list_free(l) \

@@ -6,7 +6,7 @@ static void list_node_release(list* l, list_node* n)
    l->free_list->next = n;
 }
 
-static list_node* list_node_push(arena* a, list* l, size node_size)
+static list_node* list_node_push(arena* a, list* l)
 {
    list_node* result = 0;
 
@@ -19,13 +19,17 @@ static list_node* list_node_push(arena* a, list* l, size node_size)
    }
 
    // how much to allocate in burst - align to 4k page size usually
-   const size list_count = PAGE_SIZE / node_size;
+   const size list_count = PAGE_SIZE / sizeof(list_node);
 
    // first time alloc or ran out
-   if(!l->nodes || l->node_count == list_count)
-   {
-      l->node_count = 0;
+   if(!l->nodes)
       l->nodes = push(a, list_node, list_count, arena_persistent_kind);
+   else if((l->node_count % list_count) == 0)
+   {
+      // realloc new nodes
+      list_node* new_nodes = push(a, list_node, l->node_count + list_count, arena_persistent_kind);
+      memmove(new_nodes, l->nodes, l->node_count);
+      l->nodes = new_nodes;
    }
 
    // dummy free list header
@@ -58,11 +62,20 @@ static void free_list_print(list* l)
    }
 }
 
-#if 0
 static void free_list_tests(arena* a)
 {
-   // l->head is m, m->next is n, n->next is null
    list l = {0};
+
+   for(size i = 0; i < 64; ++i)
+   {
+      list_node* n = list_push(a, &l);
+      n->data.slot_size = i;
+   }
+   for(size i = 0; i < 64; ++i)
+   {
+      list_node* n = list_push(a, &l);
+      n->data.slot_size = i+1;
+   }
 
    list_node* n = list_push(a, &l); n->data.slot_size = 1;
    list_node* m = list_push(a, &l); m->data.slot_size = 2;
@@ -116,6 +129,5 @@ static void free_list_tests(arena* a)
 
    assert(implies(f, target.data.slot_size == f->data.slot_size));
 
-   return false;
+   list_release(&l);
 }
-#endif
