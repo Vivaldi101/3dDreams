@@ -13,7 +13,6 @@ align_struct list_node
 {
    struct list_node* next;
    vk_memory_slot data; // TODO: dummy for testing
-   bool is_free_list; // TOOD: Remove
 } list_node;
 
 //#define list_node(T) \

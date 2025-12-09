@@ -15,7 +15,6 @@ static list_node* list_node_push(arena* a, list* l, size node_size)
       // take first from free list
       result = l->free_list->next;
       l->free_list->next = l->free_list->next->next;
-      result->is_free_list = true;
       return result;
    }
 
@@ -29,6 +28,7 @@ static list_node* list_node_push(arena* a, list* l, size node_size)
       l->nodes = push(a, list_node, list_count, arena_persistent_kind);
    }
 
+   // dummy free list header
    if(!l->free_list)
       l->free_list = push(a, list_node);
 
@@ -61,16 +61,61 @@ static void free_list_print(list* l)
 #if 0
 static void free_list_tests(arena* a)
 {
-   list(size) l = {0};
+   // l->head is m, m->next is n, n->next is null
+   list l = {0};
 
-   for(size i = 0; i < 64; ++i)
+   list_node* n = list_push(a, &l); n->data.slot_size = 1;
+   list_node* m = list_push(a, &l); m->data.slot_size = 2;
+   list_node* q = list_push(a, &l); q->data.slot_size = 42;
+
+   node_release(&l, q);
+   node_release(&l, m);
+   node_release(&l, n);
+
+   free_list_print(&l);
+
+   size target_size = 42;
+   list_node target = {0};
+   target.data.slot_size = target_size;
+
+   list_node* f = l.free_list;
+   list_node* prev = 0;
+   while(f && (target.data.slot_size != f->data.slot_size))
    {
-      node_size_t* n = list_push(a, &l);
-
-      n->data = i;
+      prev = f;
+      f = f->next;
    }
 
-   list_free(&l);
+   assert(prev);
+   assert(prev != f);
+   assert(!f || (target.data.slot_size == f->data.slot_size));
 
+   if(f)
+   {
+      prev->next = f->next;
+      f->next = 0;
+      target = *f;
+      printf("Found slot size: %zu in %p\n", target.data.slot_size, f);
+   }
+
+   assert(implies(f, target.data.slot_size == f->data.slot_size));
+
+   target.data.slot_size = target_size;
+   f = l.free_list;
+
+   while(f && (target.data.slot_size != f->data.slot_size))
+      f = f->next;
+
+   assert(!f || (target.data.slot_size == f->data.slot_size));
+
+   if(f)
+   {
+      target = *f;
+      printf("Found slot size: %zu\n", target.data.slot_size);
+   }
+
+   assert(implies(f, target.data.slot_size == f->data.slot_size));
+
+   return false;
 }
 #endif

@@ -1757,25 +1757,6 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
-   #if 0
-   // l->head is m, m->next is n, n->next is null
-   list l = {};
-
-   list_node* n = list_push(a, &l);
-   n->data.slot_size = 1;
-   list_node* m = list_push(a, &l);
-   m->data.slot_size = 2;
-
-   assert(m->next == n);
-   assert(!n->next);
-
-   node_release(&l, m);
-   node_release(&l, n);
-
-   free_list_print(&l);
-
-   return false;
-   #endif
 
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;
