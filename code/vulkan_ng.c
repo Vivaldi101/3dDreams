@@ -39,23 +39,18 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
 
    void* result = 0;
 
-   // We could iterate the free list here instead too
-   if(n->data.slot_size == new_size)
+   if(n && n->data.slot_size == new_size)
    {
       printf("ACQUIRING node from free-list: %p with %zu bytes\n", n->data.memory, n->data.slot_size);
       return n->data.memory;
    }
-   else
-   {
-      allocator->free_list_head = n;
 
-      // + sizeof(size) for header size for realloc
-      result = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
+   // + sizeof(size) for header size for realloc
+   result = array_alloc((array*)&allocator->memory, 1, alignment, new_size + sizeof(size), 0);
 
-      assert(!((uptr)result & (alignment - 1)));
+   assert(!((uptr)result & (alignment - 1)));
 
-      *(size*)(byte*)result = new_size;
-   }
+   *(size*)(byte*)result = new_size;
 
    #if _DEBUG
    printf("Vulkan alloc: %p with %zu bytes\n", result, new_size);
@@ -100,15 +95,10 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    list* l = &allocator->slots;
    size slot_size = *(size*)((byte*)memory - sizeof(size));
 
-   if(allocator->free_list_head)
+   if(allocator->free_list)
    {
-      allocator->free_list_head->data.memory = memory;
-      allocator->free_list_head->data.slot_size = slot_size;
-
       printf("Vulkan release node to free-list: %p with %zu bytes\n", (byte*)memory - sizeof(size), slot_size);
-      node_release(l, allocator->free_list_head);
-
-      allocator->free_list_head = allocator->free_list_head->next;
+      //node_release(l, allocator->free_list_head);
    }
 
    // TODO: instead of decommiting use a free-list of available arenas first then do decommit if none found
@@ -1757,6 +1747,12 @@ bool vk_initialize(hw* hw)
    arena* a = context->app_storage;
    arena s = context->scratch;
 
+   #if 1
+
+   free_list_tests(a);
+
+   return false;
+   #endif
 
    global_allocator.memory.arena = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;

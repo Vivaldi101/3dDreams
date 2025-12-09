@@ -177,7 +177,7 @@ align_struct vk_allocator
 {
    VkAllocationCallbacks handle;
    list slots;
-   list_node* free_list_head;
+   list_node* free_list;
    array(byte) memory;
 } vk_allocator;
 

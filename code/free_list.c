@@ -1,9 +1,22 @@
 #include "free_list.h"
 
+static bool list_node_is_linked(list* l, list_node* n)
+{
+   for(size i = 0; i < l->node_count; ++i)
+      if(l->nodes + i == n)
+         return true;
+
+   return false;
+}
+
 static void list_node_release(list* l, list_node* n)
 {
+   assert(list_node_is_linked(l, n));
+
    n->next = l->free_list->next;
    l->free_list->next = n;
+
+   printf("Releasing free list node: %p\n", n);
 }
 
 static list_node* list_node_push(arena* a, list* l)
@@ -15,6 +28,8 @@ static list_node* list_node_push(arena* a, list* l)
       // take first from free list
       result = l->free_list->next;
       l->free_list->next = l->free_list->next->next;
+
+      printf("Reusing free list node: %p\n", result);
       return result;
    }
 
@@ -66,15 +81,16 @@ static void free_list_tests(arena* a)
 {
    list l = {0};
 
-   for(size i = 0; i < 64; ++i)
+   for(size i = 0; i < 2; ++i)
    {
-      list_node* n = list_push(a, &l);
-      n->data.slot_size = i;
-   }
-   for(size i = 0; i < 64; ++i)
-   {
-      list_node* n = list_push(a, &l);
-      n->data.slot_size = i+1;
+      list_node* n0 = list_push(a, &l);
+      n0->data.slot_size = 1280;
+
+      list_node* n1 = list_push(a, &l);
+      n1->data.slot_size = 128;
+
+      node_release(&l, n0);
+      node_release(&l, n1);
    }
 
    list_node* n = list_push(a, &l); n->data.slot_size = 1;
