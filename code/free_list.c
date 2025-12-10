@@ -19,10 +19,27 @@ static void list_node_release(list* l, list_node* n)
    printf("Releasing free list node: %p\n", n);
 }
 
+static list_node* free_list_node(list* l)
+{
+   assert(l->free_list && l->free_list->next);
+
+   list_node* result = 0;
+
+   // take first from free list
+   result = l->free_list->next;
+   l->free_list->next = l->free_list->next->next;
+
+   printf("Reusing free list node: %p\n", result);
+
+   return result;
+}
+
 static list_node* list_node_push(arena* a, list* l)
 {
    list_node* result = 0;
 
+   #if 0
+   // TODO: bool to take from free-list?
    if(l->free_list && l->free_list->next)
    {
       // take first from free list
@@ -32,6 +49,7 @@ static list_node* list_node_push(arena* a, list* l)
       printf("Reusing free list node: %p\n", result);
       return result;
    }
+   #endif
 
    // how much to allocate in burst - align to 4k page size usually
    const size list_count = PAGE_SIZE / sizeof(list_node);

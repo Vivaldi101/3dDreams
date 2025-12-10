@@ -5,22 +5,17 @@
 
 typedef struct vk_memory_slot
 {
-   void* memory;
    size slot_size;
+   void* memory;
 } vk_memory_slot;
 
 align_struct list_node
 {
+   vk_memory_slot data;
    struct list_node* next;
-   vk_memory_slot data; // TODO: dummy for testing
 } list_node;
 
-//#define list_node(T) \
-//__declspec(align(custom_alignment)) \
-//struct { struct list_node* next; T data; }
-
-// sanity check for generic list_node
-//static_assert(offsetof(list_node, data) == offsetof(list_node(int), data));
+static_assert(offsetof(vk_memory_slot, slot_size) == offsetof(list_node, data));
 
 align_struct list
 {

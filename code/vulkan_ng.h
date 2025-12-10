@@ -177,8 +177,7 @@ align_struct vk_allocator
 {
    VkAllocationCallbacks handle;
    list slots;
-   list_node* free_list;
-   array(byte) memory;
+   arena* a;
 } vk_allocator;
 
 typedef array(VkFramebuffer) framebuffers_array;
