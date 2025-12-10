@@ -1,22 +1,9 @@
 #include "free_list.h"
 
-static bool list_node_is_linked(list* l, list_node* n)
-{
-   for(size i = 0; i < l->node_count; ++i)
-      if(l->nodes + i == n)
-         return true;
-
-   return false;
-}
-
 static void list_node_release(list* l, list_node* n)
 {
-   assert(list_node_is_linked(l, n));
-
    n->next = l->free_list->next;
    l->free_list->next = n;
-
-   printf("Releasing free list node: %p\n", n);
 }
 
 static list_node* free_list_node(list* l)
@@ -34,54 +21,22 @@ static list_node* free_list_node(list* l)
    return result;
 }
 
-static list_node* list_node_push(arena* a, list* l)
+static list_node* list_node_push(arena* a, list* l, size node_memory_size)
 {
-   list_node* result = 0;
-
-   #if 0
-   // TODO: bool to take from free-list?
-   if(l->free_list && l->free_list->next)
-   {
-      // take first from free list
-      result = l->free_list->next;
-      l->free_list->next = l->free_list->next->next;
-
-      printf("Reusing free list node: %p\n", result);
-      return result;
-   }
-   #endif
-
-   // how much to allocate in burst - align to 4k page size usually
-   const size list_count = PAGE_SIZE / sizeof(list_node);
-
-   // first time alloc or ran out
-   if(!l->nodes)
-      l->nodes = push(a, list_node, list_count, arena_persistent_kind);
-   else if((l->node_count % list_count) == 0)
-   {
-      // realloc new nodes
-      list_node* new_nodes = push(a, list_node, l->node_count + list_count, arena_persistent_kind);
-      memmove(new_nodes, l->nodes, l->node_count);
-      l->nodes = new_nodes;
-   }
+   size alloc_size = sizeof(list_node) + node_memory_size;
+   list_node* result = alloc(a, alloc_size, __alignof(list_node), 1, list_persistent_kind);
 
    // dummy free list header
    if(!l->free_list)
-      l->free_list = push(a, list_node);
+      l->free_list = alloc(a, alloc_size, __alignof(list_node), 1, list_persistent_kind);
 
-   result = l->nodes + l->node_count;
    result->next = l->head;
    l->head = result;
 
-   l->node_count++;
+
+   result->data.memory = result + 1;
 
    return result;
-}
-
-static void list_release(list* l)
-{
-   for(size i = 0; i < l->node_count; ++i)
-      list_node_release(l, l->nodes + i);
 }
 
 static void free_list_print(list* l)
@@ -95,6 +50,7 @@ static void free_list_print(list* l)
    }
 }
 
+#if 0
 static void free_list_tests(arena* a)
 {
    list l = {0};
@@ -165,3 +121,4 @@ static void free_list_tests(arena* a)
 
    list_release(&l);
 }
+#endif

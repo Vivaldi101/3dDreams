@@ -20,7 +20,6 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
                                      VkSystemAllocationScope scope)
 {
    (void)scope;
-   (void)alignment;
 
    if(new_size == 0)
       return 0;
@@ -30,24 +29,35 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    arena* a = allocator->a;
    list* l = &allocator->slots;
 
+   #if 1
    // take from free-list
    if(l->free_list && l->free_list->next)
    {
-      list_node* n = free_list_node(l);
-
-      // TODO: atm just take the first free one if match
-      if(n->data.slot_size == new_size)
+      list_node* f = l->free_list;
+      list_node* prev = 0;
+      while(f && (f->data.slot_size != new_size))
       {
-         assert(n != l->free_list->next);
+         prev = f;
+         f = f->next;
+      }
+      if(f)
+      {
+         prev->next = f->next;
+         f->next = 0;
 
-         assert(implies(n->data.memory, !((uptr)((byte*)n->data.memory - sizeof(size)) & (alignment - 1))));
-         printf("ACQUIRING node from free-list: %p with %zu bytes\n", n->data.memory, n->data.slot_size);
-         return n->data.memory;
+         printf("ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
+
+         assert(!((uptr)f->data.memory & (alignment - 1)));
+         return (byte*)f->data.memory + sizeof(size);
       }
    }
+   #endif
 
    // + sizeof(size) for header size for realloc
-   void* memory = alloc(a, 1, alignment, new_size + sizeof(size), 0);
+   list_node* n = list_node_push(a, l, new_size + sizeof(size));
+
+   void* memory = n->data.memory;
+   n->data.slot_size = new_size;
 
    assert(!((uptr)memory & (alignment - 1)));
 
@@ -95,7 +105,38 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    vk_allocator* allocator = user_data;
    arena* a = allocator->a;
    list* l = &allocator->slots;
+
    size slot_size = *(size*)((byte*)memory - sizeof(size));
+   list_node* n = (list_node*)((byte*)memory - 0x48);
+
+   static_assert(0x48 == sizeof(list_node) + sizeof(size));
+   assert(slot_size == n->data.slot_size); // TODO: remove superflous slot_size from payload?
+
+   node_release(l, n);
+
+   #if 0
+   // take from free-list
+   if(l->free_list && l->free_list->next)
+   {
+      list_node* f = l->free_list;
+      list_node* prev = 0;
+      while(f && (f->data.slot_size != slot_size))
+      {
+         prev = f;
+         f = f->next;
+      }
+      if(f)
+      {
+         prev->next = f->next;
+         f->next = 0;
+
+         //assert(implies(f->data.memory, !((uptr)((byte*)f->data.memory - sizeof(size)) & (alignment - 1))));
+         printf("RE-ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
+         node_release(l, f);
+
+         return;
+      }
+   }
 
    list_node* n = list_push(a, l);
    n->data.memory = memory;
@@ -106,11 +147,10 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
 
    node_release(l, n);
 
-   // TODO: instead of decommiting use a free-list of available arenas first then do decommit if none found
-   //hw_virtual_memory_decommit((byte*)memory - sizeof(size), slot_size);
+   #endif
 
    #if _DEBUG
-   printf("Vulkan release node to free-list: %p with %zu bytes\n", (byte*)memory - sizeof(size), slot_size);
+   printf("RELEASING node to free-list: %p with %zu bytes\n", n, n->data.slot_size);
    #endif
 }
 

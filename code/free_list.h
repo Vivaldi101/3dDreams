@@ -22,10 +22,9 @@ align_struct list
    list_node* free_list;
    list_node* nodes;
    list_node* head;
-   size node_count;
 } list;
 
-#define list_push(a, l) list_node_push((a), (l))
+#define list_push(a, l, s) list_node_push((a), (l), sizeof(s))
 
 // TODO: cleanup sanity asserts
 #define list_free(l) \
