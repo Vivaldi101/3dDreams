@@ -29,7 +29,6 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    arena* a = allocator->a;
    list* l = &allocator->slots;
 
-   #if 1
    // take from free-list
    if(l->free_list && l->free_list->next)
    {
@@ -51,7 +50,6 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
          return (byte*)f->data.memory + sizeof(size);
       }
    }
-   #endif
 
    // + sizeof(size) for header size for realloc
    list_node* n = list_node_push(a, l, new_size + sizeof(size));
