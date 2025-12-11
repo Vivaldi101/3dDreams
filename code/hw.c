@@ -125,6 +125,11 @@ static void hw_frame_present(hw* hw)
 
 }
 
+static vec2 hw_window_size(hw* hw)
+{
+   return hw->renderer.window_size(&hw->renderer.window);
+}
+
 static void hw_frame_render(hw* hw)
 {
    void** renderers = hw->renderer.backends;
@@ -158,10 +163,11 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
 
    i64 begin = clock_query_counter();
    i64 fps_counter = begin;
-   for (;;)
+   while(!hw->quit)
    {
-      if (!hw->platform_loop())
-         break;
+      SwitchToFiber(hw->message_fiber); // run the fiber message pump
+
+      puts("Inside main fiber");
 
       hw->state.camera.viewplane_width = hw->renderer.window.width;
       hw->state.camera.viewplane_height = hw->renderer.window.height;

@@ -44,17 +44,28 @@ static void win32_window_title(hw* hw, s8 message, ...)
    va_end(args);
 }
 
-static bool win32_platform_loop()
+static vec2 win32_window_size(hw_window* window)
 {
-   MSG msg;
-   while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-   {
-      if(msg.message == WM_QUIT) return false;
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-   }
+   RECT rect;
+   GetClientRect(window->handle, &rect);
+   i32 width = rect.right - rect.left;
+   i32 height = rect.bottom - rect.top;
 
-   return true;
+   return (vec2){.x = (f32)width, .y = (f32)height};
+}
+
+static void CALLBACK win32_platform_loop(hw* hw)
+{
+   for(;;)
+   {
+      MSG msg;
+      while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+      {
+         TranslateMessage(&msg);
+         DispatchMessage(&msg);
+      }
+      SwitchToFiber(hw->main_fiber);
+   }
 }
 
 static WINDOWPLACEMENT global_window_placement = {sizeof(global_window_placement)};
@@ -80,9 +91,11 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          return 0;
       }
 
-      case WM_CLOSE:
-         PostQuitMessage(0);
-         return 0;
+      case WM_DESTROY:
+      win32_hw->quit = true;
+      win32_hw->renderer.window.width = 0;
+      win32_hw->renderer.window.height = 0;
+      return 0;
 
       case WM_ERASEBKGND:
          return 1; // prevent Windows from clearing the background with white
@@ -120,6 +133,22 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
          return 0;
       }
+
+      case WM_TIMER:
+      if(win32_hw)
+      {
+         assert(win32_hw->main_fiber);
+         SwitchToFiber(win32_hw->main_fiber);
+      }
+      break;
+
+      case WM_ENTERSIZEMOVE:
+      SetTimer(hwnd, 0, 1, 0);
+      break;
+
+      case WM_EXITSIZEMOVE:
+      KillTimer(hwnd, 0);
+      break;
 
       case WM_MOUSEWHEEL:
       {
@@ -460,6 +489,7 @@ int main(int argc, char** argv)
 
    hw.renderer.window.open = win32_window_open;
    hw.renderer.window.close = win32_window_close;
+   hw.renderer.window_size = win32_window_size;
    hw.renderer.window_surface_create = window_surface_create;
 
    hw.timer.sleep = win32_sleep;
@@ -470,6 +500,12 @@ int main(int argc, char** argv)
    hw.platform_loop = win32_platform_loop;
 
    hw.window_title_set = win32_window_title;
+
+   hw.main_fiber = ConvertThreadToFiber(0);
+   hw.message_fiber = CreateFiber(0, hw.platform_loop, &hw);
+
+   assert(hw.main_fiber);
+   assert(hw.message_fiber);
 
    if(argc < 2)
    {

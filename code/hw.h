@@ -52,6 +52,7 @@ align_struct hw_renderer
    void(*gpu_log)(hw* hw);
 
    hw_result (*window_surface_create)(struct vk_allocator* allocator, void* instance, void* window_handle);
+   vec2 (*window_size)(hw_window* window);
    hw_window window;
 
    // should be inside app.c
@@ -77,8 +78,14 @@ align_struct hw
    arena scratch;
    hw_timer timer;
    app_state state;
+   void* main_fiber;
+   void* message_fiber;
+   bool quit;
+   
    void (*window_title_set)(struct hw* hw, s8 message, ...);
-   bool(*platform_loop)();
+   #ifdef _WIN32
+   void (CALLBACK *platform_loop)(struct hw* hw);
+   #endif
 } hw;
 
 bool hw_window_open(hw* hw, const char *title, int x, int y, int width, int height);

@@ -838,8 +838,6 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
    vk_context* context = renderer->backends[renderer_index];
    vk_device* devices = &context->devices;
 
-   vkDeviceWaitIdle(devices->logical);
-
    vk_swapchain_images* images = &context->images;
    framebuffers_array* framebuffers = &context->framebuffers;
    vk_swapchain_surface* swapchain = &context->swapchain;
@@ -865,8 +863,6 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
    renderer->mvp = mvp;
 
    vkDeviceWaitIdle(devices->logical);
-
-   //printf("Viewport resized: [%u %u]\n", width, height);
 }
 
 static hw_result vk_query_pool_create(vk_device* devices, size query_pool_size)
