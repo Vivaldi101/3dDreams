@@ -862,6 +862,8 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
    mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    renderer->mvp = mvp;
 
+   printf("Window size: [%ux%u]\n", width, height);
+
    vkDeviceWaitIdle(devices->logical);
 }
 
