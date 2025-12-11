@@ -341,7 +341,7 @@ static VkFormat vk_swapchain_format(arena scratch, VkPhysicalDevice physical_dev
    return formats.data[0].format;
 }
 
-static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface, u32 width, u32 height)
 {
    vk_swapchain_surface result = {0};
 
@@ -360,13 +360,25 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, co
 
    VkSwapchainKHR swapchain = 0;
 
+   VkSurfaceCapabilitiesKHR caps;
+   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(devices->physical, surface, &caps);
+
+   VkExtent2D extent = {0};
+
+   if(caps.currentExtent.width != UINT32_MAX)
+      extent = caps.currentExtent;
+   else
+   {
+      extent.width = clamp(width, caps.minImageExtent.width, caps.maxImageExtent.width);
+      extent.height = clamp(height, caps.minImageExtent.height, caps.maxImageExtent.height);
+   }
+
    VkSwapchainCreateInfoKHR swapchain_info = {vk_info_khr(SWAPCHAIN)};
    swapchain_info.surface = surface;
    swapchain_info.minImageCount = image_count;
    swapchain_info.imageFormat = vk_swapchain_format(scratch, devices->physical, surface);
    swapchain_info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-   swapchain_info.imageExtent.width = surface_caps.currentExtent.width;
-   swapchain_info.imageExtent.height = surface_caps.currentExtent.height;
+   swapchain_info.imageExtent = extent;
    swapchain_info.imageArrayLayers = 1;
    swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
    swapchain_info.queueFamilyIndexCount = 1;
@@ -384,8 +396,8 @@ static vk_swapchain_surface vk_window_swapchain_surface_create(arena scratch, co
    result.format = swapchain_info.imageFormat;
    result.handle = swapchain;
    result.image_count = image_count;
-   result.image_width = surface_caps.currentExtent.width;
-   result.image_height = surface_caps.currentExtent.height;
+   result.image_width = extent.width;
+   result.image_height = extent.height;
 
    return result;
 }
@@ -611,9 +623,9 @@ static hw_result vk_semaphore_create(vk_device* devices)
    return (hw_result){sema};
 }
 
-static vk_swapchain_surface vk_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface)
+static vk_swapchain_surface vk_swapchain_surface_create(arena scratch, const vk_device* devices, VkSurfaceKHR surface, u32 width, u32 height)
 {
-   return vk_window_swapchain_surface_create(scratch, devices, surface);
+   return vk_window_swapchain_surface_create(scratch, devices, surface, width, height);
 }
 
 static hw_result vk_command_buffer_create(vk_cmd* cmd, vk_device* devices)
@@ -820,16 +832,6 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
    if(width == 0 || height == 0)
       return;
 
-   mvp_transform mvp = {0};
-   const f32 ar = (f32)width / height;
-
-   mvp.n = 0.01f;
-   mvp.f = 10000.0f;
-   mvp.ar = ar;
-
-   mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
-   renderer->mvp = mvp;
-
    u32 renderer_index = renderer->renderer_index;
    assert(renderer_index < RENDERER_COUNT);
 
@@ -849,10 +851,22 @@ static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
 
    VkRenderPass renderpass = context->renderpass;
 
-   context->swapchain = vk_swapchain_surface_create(s, devices, surface);
+   context->swapchain = vk_swapchain_surface_create(s, devices, surface, width, height);
    vk_swapchain_update(s, devices, images, swapchain, framebuffers, renderpass);
 
-   printf("Viewport resized: [%u %u]\n", width, height);
+   mvp_transform mvp = {0};
+   const f32 ar = (f32)swapchain->image_width / swapchain->image_height;
+
+   mvp.n = 0.01f;
+   mvp.f = 10000.0f;
+   mvp.ar = ar;
+
+   mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
+   renderer->mvp = mvp;
+
+   vkDeviceWaitIdle(devices->logical);
+
+   //printf("Viewport resized: [%u %u]\n", width, height);
 }
 
 static hw_result vk_query_pool_create(vk_device* devices, size query_pool_size)
@@ -1005,10 +1019,10 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    context->image_index = image_index;
 
-   if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
+   if(next_image_result == VK_SUBOPTIMAL_KHR || next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
       vk_resize(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
 
-   if(next_image_result != VK_SUBOPTIMAL_KHR && next_image_result != VK_SUCCESS)
+   if(next_image_result != VK_SUCCESS)
       return;
 
    vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
@@ -1826,7 +1840,7 @@ bool vk_initialize(hw* hw)
       return false;
    }
    // TODO: break this apart so that handle creation is separate
-   context->swapchain = vk_swapchain_surface_create(s, devices, *surface);
+   context->swapchain = vk_swapchain_surface_create(s, devices, *surface, hw->renderer.window.width, hw->renderer.window.height);
 
    if(!(context->renderpass = vk_renderpass_create(devices, swapchain).h))
    {
