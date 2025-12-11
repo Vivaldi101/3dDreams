@@ -20,6 +20,7 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
                                      VkSystemAllocationScope scope)
 {
    (void)scope;
+   (void)alignment;
 
    if(new_size == 0)
       return 0;
@@ -44,7 +45,9 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
          prev->next = f->next;
          f->next = 0;
 
+         #if _DEBUG
          printf("ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
+         #endif
 
          assert(!((uptr)f->data.memory & (alignment - 1)));
          return (byte*)f->data.memory + sizeof(size);
@@ -101,51 +104,11 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
       return;
 
    vk_allocator* allocator = user_data;
-   arena* a = allocator->a;
    list* l = &allocator->slots;
 
-   size slot_size = *(size*)((byte*)memory - sizeof(size));
-   list_node* n = (list_node*)((byte*)memory - 0x48);
-
-   static_assert(0x48 == sizeof(list_node) + sizeof(size));
-   assert(slot_size == n->data.slot_size); // TODO: remove superflous slot_size from payload?
+   list_node* n = (list_node*)((byte*)memory - (sizeof(list_node) + sizeof(size)));
 
    node_release(l, n);
-
-   #if 0
-   // take from free-list
-   if(l->free_list && l->free_list->next)
-   {
-      list_node* f = l->free_list;
-      list_node* prev = 0;
-      while(f && (f->data.slot_size != slot_size))
-      {
-         prev = f;
-         f = f->next;
-      }
-      if(f)
-      {
-         prev->next = f->next;
-         f->next = 0;
-
-         //assert(implies(f->data.memory, !((uptr)((byte*)f->data.memory - sizeof(size)) & (alignment - 1))));
-         printf("RE-ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
-         node_release(l, f);
-
-         return;
-      }
-   }
-
-   list_node* n = list_push(a, l);
-   n->data.memory = memory;
-   n->data.slot_size = slot_size;
-
-   assert(n->data.slot_size > 0);
-   assert(n->data.memory);
-
-   node_release(l, n);
-
-   #endif
 
    #if _DEBUG
    printf("RELEASING node to free-list: %p with %zu bytes\n", n, n->data.slot_size);
@@ -1789,11 +1752,6 @@ bool vk_initialize(hw* hw)
 
    arena* a = context->app_storage;
    arena s = context->scratch;
-
-   #if 0
-   free_list_tests(a);
-   return false;
-   #endif
 
    global_allocator.a = context->vulkan_storage;
    global_allocator.handle.pUserData = &global_allocator;

@@ -16,8 +16,6 @@ static list_node* free_list_node(list* l)
    result = l->free_list->next;
    l->free_list->next = l->free_list->next->next;
 
-   printf("Reusing free list node: %p\n", result);
-
    return result;
 }
 
@@ -44,10 +42,7 @@ static void free_list_print(list* l)
    list_node* n = l->free_list->next;
    
    while(n)
-   {
-      printf("Free-list node: %p\n", n);
       n = n->next;
-   }
 }
 
 #if 0
