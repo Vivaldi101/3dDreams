@@ -167,7 +167,13 @@ void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_s
    {
       SwitchToFiber(hw->message_fiber); // run the fiber message pump
 
-      puts("Inside main fiber");
+      if(hw->renderer.window.resize)
+      {
+         hw->renderer.frame_resize(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
+         printf("New window size: [%ux%u]\n", hw->renderer.window.width, hw->renderer.window.height);
+      }
+
+      //continue;
 
       hw->state.camera.viewplane_width = hw->renderer.window.width;
       hw->state.camera.viewplane_height = hw->renderer.window.height;

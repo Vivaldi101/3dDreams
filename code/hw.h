@@ -33,6 +33,7 @@ align_struct hw_window
    void (*close)(struct hw_window window);
    u32 width, height;
    void* handle;
+   bool resize;
 } hw_window;
 
 typedef union hw_result
@@ -80,6 +81,7 @@ align_struct hw
    app_state state;
    void* main_fiber;
    void* message_fiber;
+
    bool quit;
    
    void (*window_title_set)(struct hw* hw, s8 message, ...);

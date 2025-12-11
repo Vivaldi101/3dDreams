@@ -44,16 +44,6 @@ static void win32_window_title(hw* hw, s8 message, ...)
    va_end(args);
 }
 
-static vec2 win32_window_size(hw_window* window)
-{
-   RECT rect;
-   GetClientRect(window->handle, &rect);
-   i32 width = rect.right - rect.left;
-   i32 height = rect.bottom - rect.top;
-
-   return (vec2){.x = (f32)width, .y = (f32)height};
-}
-
 static void CALLBACK win32_platform_loop(hw* hw)
 {
    for(;;)
@@ -68,33 +58,60 @@ static void CALLBACK win32_platform_loop(hw* hw)
    }
 }
 
+static vec2 win32_window_size(hw_window* window)
+{
+   RECT rect;
+   GetClientRect(window->handle, &rect);
+   i32 width = rect.right - rect.left;
+   i32 height = rect.bottom - rect.top;
+
+   return (vec2){.x = (f32)width, .y = (f32)height};
+}
+
 static WINDOWPLACEMENT global_window_placement = {sizeof(global_window_placement)};
 
-static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam) {
+static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPARAM lparam)
+{
+   LRESULT result = 0;
+
    hw* win32_hw = (hw*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
    switch(umsg)
    {
-      case WM_CREATE:
+      case WM_TIMER:
       {
-         CREATESTRUCT* pcreate = (CREATESTRUCT*)lparam;
-         int width = pcreate->cx;
-         int height = pcreate->cy;
+         assert(win32_hw);
+         assert(win32_hw->main_fiber);
 
-         if(win32_hw)
-         {
-            win32_hw->renderer.window.width = width;
-            win32_hw->renderer.window.height = height;
-            win32_hw->renderer.frame_resize(&win32_hw->renderer, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
-         }
+         //vec2 window_size = win32_window_size(&win32_hw->renderer.window);
 
-         return 0;
+         //static u32 counter = 0;
+         //printf("Counter: %u\n", counter++);
+
+         SwitchToFiber(win32_hw->main_fiber);
       }
+      break;
+
+      case WM_ENTERMENULOOP:
+      case WM_ENTERSIZEMOVE:
+      {
+         SetTimer(hwnd, 1, 1, 0);
+      }
+      break;
+
+      case WM_EXITMENULOOP:
+      case WM_EXITSIZEMOVE:
+      {
+         KillTimer(hwnd, 1);
+      }
+      break;
 
       case WM_DESTROY:
-      win32_hw->quit = true;
-      win32_hw->renderer.window.width = 0;
-      win32_hw->renderer.window.height = 0;
+      {
+         win32_hw->quit = true;
+         win32_hw->renderer.window.width = 0;
+         win32_hw->renderer.window.height = 0;
+      }
       return 0;
 
       case WM_ERASEBKGND:
@@ -105,17 +122,6 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          PAINTSTRUCT ps;
          BeginPaint(hwnd, &ps);
          EndPaint(hwnd, &ps);
-         return 0;
-      }
-
-      case WM_SIZE:
-      {
-         if(win32_hw)
-         {
-            win32_hw->renderer.window.width = LOWORD(lparam);
-            win32_hw->renderer.window.height = HIWORD(lparam);
-            win32_hw->renderer.frame_resize(&win32_hw->renderer, win32_hw->renderer.window.width, win32_hw->renderer.window.height);
-         }
          return 0;
       }
 
@@ -133,22 +139,16 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
 
          return 0;
       }
-
-      case WM_TIMER:
-      if(win32_hw)
+      case WM_SIZE:
       {
-         assert(win32_hw->main_fiber);
-         SwitchToFiber(win32_hw->main_fiber);
+         if(win32_hw)
+         {
+            win32_hw->renderer.window.width = LOWORD(lparam);
+            win32_hw->renderer.window.height = HIWORD(lparam);
+            win32_hw->renderer.window.resize = true;
+         }
+         return 0;
       }
-      break;
-
-      case WM_ENTERSIZEMOVE:
-      SetTimer(hwnd, 0, 1, 0);
-      break;
-
-      case WM_EXITSIZEMOVE:
-      KillTimer(hwnd, 0);
-      break;
 
       case WM_MOUSEWHEEL:
       {
@@ -246,9 +246,12 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          return 0;
       }
       break;
+
+      default:
+      result = DefWindowProc(hwnd, umsg, wparam, lparam);
    }
 
-   return DefWindowProc(hwnd, umsg, wparam, lparam);
+   return result;
 }
 
 static HWND win32_window_open(const char* title, int x, int y, int width, int height)
@@ -449,6 +452,8 @@ static void arena_test_result(arena* a, size sz)
 
 int main(int argc, char** argv)
 {
+   timeBeginPeriod(1);
+
    hw hw = {0};
 
    hw_virtual_memory_init();
@@ -547,6 +552,8 @@ int main(int argc, char** argv)
    assert(arena_left(&scratch_storage) >= 0);
 
    global_free(program_memory, 0, MEM_RELEASE);
+
+   timeEndPeriod(1);
 
    return 0;
 }
