@@ -827,7 +827,7 @@ static void gpu_log(hw* hw)
                        hw->state.frame_delta_in_seconds * ms, gpu_delta / us);
 }
 
-static void vk_resize(hw_renderer* renderer, u32 width, u32 height)
+static void vk_resize_swapchain(hw_renderer* renderer, u32 width, u32 height)
 {
    if(width == 0 || height == 0)
       return;
@@ -999,7 +999,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
+      vk_resize_swapchain(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
 
    if(present_result != VK_SUCCESS)
       return;
@@ -1018,7 +1018,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    context->image_index = image_index;
 
    if(next_image_result == VK_SUBOPTIMAL_KHR || next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
+      vk_resize_swapchain(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
 
    //if(next_image_result != VK_SUCCESS)
       //return;
@@ -1754,7 +1754,7 @@ bool vk_initialize(hw* hw)
    hw->renderer.backends[VULKAN_RENDERER_INDEX] = context;
    hw->renderer.frame_render = vk_render;
    hw->renderer.frame_present = vk_present;
-   hw->renderer.frame_resize = vk_resize;
+   hw->renderer.frame_resize = vk_resize_swapchain;
    hw->renderer.gpu_log = gpu_log;
    hw->renderer.renderer_index = VULKAN_RENDERER_INDEX;
 
