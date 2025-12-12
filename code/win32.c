@@ -512,13 +512,6 @@ int main(int argc, char** argv)
    assert(hw.main_fiber);
    assert(hw.message_fiber);
 
-   if(argc < 2)
-   {
-      printf("Place the gltf asset in assets/gltf directory and ");
-      printf("use like so: program_name.exe <gltf-dir/gltf-name.gltf>");
-      return 0;
-   }
-
    // TOOD: Remove
    // arena tests
    #if 0
@@ -543,7 +536,20 @@ int main(int argc, char** argv)
 
    #else
 
-   app_start(&hw, s8(argv[1]));
+   s8 asset_file = {0};
+
+   if(argc < 2)
+   {
+      printf("Place the gltf asset in assets/gltf directory and ");
+      printf("use like so: program_name.exe <gltf-dir/gltf-name.gltf>\n");
+
+      asset_file = s8("sponza/sponza.gltf"); // default gltf scene
+      printf("Launching with the default gltf scene: %s\n", s8_data(asset_file));
+   }
+   else
+      asset_file = s8(argv[1]);
+
+   app_start(&hw, asset_file);
 
    #endif
 
