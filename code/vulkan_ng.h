@@ -33,7 +33,6 @@
 #define vk_info_begin(i) VK_STRUCTURE_TYPE_##i##_BEGIN_INFO
 #define vk_info_end(i) VK_STRUCTURE_TYPE_##i##_END_INFO
 
-// currently we just assert for lot of the commands - we should expand the contract to return null handle on failure and just use this to assert invariants on vulkan state?
 #ifdef _DEBUG
 #define vk_assert(v) \
         do { \
