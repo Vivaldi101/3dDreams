@@ -46,7 +46,7 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
          f->next = 0;
 
          #if _DEBUG
-         //printf("ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
+         printf("ACQUIRING node from free-list: %p with %zu bytes\n", f, f->data.slot_size);
          #endif
 
          assert(!((uptr)f->data.memory & (alignment - 1)));
@@ -65,7 +65,7 @@ static void* VKAPI_PTR vk_allocation(void* user_data,
    *(size*)(byte*)memory = new_size;
 
    #if _DEBUG
-   //printf("Vulkan alloc: %p with %zu bytes\n", memory, new_size);
+   printf("Vulkan alloc: %p with %zu bytes\n", memory, new_size);
    #endif
 
    return (byte*)memory + sizeof(size);
@@ -92,7 +92,7 @@ static void* VKAPI_PTR vk_reallocation(void* user_data,
    memmove(result, original, old_size);
 
    #if _DEBUG
-   //printf("Vulkan re-alloc: %p with %zu bytes\n", result, new_size);
+   printf("Vulkan re-alloc: %p with %zu bytes\n", result, new_size);
    #endif
 
    return result;
@@ -111,7 +111,7 @@ static void VKAPI_PTR vk_free(void* user_data, void* memory)
    node_release(l, n);
 
    #if _DEBUG
-   //printf("RELEASING node to free-list: %p with %zu bytes\n", n, n->data.slot_size);
+   printf("RELEASING node to free-list: %p with %zu bytes\n", n, n->data.slot_size);
    #endif
 }
 
