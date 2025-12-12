@@ -1001,12 +1001,10 @@ static void vk_present(hw* hw, vk_context* context)
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
       vk_resize_swapchain(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
 
-   if(present_result != VK_SUCCESS)
-      return;
-
    // wait until all queue ops are done
    // essentialy run gpu and cpu in sync (driver decides this)
    // TODO: This is bad way to do sync but who cares for now
+   // TODO: Use fences really
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }
 
@@ -1017,11 +1015,19 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
 
    context->image_index = image_index;
 
-   if(next_image_result == VK_SUBOPTIMAL_KHR || next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
+   if(next_image_result == VK_ERROR_OUT_OF_DATE_KHR)
+   {
+      // TODO: recycle semaphores with free-list
+      vkDestroySemaphore(context->devices.logical, context->image_ready_semaphore, &global_allocator.handle);
+      context->image_ready_semaphore = vk_semaphore_create(&context->devices).h;
+
       vk_resize_swapchain(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
 
-   //if(next_image_result != VK_SUCCESS)
-      //return;
+      return; // drop this frame
+   }
+
+   if(next_image_result == VK_SUBOPTIMAL_KHR)
+      vk_resize_swapchain(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
 
    vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
 
