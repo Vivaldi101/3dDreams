@@ -83,11 +83,6 @@ static LRESULT CALLBACK win32_win_proc(HWND hwnd, UINT umsg, WPARAM wparam, LPAR
          assert(win32_hw);
          assert(win32_hw->main_fiber);
 
-         //vec2 window_size = win32_window_size(&win32_hw->renderer.window);
-
-         //static u32 counter = 0;
-         //printf("Counter: %u\n", counter++);
-
          SwitchToFiber(win32_hw->main_fiber);
       }
       break;
