@@ -150,7 +150,7 @@ static void hw_log(hw* hw, s8 message, ...)
    hw->window_title_set(hw, message);
 }
 
-void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_state* state), void (*app_input_function)(struct app_state* state))
+void hw_event_loop_start(hw* hw, void (*app_frame_function)(arena scratch, app_state* state), void (*app_input_function)(app_state* state))
 {
    clock_query_frequency();
 

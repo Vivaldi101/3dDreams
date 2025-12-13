@@ -855,16 +855,6 @@ static void vk_resize_swapchain(hw_renderer* renderer, u32 width, u32 height)
    context->swapchain = vk_swapchain_surface_create(s, devices, surface, width, height);
    vk_swapchain_update(s, devices, images, swapchain, framebuffers, renderpass);
 
-   mvp_transform mvp = {0};
-   const f32 ar = (f32)swapchain->image_width / swapchain->image_height;
-
-   mvp.n = 0.01f;
-   mvp.f = 10000.0f;
-   mvp.ar = ar;
-
-   mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
-   renderer->mvp = mvp;
-
    printf("Window size: [%ux%u]\n", width, height);
 }
 
@@ -1048,22 +1038,24 @@ static void vk_render(hw_renderer* renderer, vk_context* context, app_state* sta
    vkCmdResetQueryPool(context->cmd.buffer, context->query_pool, 0, context->query_pool_size);
    vkCmdWriteTimestamp(context->cmd.buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
-   mvp_transform mvp = renderer->mvp;
-   assert(mvp.n > 0.0f);
-   assert(mvp.ar != 0.0f);
+   mvp_transform mvp = {0};
+   const f32 ar = (f32)context->swapchain.image_width / context->swapchain.image_height;
 
    // world space origin
    vec3 eye = state->camera.eye;
    vec3 dir = state->camera.dir;
    vec3_normalize(dir);
 
+   mvp.n = 0.01f;
+   mvp.f = 10000.0f;
+   mvp.ar = ar;
+   mvp.projection = mat4_perspective(ar, 75.0f, mvp.n, mvp.f);
    mvp.view = mat4_view(eye, dir);
 
-   //mvp.world = mat4_identity();
+   assert(mvp.n > 0.0f);
+   assert(mvp.ar != 0.0f);
 
    VkClearValue clear[2] = {0};
-   //clear[0].color = (VkClearColorValue){68.f / c, 10.f / c, 36.f / c, 1.0f};
-   //clear[0].color = (VkClearColorValue){1.f, 1.f, 1.f};
    clear[0].color = (VkClearColorValue){0.19f, 0.19f, 0.19f};
    clear[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
 

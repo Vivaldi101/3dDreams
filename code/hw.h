@@ -31,7 +31,8 @@ align_struct hw_window
 {
    void*(*open)(const char* title, int x, int y, int width, int height);
    void (*close)(struct hw_window window);
-   u32 width, height;
+   u32 width;
+   u32 height;
    void* handle;
    bool resize;
 } hw_window;
@@ -55,10 +56,6 @@ align_struct hw_renderer
    hw_result (*window_surface_create)(struct vk_allocator* allocator, void* instance, void* window_handle);
    vec2 (*window_size)(hw_window* window);
    hw_window window;
-
-   // should be inside app.c
-   mvp_transform mvp;
-   // should be inside app.c
 
    u32 renderer_index;
 } hw_renderer;
