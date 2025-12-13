@@ -47,8 +47,8 @@ typedef union hw_result
 align_struct hw_renderer
 {
    void* backends[RENDERER_COUNT];
-   void(*frame_render)(struct hw* hw, void* context, app_state* state);
-   void(*frame_present)(struct hw* hw, void* context);
+   void(*frame_render)(struct hw_renderer* renderer, void* context, app_state* state);
+   void(*frame_present)(struct hw_renderer* renderer, void* context);
    void(*frame_resize)(struct hw_renderer* renderer, u32 width, u32 height);
    void(*gpu_log)(hw* hw);
 

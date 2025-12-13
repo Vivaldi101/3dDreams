@@ -121,7 +121,7 @@ static void hw_frame_present(hw* hw)
       return;
 
    assert(renderer_index < RENDERER_COUNT);
-   hw->renderer.frame_present(hw, renderers[renderer_index]);
+   hw->renderer.frame_present(&hw->renderer, renderers[renderer_index]);
 
 }
 
@@ -142,7 +142,7 @@ static void hw_frame_render(hw* hw)
       return;
 
    assert(renderer_index < RENDERER_COUNT);
-   hw->renderer.frame_render(hw, renderers[renderer_index], &hw->state);
+   hw->renderer.frame_render(&hw->renderer, renderers[renderer_index], &hw->state);
 }
 
 static void hw_log(hw* hw, s8 message, ...)

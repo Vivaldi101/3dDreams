@@ -988,7 +988,7 @@ static void cmd_bind_descriptor_set(VkCommandBuffer command_buffer, VkPipelineLa
    );
 }
 
-static void vk_present(hw* hw, vk_context* context)
+static void vk_present(hw_renderer* renderer, vk_context* context)
 {
    VkPresentInfoKHR present_info = {VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
    present_info.swapchainCount = 1;
@@ -1000,7 +1000,7 @@ static void vk_present(hw* hw, vk_context* context)
    VkResult present_result = vkQueuePresentKHR(context->graphics_queue, &present_info);
 
    if(present_result == VK_SUBOPTIMAL_KHR || present_result == VK_ERROR_OUT_OF_DATE_KHR)
-      vk_resize_swapchain(&hw->renderer, context->swapchain.image_width, context->swapchain.image_height);
+      vk_resize_swapchain(renderer, context->swapchain.image_width, context->swapchain.image_height);
 
    // wait until all queue ops are done
    // essentialy run gpu and cpu in sync (driver decides this)
@@ -1009,7 +1009,7 @@ static void vk_present(hw* hw, vk_context* context)
    vk_assert(vkDeviceWaitIdle(context->devices.logical));
 }
 
-static void vk_render(hw* hw, vk_context* context, app_state* state)
+static void vk_render(hw_renderer* renderer, vk_context* context, app_state* state)
 {
    u32 image_index = 0;
    VkResult next_image_result = vkAcquireNextImageKHR(context->devices.logical, context->swapchain.handle, UINT64_MAX, context->image_ready_semaphore, VK_NULL_HANDLE, &image_index);
@@ -1022,13 +1022,13 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
       vkDestroySemaphore(context->devices.logical, context->image_ready_semaphore, &global_allocator.handle);
       context->image_ready_semaphore = vk_semaphore_create(&context->devices).h;
 
-      vk_resize_swapchain(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
+      vk_resize_swapchain(renderer, renderer->window.width, renderer->window.height);
 
       return; // drop this frame
    }
 
    if(next_image_result == VK_SUBOPTIMAL_KHR)
-      vk_resize_swapchain(&hw->renderer, hw->renderer.window.width, hw->renderer.window.height);
+      vk_resize_swapchain(renderer, renderer->window.width, renderer->window.height);
 
    vk_assert(vkResetCommandPool(context->devices.logical, context->cmd.pool, 0));
 
@@ -1048,7 +1048,7 @@ static void vk_render(hw* hw, vk_context* context, app_state* state)
    vkCmdResetQueryPool(context->cmd.buffer, context->query_pool, 0, context->query_pool_size);
    vkCmdWriteTimestamp(context->cmd.buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, context->query_pool, 0);
 
-   mvp_transform mvp = hw->renderer.mvp;
+   mvp_transform mvp = renderer->mvp;
    assert(mvp.n > 0.0f);
    assert(mvp.ar != 0.0f);
 
